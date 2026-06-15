@@ -9,6 +9,10 @@ export interface Category {
 export interface ProductOptionChoice {
   label: string;
   value: string;
+  /** Optional variant thumbnail configured by the shop admin. */
+  imageUrl?: string;
+  /** Preview background used when variant photography is not available yet. */
+  swatchColor?: string;
 }
 
 export interface ProductOption {

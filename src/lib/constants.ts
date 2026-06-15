@@ -4,7 +4,7 @@ import type {
   PaymentStatus,
 } from "@/types/order";
 
-export const SHOP_NAME = "Pon Pon";
+export const SHOP_NAME = "PonPon Official";
 export const SHOP_TAGLINE = "ช้อปง่าย สั่งไว ผ่าน LINE";
 
 /** Flat shipping fee used across the demo (THB). */

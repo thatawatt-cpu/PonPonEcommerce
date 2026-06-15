@@ -50,10 +50,14 @@ export function LiffProfileCard({
           </p>
         </div>
       </div>
-      <p className="mt-3 rounded-lg bg-brand-soft px-3 py-2 text-xs text-brand">
-        * นี่คือข้อมูลโปรไฟล์ LIFF จำลอง (mock) ยังไม่ได้เชื่อมต่อ LINE
-        จริง
-      </p>
+      <div className="mt-3 flex items-center gap-2">
+        <span className="rounded-full bg-brand-soft px-2.5 py-1 text-[10px] font-extrabold text-brand">
+          โหมดทดลอง
+        </span>
+        <p className="text-[11px] font-medium text-ink-soft">
+          ข้อมูล LINE จำลองสำหรับทดสอบหน้าร้าน
+        </p>
+      </div>
     </Card>
   );
 }

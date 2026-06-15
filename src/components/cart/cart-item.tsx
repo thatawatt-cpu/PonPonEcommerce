@@ -4,6 +4,7 @@ import { Trash2 } from "lucide-react";
 import { ProductImage } from "@/components/product/product-image";
 import { QuantitySelector } from "@/components/product/quantity-selector";
 import { Price } from "@/components/ui/price";
+import { getProductById } from "@/features/products/product-service";
 import { useCartStore } from "@/store/cart-store";
 import type { CartItem as CartItemType } from "@/types/cart";
 
@@ -15,33 +16,48 @@ export function CartItem({ item }: { item: CartItemType }) {
   const optionText = item.selectedOptions
     ? Object.values(item.selectedOptions).join(" · ")
     : null;
+  const currentProduct = getProductById(item.productId);
+  const displayName = currentProduct?.name ?? item.name;
+  const displayImageUrl = currentProduct?.imageUrl ?? item.imageUrl;
+  const displayEmoji = currentProduct?.emoji ?? item.emoji;
+  const unitPrice = currentProduct?.price ?? item.price;
 
   return (
-    <div className="flex gap-3 py-3">
+    <div className="flex gap-3 rounded-3xl bg-[#fff8f6] p-2.5 ring-1 ring-black/[0.03]">
       <ProductImage
-        emoji={item.emoji}
+        imageUrl={displayImageUrl}
+        emoji={displayEmoji}
         size="sm"
-        className="h-20 w-20 shrink-0 rounded-xl"
+        className="h-[5.5rem] w-[5.5rem] shrink-0 rounded-2xl shadow-sm"
       />
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex items-start justify-between gap-2">
-          <h3 className="line-clamp-2 text-sm font-semibold text-ink">
-            {item.name}
-          </h3>
+          <div className="min-w-0">
+            <h3 className="line-clamp-2 text-sm font-extrabold leading-snug text-ink">
+              {displayName}
+            </h3>
+            {optionText && (
+              <p className="mt-1 inline-flex rounded-full bg-white px-2 py-1 text-[10px] font-bold text-ink-soft shadow-sm">
+                {optionText}
+              </p>
+            )}
+          </div>
           <button
             type="button"
             onClick={() => remove(item.productId)}
             aria-label="ลบสินค้า"
-            className="-mr-1 -mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-ink-soft hover:bg-surface-muted hover:text-brand"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-ink-soft shadow-sm transition hover:text-brand"
           >
             <Trash2 className="h-4 w-4" />
           </button>
         </div>
-        {optionText && (
-          <p className="mt-0.5 text-xs text-ink-soft">{optionText}</p>
-        )}
-        <div className="mt-auto flex items-center justify-between pt-2">
-          <Price value={item.price * item.quantity} size="sm" />
+        <div className="mt-auto flex items-end justify-between gap-2 pt-3">
+          <div>
+            <Price value={unitPrice * item.quantity} size="sm" />
+            <p className="mt-0.5 text-[10px] font-semibold text-ink-soft">
+              ฿{unitPrice.toLocaleString("th-TH")} / ชิ้น
+            </p>
+          </div>
           <QuantitySelector
             value={item.quantity}
             size="sm"

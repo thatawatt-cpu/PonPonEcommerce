@@ -34,6 +34,8 @@ export interface Order {
   items: CartItem[];
   subtotal: number;
   shippingFee: number;
+  discountAmount?: number;
+  couponCode?: string;
   total: number;
   paymentMethod: PaymentMethod;
   paymentStatus: PaymentStatus;

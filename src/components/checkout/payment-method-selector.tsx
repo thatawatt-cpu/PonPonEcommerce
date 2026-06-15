@@ -29,10 +29,10 @@ export function PaymentMethodSelector({
             type="button"
             onClick={() => onChange(method)}
             className={cn(
-              "flex w-full items-center gap-3 rounded-xl border p-3 text-left transition-colors",
+              "flex w-full items-center gap-3 rounded-2xl border p-3 text-left transition-colors",
               active
-                ? "border-brand bg-brand-soft"
-                : "border-black/10 bg-white"
+                ? "border-brand bg-brand-soft shadow-sm"
+                : "border-black/[0.07] bg-white"
             )}
           >
             <span

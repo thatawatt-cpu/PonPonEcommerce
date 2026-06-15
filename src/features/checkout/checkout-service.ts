@@ -15,6 +15,8 @@ interface PlaceOrderInput {
   shipping: ShippingInfo;
   items: CartItem[];
   paymentMethod: PaymentMethod;
+  discountAmount?: number;
+  couponCode?: string;
 }
 
 /**
@@ -25,6 +27,8 @@ export function placeOrder({
   shipping,
   items,
   paymentMethod,
+  discountAmount = 0,
+  couponCode,
 }: PlaceOrderInput): Order {
   const subtotal = items.reduce(
     (sum, item) => sum + item.price * item.quantity,
@@ -43,7 +47,9 @@ export function placeOrder({
     items,
     subtotal,
     shippingFee,
-    total: subtotal + shippingFee,
+    discountAmount,
+    couponCode,
+    total: Math.max(subtotal + shippingFee - discountAmount, 0),
     paymentMethod,
     paymentStatus: "pending",
     orderStatus: "pending",

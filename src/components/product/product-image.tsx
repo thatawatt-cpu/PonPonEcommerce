@@ -1,9 +1,12 @@
+import Image from "next/image";
 import { cn } from "@/lib/utils";
 
 interface ProductImageProps {
+  imageUrl?: string;
   emoji: string;
   className?: string;
   size?: "sm" | "md" | "lg";
+  fit?: "cover" | "contain";
 }
 
 const emojiSize = {
@@ -12,24 +15,41 @@ const emojiSize = {
   lg: "text-7xl",
 };
 
-/**
- * Friendly placeholder visual for a product. No real product photos exist in
- * the mock, so we render the product's emoji on a soft brand-tinted gradient.
- */
 export function ProductImage({
+  imageUrl,
   emoji,
   className,
   size = "md",
+  fit = "cover",
 }: ProductImageProps) {
   return (
     <div
       className={cn(
-        "flex items-center justify-center bg-gradient-to-br from-brand-soft to-brand-tint",
+        "relative flex items-center justify-center overflow-hidden bg-[#fbf7f2]",
         className
       )}
       aria-hidden
     >
-      <span className={emojiSize[size]}>{emoji}</span>
+      {imageUrl ? (
+        <Image
+          src={imageUrl}
+          alt=""
+          fill
+          sizes={
+            size === "lg"
+              ? "(min-width: 768px) 384px, 100vw"
+              : size === "sm"
+                ? "80px"
+                : "(min-width: 768px) 200px, 45vw"
+          }
+          className={cn(
+            "transition-transform duration-300",
+            fit === "contain" ? "object-contain" : "object-cover"
+          )}
+        />
+      ) : (
+        <span className={emojiSize[size]}>{emoji}</span>
+      )}
     </div>
   );
 }

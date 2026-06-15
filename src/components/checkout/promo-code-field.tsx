@@ -1,0 +1,101 @@
+"use client";
+
+import Link from "next/link";
+import { Check, TicketPercent, X } from "lucide-react";
+
+interface PromoCodeFieldProps {
+  value: string;
+  onChange: (value: string) => void;
+  onApply: () => void;
+  onRemove: () => void;
+  appliedCode?: string;
+  message?: string;
+  error?: boolean;
+}
+
+export function PromoCodeField({
+  value,
+  onChange,
+  onApply,
+  onRemove,
+  appliedCode,
+  message,
+  error,
+}: PromoCodeFieldProps) {
+  return (
+    <div>
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-soft text-brand">
+            <TicketPercent className="h-4 w-4" />
+          </span>
+          <div>
+            <h2 className="text-sm font-bold text-ink">โค้ดส่วนลด</h2>
+            <p className="text-[11px] text-ink-soft">
+              กรอก Promo Code ก่อนชำระเงิน
+            </p>
+          </div>
+        </div>
+        <Link
+          href="/coupons?returnTo=checkout"
+          className="text-xs font-extrabold text-brand"
+        >
+          ดูคูปอง
+        </Link>
+      </div>
+
+      {appliedCode ? (
+        <div className="flex items-center gap-3 rounded-2xl border border-success/20 bg-success-soft px-3 py-2.5">
+          <Check className="h-5 w-5 shrink-0 text-success" />
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-extrabold text-success">
+              ใช้โค้ด {appliedCode} แล้ว
+            </p>
+            {message && (
+              <p className="mt-0.5 text-[11px] text-ink-soft">{message}</p>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={onRemove}
+            aria-label="ยกเลิกโค้ดส่วนลด"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-ink-soft shadow-sm"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      ) : (
+        <>
+          <div className="flex gap-2">
+            <input
+              value={value}
+              onChange={(event) => onChange(event.target.value.toUpperCase())}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") onApply();
+              }}
+              placeholder="เช่น PONPON50"
+              className="h-11 min-w-0 flex-1 rounded-2xl border border-black/10 bg-[#fffaf8] px-4 text-sm font-bold uppercase text-ink outline-none transition focus:border-brand/40 focus:ring-2 focus:ring-brand/10"
+            />
+            <button
+              type="button"
+              onClick={onApply}
+              disabled={!value.trim()}
+              className="brand-button h-11 shrink-0 rounded-full px-5 text-sm font-extrabold text-white disabled:cursor-not-allowed disabled:opacity-45"
+            >
+              ใช้โค้ด
+            </button>
+          </div>
+          {message && (
+            <p
+              className={`mt-2 text-xs font-bold ${
+                error ? "text-brand" : "text-success"
+              }`}
+            >
+              {message}
+            </p>
+          )}
+        </>
+      )}
+    </div>
+  );
+}

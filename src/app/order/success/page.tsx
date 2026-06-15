@@ -1,21 +1,44 @@
 "use client";
 
-import { use } from "react";
+import { use, useEffect } from "react";
 import Link from "next/link";
-import { CheckCircle2, Home, MessageCircle, PackageSearch } from "lucide-react";
+import {
+  CheckCircle2,
+  Coins,
+  Home,
+  MessageCircle,
+  PackageSearch,
+} from "lucide-react";
 import { PageContainer } from "@/components/layout/page-container";
 import { PonPonLogo } from "@/components/brand/ponpon-logo";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { openExternalWindow } from "@/lib/liff";
 import { LINE_OA_URL } from "@/lib/constants";
+import { useMembershipStore } from "@/store/membership-store";
 
 export default function OrderSuccessPage({
   searchParams,
 }: {
-  searchParams: Promise<{ orderNo?: string }>;
+  searchParams: Promise<{
+    orderNo?: string;
+    points?: string;
+    spend?: string;
+  }>;
 }) {
-  const { orderNo = "ORD001" } = use(searchParams);
+  const {
+    orderNo = "ORD001",
+    points: pointsParam = "0",
+    spend: spendParam = "0",
+  } = use(searchParams);
+  const creditOrder = useMembershipStore((state) => state.creditOrder);
+  const earnedPoints = Math.max(Number(pointsParam) || 0, 0);
+  const orderSpend = Math.max(Number(spendParam) || 0, 0);
+
+  useEffect(() => {
+    if (earnedPoints <= 0) return;
+    creditOrder(orderNo, earnedPoints, orderSpend);
+  }, [creditOrder, earnedPoints, orderNo, orderSpend]);
 
   return (
     <PageContainer className="flex min-h-dvh flex-col items-center justify-center pt-8 text-center">
@@ -39,6 +62,24 @@ export default function OrderSuccessPage({
           รอตรวจสอบสลิป
         </span>
       </Card>
+
+      {earnedPoints > 0 ? (
+        <Link href="/membership" className="mt-3 block w-full text-left">
+          <Card className="flex items-center gap-3 border border-warning/10 bg-warning-soft/60 p-4">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white text-warning shadow-sm">
+              <Coins className="h-6 w-6" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-extrabold text-ink">
+                ได้รับ +{earnedPoints.toLocaleString("th-TH")} คะแนน
+              </span>
+              <span className="mt-0.5 block text-xs text-ink-soft">
+                คะแนนถูกเพิ่มในบัญชีสมาชิกแล้ว
+              </span>
+            </span>
+          </Card>
+        </Link>
+      ) : null}
 
       <div className="mt-6 w-full space-y-2.5">
         <Link href={`/orders/${orderNo}`} className="block">

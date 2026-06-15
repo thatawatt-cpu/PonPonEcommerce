@@ -14,9 +14,13 @@ import { getOrderByNo } from "@/features/orders/order-service";
 export default function PaymentPage({
   searchParams,
 }: {
-  searchParams: Promise<{ orderNo?: string; amount?: string }>;
+  searchParams: Promise<{
+    orderNo?: string;
+    amount?: string;
+    points?: string;
+  }>;
 }) {
-  const { orderNo = "ORD001", amount } = use(searchParams);
+  const { orderNo = "ORD001", amount, points = "0" } = use(searchParams);
   const router = useRouter();
   const [hasSlip, setHasSlip] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -29,7 +33,9 @@ export default function PaymentPage({
     setSubmitting(true);
     // Mock "upload + submit": status becomes "รอตรวจสอบสลิป" on the next page.
     setTimeout(() => {
-      router.push(`/order/success?orderNo=${orderNo}`);
+      router.push(
+        `/order/success?orderNo=${orderNo}&points=${points}&spend=${payAmount}`,
+      );
     }, 600);
   };
 
@@ -62,7 +68,7 @@ export default function PaymentPage({
         </Card>
       </PageContainer>
 
-      <div className="fixed inset-x-0 bottom-above-nav z-30 mx-auto max-w-md border-t border-black/5 bg-white/95 px-4 pb-4 pt-3 backdrop-blur md:max-w-3xl md:px-6">
+      <div className="promo-action-bar fixed inset-x-0 bottom-above-nav z-30 mx-auto max-w-md border-t border-brand/10 bg-white/95 px-4 pb-4 pt-3 backdrop-blur-xl md:max-w-3xl md:px-6">
         <Button
           size="lg"
           fullWidth

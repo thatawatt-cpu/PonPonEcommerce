@@ -30,7 +30,7 @@ export function QuantitySelector({
   return (
     <div
       className={cn(
-        "inline-flex items-center rounded-full border border-black/10 bg-white",
+        "inline-flex items-center rounded-full border border-brand/15 bg-brand-soft/50",
         className
       )}
     >

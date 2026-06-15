@@ -17,7 +17,7 @@ export function PageContainer({
   return (
     <div
       className={cn(
-        "mx-auto w-full max-w-md animate-fade-in px-4 md:max-w-3xl md:px-6",
+        "mx-auto w-full max-w-md animate-fade-in px-3.5 md:max-w-3xl md:px-6",
         withBottomNav && "pb-28",
         className
       )}

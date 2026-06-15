@@ -2,9 +2,11 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { useSyncExternalStore } from "react";
 import type { CartItem } from "@/types/cart";
 import type { Product } from "@/types/product";
 import { SHIPPING_FEE } from "@/lib/constants";
+import { getProductById } from "@/features/products/product-service";
 
 interface AddItemPayload {
   product: Product;
@@ -92,7 +94,10 @@ export const useCartStore = create<CartState>()(
         get().items.reduce((sum, item) => sum + item.quantity, 0),
 
       subtotal: () =>
-        get().items.reduce((sum, item) => sum + item.price * item.quantity, 0),
+        get().items.reduce((sum, item) => {
+          const currentProduct = getProductById(item.productId);
+          return sum + (currentProduct?.price ?? item.price) * item.quantity;
+        }, 0),
 
       shippingFee: () => (get().items.length > 0 ? SHIPPING_FEE : 0),
 
@@ -105,3 +110,20 @@ export const useCartStore = create<CartState>()(
     }
   )
 );
+
+export function useCartHydrated(): boolean {
+  return useSyncExternalStore(
+    (onStoreChange) => {
+      const unsubscribeHydrate =
+        useCartStore.persist.onHydrate(onStoreChange);
+      const unsubscribeFinish =
+        useCartStore.persist.onFinishHydration(onStoreChange);
+      return () => {
+        unsubscribeHydrate();
+        unsubscribeFinish();
+      };
+    },
+    () => useCartStore.persist.hasHydrated(),
+    () => false
+  );
+}

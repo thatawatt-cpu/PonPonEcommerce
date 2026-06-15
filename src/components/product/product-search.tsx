@@ -16,7 +16,7 @@ export function ProductSearch({ value, onChange }: ProductSearchProps) {
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder="ค้นหาสินค้า Pon Pon..."
-        className="w-full rounded-full border border-black/10 bg-white py-3 pl-11 pr-10 text-sm text-ink outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
+        className="w-full rounded-full border border-black/[0.06] bg-white py-3 pl-11 pr-10 text-sm text-ink shadow-sm outline-none transition focus:border-brand focus:ring-3 focus:ring-brand/10"
       />
       {value && (
         <button

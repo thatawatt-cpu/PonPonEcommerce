@@ -39,7 +39,7 @@ export function OrderTimeline({ steps }: { steps: OrderTimelineStep[] }) {
               </span>
               {!isLast && <span className={cn("w-0.5 flex-1", lineColor)} />}
             </div>
-            <div className={cn("pb-6", isLast && "pb-0")}>
+            <div className={cn("pb-4", isLast && "pb-0")}>
               <p className={cn("text-sm font-semibold", labelColor)}>
                 {step.label}
               </p>

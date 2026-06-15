@@ -4,6 +4,8 @@ import { cn } from "@/lib/utils";
 interface CartSummaryProps {
   subtotal: number;
   shippingFee: number;
+  discountAmount?: number;
+  discountLabel?: string;
   total: number;
   className?: string;
 }
@@ -11,6 +13,8 @@ interface CartSummaryProps {
 export function CartSummary({
   subtotal,
   shippingFee,
+  discountAmount = 0,
+  discountLabel = "ส่วนลด",
   total,
   className,
 }: CartSummaryProps) {
@@ -26,6 +30,12 @@ export function CartSummary({
           {shippingFee === 0 ? "ฟรี" : formatBaht(shippingFee)}
         </span>
       </div>
+      {discountAmount > 0 && (
+        <div className="flex justify-between font-bold text-success">
+          <span>{discountLabel}</span>
+          <span>-{formatBaht(discountAmount)}</span>
+        </div>
+      )}
       <div className="my-2 border-t border-dashed border-black/10" />
       <div className="flex items-center justify-between">
         <span className="font-semibold text-ink">ยอดรวมทั้งหมด</span>
