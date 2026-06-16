@@ -15,7 +15,7 @@ import type { Order } from "@/types/order";
 /**
  * Resolve an order by number. Unknown numbers (e.g. an order that was just
  * "placed" during the demo) fall back to a synthetic order based on the first
- * mock order, stamped with a "รอตรวจสอบสลิป" timeline.
+ * mock order, stamped with a "รอตรวจสอบการชำระเงิน" timeline.
  */
 function resolveOrder(orderNo: string): Order {
   const found = getOrderByNo(orderNo);

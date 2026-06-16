@@ -1,14 +1,8 @@
 import Link from "next/link";
-import {
-  Coffee,
-  Cookie,
-  Flame,
-  Gift,
-  Shirt,
-  Sparkles,
-} from "lucide-react";
+import { Flame, Sparkles } from "lucide-react";
 import { AppHeader } from "@/components/layout/app-header";
 import { PageContainer } from "@/components/layout/page-container";
+import { CategoryIcon } from "@/components/product/category-icon";
 import { ProductCard } from "@/components/product/product-card";
 import { FlashSaleSection } from "@/components/product/flash-sale-section";
 import { CouponSection } from "@/components/home/coupon-section";
@@ -21,8 +15,6 @@ import {
   getCategories,
   getFeaturedProducts,
 } from "@/features/products/product-service";
-
-const categoryIcons = [Cookie, Coffee, Shirt, Sparkles, Gift];
 
 export default function HomePage() {
   const categories = getCategories().filter((category) => category.id !== "all");
@@ -47,8 +39,7 @@ export default function HomePage() {
 
         <section className="mt-4 rounded-card bg-white px-2 py-3 shadow-[0_8px_24px_rgba(65,25,25,0.06)]">
           <div className="grid grid-cols-5 gap-1">
-            {categories.map((category, index) => {
-              const Icon = categoryIcons[index] || Gift;
+            {categories.map((category) => {
               return (
                 <Link
                   key={category.id}
@@ -56,7 +47,10 @@ export default function HomePage() {
                   className="group flex min-w-0 flex-col items-center gap-1.5"
                 >
                   <span className="flex h-12 w-12 items-center justify-center rounded-full bg-brand-soft text-brand transition group-active:scale-90 md:h-14 md:w-14">
-                    <Icon className="h-5 w-5 md:h-6 md:w-6" strokeWidth={1.8} />
+                    <CategoryIcon
+                      categoryId={category.id}
+                      className="h-5 w-5 md:h-6 md:w-6"
+                    />
                   </span>
                   <span className="w-full truncate text-center text-[10px] font-semibold text-ink-soft md:text-xs">
                     {category.name}

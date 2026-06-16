@@ -383,7 +383,7 @@ export const mockCustomerProfile: CustomerProfile = {
  */
 export const mockOrderTimeline: OrderTimelineStep[] = [
   { key: "pending", label: "สร้างคำสั่งซื้อ", state: "completed", at: "8 มิ.ย. 2569 10:24" },
-  { key: "reviewing_payment", label: "รอตรวจสอบสลิป", state: "active", at: "8 มิ.ย. 2569 10:31" },
+  { key: "reviewing_payment", label: "รอตรวจสอบการชำระเงิน", state: "active", at: "8 มิ.ย. 2569 10:31" },
   { key: "paid", label: "ชำระเงินแล้ว", state: "pending" },
   { key: "preparing", label: "กำลังเตรียมสินค้า", state: "pending" },
   { key: "shipped", label: "จัดส่งแล้ว", state: "pending" },
@@ -452,7 +452,7 @@ export const mockOrders: Order[] = [
     orderStatus: "shipped",
     timeline: [
       { key: "pending", label: "สร้างคำสั่งซื้อ", state: "completed", at: "5 มิ.ย. 2569 09:10" },
-      { key: "reviewing_payment", label: "รอตรวจสอบสลิป", state: "completed", at: "5 มิ.ย. 2569 09:12" },
+      { key: "reviewing_payment", label: "รอตรวจสอบการชำระเงิน", state: "completed", at: "5 มิ.ย. 2569 09:12" },
       { key: "paid", label: "ชำระเงินแล้ว", state: "completed", at: "5 มิ.ย. 2569 11:00" },
       { key: "preparing", label: "กำลังเตรียมสินค้า", state: "completed", at: "6 มิ.ย. 2569 14:20" },
       { key: "shipped", label: "จัดส่งแล้ว", state: "active", at: "7 มิ.ย. 2569 08:45" },
@@ -484,7 +484,7 @@ export const mockOrders: Order[] = [
     orderStatus: "completed",
     timeline: [
       { key: "pending", label: "สร้างคำสั่งซื้อ", state: "completed", at: "28 พ.ค. 2569 13:15" },
-      { key: "reviewing_payment", label: "รอตรวจสอบสลิป", state: "completed", at: "28 พ.ค. 2569 13:20" },
+      { key: "reviewing_payment", label: "รอตรวจสอบการชำระเงิน", state: "completed", at: "28 พ.ค. 2569 13:20" },
       { key: "paid", label: "ชำระเงินแล้ว", state: "completed", at: "28 พ.ค. 2569 14:05" },
       { key: "preparing", label: "กำลังเตรียมสินค้า", state: "completed", at: "29 พ.ค. 2569 10:30" },
       { key: "shipped", label: "จัดส่งแล้ว", state: "completed", at: "30 พ.ค. 2569 09:20" },

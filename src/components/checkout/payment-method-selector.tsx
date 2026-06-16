@@ -1,6 +1,6 @@
 "use client";
 
-import { QrCode, Truck, Check } from "lucide-react";
+import { Check, QrCode, Truck, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PAYMENT_METHOD_LABEL } from "@/lib/constants";
 import type { PaymentMethod } from "@/types/order";
@@ -10,9 +10,17 @@ interface PaymentMethodSelectorProps {
   onChange: (value: PaymentMethod) => void;
 }
 
-const OPTIONS: { value: PaymentMethod; icon: typeof QrCode; hint: string }[] = [
-  { value: "promptpay", icon: QrCode, hint: "สแกน QR แล้วแนบสลิป" },
-  { value: "cod", icon: Truck, hint: "จ่ายเงินสดเมื่อรับสินค้า" },
+const OPTIONS: { value: PaymentMethod; icon: LucideIcon; hint: string }[] = [
+  {
+    value: "promptpay",
+    icon: QrCode,
+    hint: "สแกน QR พร้อมเพย์เพื่อชำระเงิน",
+  },
+  {
+    value: "cod",
+    icon: Truck,
+    hint: "จ่ายเงินสดเมื่อรับสินค้า",
+  },
 ];
 
 export function PaymentMethodSelector({
@@ -32,13 +40,13 @@ export function PaymentMethodSelector({
               "flex w-full items-center gap-3 rounded-2xl border p-3 text-left transition-colors",
               active
                 ? "border-brand bg-brand-soft shadow-sm"
-                : "border-black/[0.07] bg-white"
+                : "border-black/[0.07] bg-white",
             )}
           >
             <span
               className={cn(
                 "flex h-10 w-10 shrink-0 items-center justify-center rounded-full",
-                active ? "bg-brand text-white" : "bg-surface-muted text-ink-soft"
+                active ? "bg-brand text-white" : "bg-surface-muted text-ink-soft",
               )}
             >
               <Icon className="h-5 w-5" />
@@ -52,7 +60,7 @@ export function PaymentMethodSelector({
             <span
               className={cn(
                 "flex h-5 w-5 items-center justify-center rounded-full border",
-                active ? "border-brand bg-brand text-white" : "border-black/20"
+                active ? "border-brand bg-brand text-white" : "border-black/20",
               )}
             >
               {active && <Check className="h-3.5 w-3.5" />}

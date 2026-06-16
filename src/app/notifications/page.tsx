@@ -35,7 +35,7 @@ interface NotificationItem {
 const initialNotifications: NotificationItem[] = [
   {
     id: "n1",
-    title: "กำลังตรวจสอบสลิป ORD001",
+    title: "กำลังตรวจสอบการชำระเงิน ORD001",
     description: "ร้านได้รับหลักฐานการชำระเงินแล้ว และกำลังตรวจสอบยอด",
     time: "5 นาทีที่แล้ว",
     href: "/orders/ORD001",

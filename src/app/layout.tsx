@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { BottomNavigation } from "@/components/layout/bottom-navigation";
-import { MascotAssistant } from "@/components/layout/mascot-assistant";
 import { SHOP_NAME, SHOP_TAGLINE } from "@/lib/constants";
 
 export const metadata: Metadata = {
@@ -33,7 +32,6 @@ export default function RootLayout({
         <div className="relative min-h-dvh w-full">
           {children}
         </div>
-        <MascotAssistant />
         <BottomNavigation />
       </body>
     </html>

@@ -2,6 +2,7 @@
 
 import { cn } from "@/lib/utils";
 import type { Category } from "@/types/common";
+import { CategoryIcon } from "@/components/product/category-icon";
 
 interface CategoryFilterProps {
   categories: Category[];
@@ -38,7 +39,7 @@ export function CategoryFilter({
                   : "bg-brand-soft/70"
               )}
             >
-              {cat.emoji}
+              <CategoryIcon categoryId={cat.id} className="h-4 w-4" />
             </span>
             {cat.name}
           </button>

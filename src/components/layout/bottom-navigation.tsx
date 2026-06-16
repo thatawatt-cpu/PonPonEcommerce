@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  Heart,
   Home,
   LayoutGrid,
   ReceiptText,
+  ShoppingCart,
   UserRound,
   type LucideIcon,
 } from "lucide-react";
@@ -24,7 +24,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { href: "/", label: "Shop", icon: Home },
   { href: "/products", label: "Products", icon: LayoutGrid },
-  { href: "/cart", label: "Cart", icon: Heart },
+  { href: "/cart", label: "Cart", icon: ShoppingCart },
   {
     href: "/orders",
     label: "Orders",

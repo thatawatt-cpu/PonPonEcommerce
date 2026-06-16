@@ -33,12 +33,60 @@ import {
 import { formatBaht } from "@/lib/format";
 import { getPromotionsForProduct } from "@/lib/promotions";
 import { cn } from "@/lib/utils";
+import type { Product } from "@/types/product";
 
 type ReviewMedia =
   | { type: "image"; imageUrl: string }
   | { type: "video"; imageUrl: string; videoUrl: string };
 
 type ReviewFilter = "all" | "media" | "5" | "4" | "3" | "2" | "1" | "latest";
+
+function getPreferredVariant(
+  product: Product,
+  requiredOptions: Record<string, string> = {}
+) {
+  return product.variants
+    ?.filter(
+      (variant) =>
+        variant.stock > 0 &&
+        Object.entries(requiredOptions).every(
+          ([name, value]) => variant.options[name] === value
+        )
+    )
+    .sort((left, right) => {
+      for (const option of product.options ?? []) {
+        const leftIndex = option.choices.findIndex(
+          (choice) => choice.value === left.options[option.name]
+        );
+        const rightIndex = option.choices.findIndex(
+          (choice) => choice.value === right.options[option.name]
+        );
+        const difference = leftIndex - rightIndex;
+
+        if (difference !== 0) return difference;
+      }
+
+      return 0;
+    })[0];
+}
+
+function getDefaultSelectedOptions(
+  product: Product | undefined
+): Record<string, string> {
+  if (!product?.options?.length) return {};
+
+  const defaultVariant = getPreferredVariant(product);
+
+  if (product.variants?.length && !defaultVariant) return {};
+  if (!product.variants?.length && product.stock <= 0) return {};
+
+  return Object.fromEntries(
+    product.options.map((option) => [
+      option.name,
+      defaultVariant?.options[option.name] ?? option.choices[0]?.value ?? "",
+    ])
+  );
+}
 
 export default function ProductDetailPage({
   params,
@@ -56,7 +104,9 @@ export default function ProductDetailPage({
     favoritesHydrated && favoriteProductIds.includes(id);
 
   const [quantity, setQuantity] = useState(1);
-  const [selected, setSelected] = useState<Record<string, string>>({});
+  const [selected, setSelected] = useState<Record<string, string>>(() =>
+    getDefaultSelectedOptions(product)
+  );
   const [added, setAdded] = useState(false);
   const [activeGallery, setActiveGallery] = useState("main");
   const [reviewsOpen, setReviewsOpen] = useState(false);
@@ -209,17 +259,47 @@ export default function ProductDetailPage({
     if (allVariantsSoldOut) return true;
     if (!hasVariantStock || !product.variants) return false;
 
-    const prospectiveSelection = {
-      ...selected,
+    const optionIndex =
+      product.options?.findIndex((option) => option.name === optionName) ?? -1;
+    const priorSelections = Object.fromEntries(
+      (product.options ?? [])
+        .slice(0, Math.max(optionIndex, 0))
+        .map((option) => [option.name, selected[option.name]])
+        .filter(([, value]) => Boolean(value))
+    );
+
+    return !getPreferredVariant(product, {
+      ...priorSelections,
       [optionName]: choiceValue,
-    };
+    });
+  };
 
-    return !product.variants.some((variant) => {
-      const matchesSelectedOptions = Object.entries(prospectiveSelection).every(
-        ([name, value]) => !value || variant.options[name] === value
+  const handleChoiceSelect = (optionName: string, choiceValue: string) => {
+    setSelected((prev) => {
+      if (prev[optionName] === choiceValue) {
+        return { ...prev, [optionName]: "" };
+      }
+
+      if (!product.variants?.length) {
+        return { ...prev, [optionName]: choiceValue };
+      }
+
+      const optionIndex =
+        product.options?.findIndex((option) => option.name === optionName) ?? -1;
+      const priorSelections = Object.fromEntries(
+        (product.options ?? [])
+          .slice(0, Math.max(optionIndex, 0))
+          .map((option) => [option.name, prev[option.name]])
+          .filter(([, value]) => Boolean(value))
       );
+      const compatibleVariant = getPreferredVariant(product, {
+        ...priorSelections,
+        [optionName]: choiceValue,
+      });
 
-      return matchesSelectedOptions && variant.stock > 0;
+      return compatibleVariant
+        ? { ...prev, ...compatibleVariant.options }
+        : { ...prev, [optionName]: choiceValue };
     });
   };
 
@@ -590,13 +670,7 @@ export default function ProductDetailPage({
                       type="button"
                       disabled={soldOut}
                       onClick={() =>
-                        setSelected((prev) => ({
-                          ...prev,
-                          [option.name]:
-                            prev[option.name] === choice.value
-                              ? ""
-                              : choice.value,
-                        }))
+                        handleChoiceSelect(option.name, choice.value)
                       }
                       className={cn(
                         "relative text-sm font-medium transition disabled:cursor-not-allowed",
@@ -604,9 +678,13 @@ export default function ProductDetailPage({
                           ? "flex min-h-14 min-w-28 items-center gap-2 rounded-xl px-2.5 py-2 text-left"
                           : "flex h-12 min-w-14 items-center justify-center rounded-full border px-4 py-2",
                         soldOut
-                          ? hasPreview
-                            ? "bg-surface-muted text-ink-soft/45 ring-1 ring-black/5"
-                            : "border-black/5 bg-surface-muted text-ink-soft/45"
+                          ? active
+                            ? hasPreview
+                              ? "bg-brand-soft/60 text-brand/60 ring-2 ring-brand/45"
+                              : "border-brand/45 bg-brand-soft/60 text-brand/60"
+                            : hasPreview
+                              ? "bg-surface-muted text-ink-soft/45 ring-1 ring-black/5"
+                              : "border-black/5 bg-surface-muted text-ink-soft/45"
                           : active
                             ? hasPreview
                               ? "bg-brand-soft text-brand ring-2 ring-brand shadow-[0_5px_14px_rgba(190,9,14,0.12)]"

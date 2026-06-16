@@ -58,8 +58,8 @@ export default function OrderSuccessPage({
       <Card className="mt-5 w-full p-4">
         <p className="text-xs text-ink-soft">เลขที่คำสั่งซื้อ</p>
         <p className="text-xl font-extrabold text-brand">{orderNo}</p>
-        <span className="mt-2 inline-flex rounded-full bg-warning-soft px-3 py-1 text-xs font-semibold text-warning">
-          รอตรวจสอบสลิป
+        <span className="mt-2 inline-flex rounded-full bg-success-soft px-3 py-1 text-xs font-semibold text-success">
+          ชำระเงินสำเร็จ
         </span>
       </Card>
 

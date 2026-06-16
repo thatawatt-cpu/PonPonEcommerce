@@ -57,7 +57,7 @@ export function AppHeader({
   ];
   const notifications = [
     {
-      title: "กำลังตรวจสอบสลิป ORD001",
+      title: "กำลังตรวจสอบการชำระเงิน ORD001",
       time: "5 นาทีที่แล้ว",
       href: "/orders/ORD001",
     },

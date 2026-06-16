@@ -123,18 +123,87 @@ body {
   color: var(--color-ink);
 }
 
+/* Compatibility fallbacks for older embedded browsers.
+   Some older WebViews fail on modern Tailwind color output such as slash-alpha
+   RGB or color-mix. These plain hex/rgba rules keep brand-colored controls
+   visible before newer browsers apply the richer generated utilities. */
+@supports not (color: rgb(0 0 0 / 0.5)) {
+  .bg-brand,
+  .hover\:bg-brand:hover {
+    background-color: #ed171c;
+  }
+
+  .bg-brand-dark,
+  .hover\:bg-brand-dark:hover {
+    background-color: #be090e;
+  }
+
+  .bg-brand-light {
+    background-color: #ff4d50;
+  }
+
+  .bg-brand-soft,
+  .bg-brand-soft\/35,
+  .bg-brand-soft\/40,
+  .bg-brand-soft\/50,
+  .bg-brand-soft\/55,
+  .bg-brand-soft\/65,
+  .bg-brand-soft\/70,
+  .bg-brand-soft\/80,
+  .hover\:bg-brand-soft:hover,
+  .active\:bg-brand-soft:active {
+    background-color: #fff0ef;
+  }
+
+  .bg-brand-tint,
+  .hover\:bg-brand-tint:hover {
+    background-color: #ffd9d7;
+  }
+
+  .text-brand,
+  .hover\:text-brand:hover {
+    color: #ed171c;
+  }
+
+  .border-brand,
+  .border-brand\/10,
+  .border-brand\/15,
+  .border-brand\/20,
+  .border-brand\/25,
+  .border-brand\/30,
+  .border-brand\/35,
+  .border-brand\/40,
+  .hover\:border-brand\/15:hover,
+  .hover\:border-brand\/25:hover,
+  .focus\:border-brand\/30:focus,
+  .focus\:border-brand\/40:focus {
+    border-color: rgba(237, 23, 28, 0.28);
+  }
+
+  .ring-brand\/10,
+  .ring-brand\/15,
+  .ring-brand\/20,
+  .ring-brand\/25,
+  .ring-brand\/30,
+  .hover\:ring-brand\/25:hover,
+  .focus\:ring-brand\/10:focus {
+    --tw-ring-color: rgba(237, 23, 28, 0.14);
+  }
+}
+
 .brand-button {
   position: relative;
   isolation: isolate;
   overflow: hidden;
-  border: 1px solid rgb(255 255 255 / 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background-color: #ed171c;
   background:
     linear-gradient(180deg, #ff3b3f 0%, #ed171c 48%, #cf080e 100%);
   box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.35),
-    inset 0 -2px 0 rgb(128 0 5 / 0.2),
-    0 7px 14px rgb(190 9 14 / 0.24);
-  text-shadow: 0 1px 1px rgb(118 0 4 / 0.25);
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    inset 0 -2px 0 rgba(128, 0, 5, 0.2),
+    0 7px 14px rgba(190, 9, 14, 0.24);
+  text-shadow: 0 1px 1px rgba(118, 0, 4, 0.25);
 }
 
 .brand-button::before {
@@ -143,7 +212,7 @@ body {
   z-index: -1;
   inset: 0 auto 45% 0;
   width: 100%;
-  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.2), transparent);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
   transform: translateX(-100%);
   transition: transform 450ms ease;
 }
@@ -155,16 +224,16 @@ body {
 .brand-button:hover {
   filter: saturate(1.08) brightness(1.03);
   box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.42),
-    inset 0 -2px 0 rgb(128 0 5 / 0.22),
-    0 9px 18px rgb(190 9 14 / 0.3);
+    inset 0 1px 0 rgba(255, 255, 255, 0.42),
+    inset 0 -2px 0 rgba(128, 0, 5, 0.22),
+    0 9px 18px rgba(190, 9, 14, 0.3);
 }
 
 .brand-button:active {
   transform: translateY(2px) scale(0.98);
   box-shadow:
-    inset 0 2px 4px rgb(113 0 4 / 0.2),
-    0 3px 7px rgb(190 9 14 / 0.2);
+    inset 0 2px 4px rgba(113, 0, 4, 0.2),
+    0 3px 7px rgba(190, 9, 14, 0.2);
 }
 
 .reorder-action {
