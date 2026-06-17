@@ -5,6 +5,7 @@ interface ProductImageProps {
   imageUrl?: string;
   emoji: string;
   className?: string;
+  priority?: boolean;
   size?: "sm" | "md" | "lg";
   fit?: "cover" | "contain";
 }
@@ -19,6 +20,7 @@ export function ProductImage({
   imageUrl,
   emoji,
   className,
+  priority = false,
   size = "md",
   fit = "cover",
 }: ProductImageProps) {
@@ -42,6 +44,7 @@ export function ProductImage({
                 ? "80px"
                 : "(min-width: 768px) 200px, 45vw"
           }
+          priority={priority}
           className={cn(
             "transition-transform duration-300",
             fit === "contain" ? "object-contain" : "object-cover"

@@ -17,15 +17,38 @@ interface AddItemPayload {
 interface CartState {
   items: CartItem[];
   addItem: (payload: AddItemPayload) => void;
-  removeItem: (productId: string) => void;
-  increaseQuantity: (productId: string) => void;
-  decreaseQuantity: (productId: string) => void;
+  removeItem: (itemKey: string) => void;
+  increaseQuantity: (itemKey: string) => void;
+  decreaseQuantity: (itemKey: string) => void;
   clearCart: () => void;
   /** Total quantity of all items (used for the bottom-nav badge). */
   totalItems: () => number;
   subtotal: () => number;
   shippingFee: () => number;
   total: () => number;
+}
+
+function normalizeOptions(
+  selectedOptions?: Record<string, string>
+): Record<string, string> | undefined {
+  if (!selectedOptions) return undefined;
+
+  const entries = Object.entries(selectedOptions)
+    .filter(([, value]) => Boolean(value))
+    .sort(([left], [right]) => left.localeCompare(right));
+
+  if (entries.length === 0) return undefined;
+
+  return Object.fromEntries(entries);
+}
+
+export function getCartItemKey(
+  item: Pick<CartItem, "productId" | "selectedOptions">
+): string {
+  const normalizedOptions = normalizeOptions(item.selectedOptions);
+  if (!normalizedOptions) return item.productId;
+
+  return `${item.productId}:${JSON.stringify(normalizedOptions)}`;
 }
 
 export const useCartStore = create<CartState>()(
@@ -35,17 +58,21 @@ export const useCartStore = create<CartState>()(
 
       addItem: ({ product, quantity = 1, selectedOptions }) =>
         set((state) => {
+          const normalizedOptions = normalizeOptions(selectedOptions);
+          const itemKey = getCartItemKey({
+            productId: product.id,
+            selectedOptions: normalizedOptions,
+          });
           const existing = state.items.find(
-            (item) => item.productId === product.id
+            (item) => getCartItemKey(item) === itemKey
           );
           if (existing) {
             return {
               items: state.items.map((item) =>
-                item.productId === product.id
+                getCartItemKey(item) === itemKey
                   ? {
                       ...item,
                       quantity: item.quantity + quantity,
-                      selectedOptions: selectedOptions ?? item.selectedOptions,
                     }
                   : item
               ),
@@ -58,30 +85,30 @@ export const useCartStore = create<CartState>()(
             imageUrl: product.imageUrl,
             emoji: product.emoji,
             quantity,
-            selectedOptions,
+            selectedOptions: normalizedOptions,
           };
           return { items: [...state.items, newItem] };
         }),
 
-      removeItem: (productId) =>
+      removeItem: (itemKey) =>
         set((state) => ({
-          items: state.items.filter((item) => item.productId !== productId),
+          items: state.items.filter((item) => getCartItemKey(item) !== itemKey),
         })),
 
-      increaseQuantity: (productId) =>
+      increaseQuantity: (itemKey) =>
         set((state) => ({
           items: state.items.map((item) =>
-            item.productId === productId
+            getCartItemKey(item) === itemKey
               ? { ...item, quantity: item.quantity + 1 }
               : item
           ),
         })),
 
-      decreaseQuantity: (productId) =>
+      decreaseQuantity: (itemKey) =>
         set((state) => ({
           items: state.items
             .map((item) =>
-              item.productId === productId
+              getCartItemKey(item) === itemKey
                 ? { ...item, quantity: item.quantity - 1 }
                 : item
             )

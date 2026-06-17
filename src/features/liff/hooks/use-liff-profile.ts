@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getLiffProfile, initLiff } from "@/lib/liff";
+import { getPonPonMe } from "@/features/auth/ponpon-auth";
+import { PONPON_SKIP_LINE_LIFF } from "@/lib/auth-config";
+import { initLiff } from "@/lib/liff";
+import { mockCustomerProfile } from "@/lib/mock-data";
 import type { LiffProfile } from "@/types/liff";
 
 interface UseLiffProfileResult {
@@ -11,8 +14,7 @@ interface UseLiffProfileResult {
 }
 
 /**
- * Loads the (mock) LINE profile on mount. Mirrors the shape of a real LIFF
- * hook so swapping in the real SDK later is a one-file change.
+ * Loads the authenticated PonPon profile on mount.
  */
 export function useLiffProfile(): UseLiffProfileResult {
   const [profile, setProfile] = useState<LiffProfile | null>(null);
@@ -24,11 +26,30 @@ export function useLiffProfile(): UseLiffProfileResult {
 
     async function load() {
       try {
+        if (PONPON_SKIP_LINE_LIFF) {
+          if (!cancelled) {
+            setProfile(mockCustomerProfile);
+          }
+          return;
+        }
+
         await initLiff();
-        const result = await getLiffProfile();
-        if (!cancelled) setProfile(result);
-      } catch {
-        if (!cancelled) setError("ไม่สามารถโหลดโปรไฟล์ LINE ได้");
+        const result = await getPonPonMe();
+        if (!cancelled) {
+          setProfile({
+            displayName: result.displayName,
+            lineUserId: result.id,
+            pictureUrl: result.pictureUrl ?? "",
+          });
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(
+            err instanceof Error
+              ? err.message
+              : "ไม่สามารถโหลดข้อมูลผู้ใช้ได้"
+          );
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }

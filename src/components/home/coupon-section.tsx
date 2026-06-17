@@ -72,14 +72,14 @@ export function CouponSection() {
                   onClick={() => claim(coupon.id)}
                   disabled={isClaimed}
                   className={cn(
-                    "flex h-9 shrink-0 items-center justify-center gap-1 rounded-full px-3 text-xs font-bold transition",
+                    "flex shrink-0 items-center justify-center rounded-full text-xs font-bold transition",
                     isClaimed
-                      ? "bg-success-soft text-success"
-                      : "brand-button text-white"
+                      ? "h-9 w-9 bg-[#d9fbe7] text-[#12a85a]"
+                      : "brand-button h-9 px-3 text-white"
                   )}
+                  aria-label={isClaimed ? "เก็บคูปองแล้ว" : "เก็บคูปอง"}
                 >
-                  {isClaimed && <Check className="h-3.5 w-3.5" />}
-                  {isClaimed ? "เก็บแล้ว" : "เก็บ"}
+                  {isClaimed ? <Check className="h-4 w-4" /> : "เก็บ"}
                 </button>
               </div>
               <span className="absolute -left-2 top-1/2 h-4 w-4 -translate-y-1/2 rounded-full bg-surface-muted" />

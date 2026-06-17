@@ -1,6 +1,7 @@
 import { ProductImage } from "@/components/product/product-image";
 import { formatBaht } from "@/lib/format";
 import type { PromotionResult } from "@/lib/promotions";
+import { getCartItemKey } from "@/store/cart-store";
 import type { CartItem } from "@/types/cart";
 
 interface OrderSummaryProps {
@@ -55,7 +56,10 @@ export function OrderSummary({ items, promotion }: OrderSummaryProps) {
             ? Object.values(item.selectedOptions).join(" · ")
             : null;
           return (
-            <li key={item.productId} className="flex items-center gap-3 py-2.5">
+            <li
+              key={getCartItemKey(item)}
+              className="flex items-center gap-3 py-2.5"
+            >
               <ProductImage
                 imageUrl={item.imageUrl}
                 emoji={item.emoji}

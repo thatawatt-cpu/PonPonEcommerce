@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { Card } from "@/components/ui/card";
 import type { LiffProfile } from "@/types/liff";
 
@@ -37,16 +38,26 @@ export function LiffProfileCard({
   return (
     <Card className="p-4">
       <div className="flex items-center gap-4">
-        <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand-light to-brand text-2xl text-white">
-          {/* Mock avatar — initials in lieu of a real LINE picture. */}
-          🧑
+        <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-brand-light to-brand text-2xl text-white">
+          {profile.pictureUrl ? (
+            <Image
+              src={profile.pictureUrl}
+              alt={profile.displayName}
+              width={64}
+              height={64}
+              className="h-full w-full object-cover"
+              unoptimized
+            />
+          ) : (
+            "🧑"
+          )}
         </div>
         <div className="min-w-0">
           <p className="truncate text-base font-bold text-ink">
             {profile.displayName}
           </p>
           <p className="truncate text-xs text-ink-soft">
-            LINE ID: {profile.lineUserId}
+            Customer ID: {profile.lineUserId}
           </p>
         </div>
       </div>

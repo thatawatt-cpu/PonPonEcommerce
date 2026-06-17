@@ -1,5 +1,20 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Environment
+
+For LIFF auth, set these public env vars when connecting to the real LINE app and backend:
+
+```bash
+NEXT_PUBLIC_APP_ORIGIN=https://xxxx.ngrok-free.app
+NEXT_PUBLIC_LIFF_ID=your_liff_id
+PONPON_AUTH_BACKEND_URL=https://e1be-2405-9800-b662-4f07-e8f1-6753-d343-27dd.ngrok-free.app/api/auth/line-login
+PONPON_AUTH_BACKEND_BASE_URL=https://e1be-2405-9800-b662-4f07-e8f1-6753-d343-27dd.ngrok-free.app
+```
+
+When you run the frontend through ngrok, set `NEXT_PUBLIC_APP_ORIGIN` to the ngrok URL. In local browser dev, the app can also fall back to `window.location.origin`.
+Frontend calls `/api/auth/line-login`, and Next.js proxies that request to `PONPON_AUTH_BACKEND_URL` on the server side so you do not have to fight CORS in the browser.
+Use `Authorization: Bearer <token>` for `/api/auth/me`; the frontend proxy forwards that bearer token to the backend `GET /api/auth/me` endpoint.
+
 ## Getting Started
 
 First, run the development server:

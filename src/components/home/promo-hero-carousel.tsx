@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { isLineWebView } from "@/lib/webview";
 
 const slides = [
   {
@@ -50,7 +51,11 @@ export function PromoHeroCarousel() {
   const [paused, setPaused] = useState(false);
 
   useEffect(() => {
-    if (paused || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    if (
+      paused ||
+      isLineWebView() ||
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    ) {
       return;
     }
 

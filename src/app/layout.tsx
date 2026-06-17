@@ -1,11 +1,15 @@
 import type { Metadata, Viewport } from "next";
+import Script from "next/script";
 import "./globals.css";
 import { BottomNavigation } from "@/components/layout/bottom-navigation";
+import { LiffAuthBootstrap } from "@/components/layout/liff-auth-bootstrap";
 import { SHOP_NAME, SHOP_TAGLINE } from "@/lib/constants";
+import { getAppOrigin } from "@/lib/site-url";
 
 export const metadata: Metadata = {
-  title: `${SHOP_NAME} — ${SHOP_TAGLINE}`,
-  description: "ร้าน Pon Pon — ช้อปง่าย สั่งไว ผ่าน LINE",
+  metadataBase: new URL(getAppOrigin()),
+  title: `${SHOP_NAME} â€” ${SHOP_TAGLINE}`,
+  description: "à¸£à¹‰à¸²à¸™ Pon Pon â€” à¸Šà¹‰à¸­à¸›à¸‡à¹ˆà¸²à¸¢ à¸ªà¸±à¹ˆà¸‡à¹„à¸§ à¸œà¹ˆà¸²à¸™ LINE",
 };
 
 export const viewport: Viewport = {
@@ -22,14 +26,35 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="th" className="h-full">
-      <body className="min-h-full bg-surface-muted">
+    <html lang="th" className="h-full" suppressHydrationWarning>
+      <body className="min-h-full bg-surface-muted" suppressHydrationWarning>
+        <Script
+          id="line-webview-performance-mode"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function () {
+                try {
+                  var ua = navigator.userAgent || "";
+                  if (/Line\\//i.test(ua) || /LIFF/i.test(ua)) {
+                    document.documentElement.classList.add("line-webview");
+                  }
+                } catch (_) {}
+              })();
+            `,
+          }}
+        />
+        <Script
+          src="https://static.line-scdn.net/liff/edge/2/sdk.js"
+          strategy="beforeInteractive"
+        />
         {/*
           Mobile-first shell. Pages set their own column width via PageContainer
           (max-w-md on phones, widening to max-w-3xl on tablet/desktop) so the
           app also looks at home in LINE on iPad and on a PC browser.
         */}
         <div className="relative min-h-dvh w-full">
+          <LiffAuthBootstrap />
           {children}
         </div>
         <BottomNavigation />

@@ -4,17 +4,17 @@ import { use, useState } from "react";
 import { useRouter } from "next/navigation";
 import { notFound } from "next/navigation";
 import {
-  BadgePercent,
   Check,
   X,
-  Gift,
   Heart,
   PackageCheck,
   ShieldCheck,
   ShoppingCart,
   Star,
+  TicketPercent,
   Truck,
 } from "lucide-react";
+import Link from "next/link";
 import { AppHeader } from "@/components/layout/app-header";
 import { Badge } from "@/components/ui/badge";
 import { Price } from "@/components/ui/price";
@@ -22,7 +22,6 @@ import { Button } from "@/components/ui/button";
 import { ProductImage } from "@/components/product/product-image";
 import { QuantitySelector } from "@/components/product/quantity-selector";
 import {
-  getAllProducts,
   getProductById,
 } from "@/features/products/product-service";
 import { useCartStore } from "@/store/cart-store";
@@ -30,8 +29,6 @@ import {
   useFavoriteStore,
   useFavoritesHydrated,
 } from "@/store/favorite-store";
-import { formatBaht } from "@/lib/format";
-import { getPromotionsForProduct } from "@/lib/promotions";
 import { cn } from "@/lib/utils";
 import type { Product } from "@/types/product";
 
@@ -40,6 +37,30 @@ type ReviewMedia =
   | { type: "video"; imageUrl: string; videoUrl: string };
 
 type ReviewFilter = "all" | "media" | "5" | "4" | "3" | "2" | "1" | "latest";
+
+const productCoupons = [
+  {
+    id: "ponpon50",
+    value: "฿50",
+    title: "ลดทันที",
+    detail: "เมื่อช้อปครบ ฿499",
+    code: "PONPON50",
+  },
+  {
+    id: "freeship",
+    value: "FREE",
+    title: "ส่งฟรี",
+    detail: "เมื่อช้อปครบ ฿399",
+    code: "FREESHIP",
+  },
+  {
+    id: "friend50",
+    value: "฿50",
+    title: "เพื่อนใหม่",
+    detail: "เมื่อช้อปครบ ฿299",
+    code: "PONFRIEND50",
+  },
+];
 
 function getPreferredVariant(
   product: Product,
@@ -111,18 +132,14 @@ export default function ProductDetailPage({
   const [activeGallery, setActiveGallery] = useState("main");
   const [reviewsOpen, setReviewsOpen] = useState(false);
   const [reviewFilter, setReviewFilter] = useState<ReviewFilter>("all");
+  const [claimedProductCoupons, setClaimedProductCoupons] = useState<string[]>(
+    []
+  );
   const [activeReviewMedia, setActiveReviewMedia] =
     useState<ReviewMedia | null>(null);
 
   if (!product) notFound();
 
-  const bundleProduct =
-    getAllProducts().find(
-      (item) => item.id !== product.id && item.categoryId !== product.categoryId
-    ) ?? getAllProducts().find((item) => item.id !== product.id);
-  const bundleTotal = bundleProduct ? product.price + bundleProduct.price : 0;
-  const bundleDealPrice = Math.max(bundleTotal - 20, 0);
-  const productPromotion = getPromotionsForProduct(product.id)[0];
   const detailContent =
     product.detailContent ??
     (product.categoryId === "fashion"
@@ -204,17 +221,6 @@ export default function ProductDetailPage({
       emoji: item.emoji ?? product.emoji,
       type: "image",
     })) ?? []),
-    ...(bundleProduct
-      ? [
-          {
-            key: "bundle",
-            label: "ซื้อคู่",
-            imageUrl: bundleProduct.imageUrl,
-            emoji: bundleProduct.emoji,
-            type: "bundle",
-          },
-        ]
-      : []),
   ];
   const activeGalleryItem =
     galleryItems.find((item) => item.key === activeGallery) ?? galleryItems[0];
@@ -306,14 +312,6 @@ export default function ProductDetailPage({
   const handleAdd = () => {
     if (purchaseDisabled) return;
     addItem({ product, quantity, selectedOptions: selected });
-    setAdded(true);
-    setTimeout(() => setAdded(false), 1500);
-  };
-
-  const handleAddBundle = () => {
-    if (!bundleProduct || purchaseDisabled) return;
-    addItem({ product, quantity: 1, selectedOptions: selected });
-    addItem({ product: bundleProduct, quantity: 1 });
     setAdded(true);
     setTimeout(() => setAdded(false), 1500);
   };
@@ -428,38 +426,7 @@ export default function ProductDetailPage({
                   strokeWidth={2.3}
                 />
               </button>
-              {activeGalleryItem.type === "bundle" && bundleProduct ? (
-                <div className="flex aspect-square w-full flex-col justify-center bg-[radial-gradient(circle_at_50%_20%,#fff_0%,#fff6f4_52%,#f7ece8_100%)] p-8">
-                  <div className="mb-4 inline-flex w-fit rounded-full bg-brand px-3 py-1 text-xs font-extrabold text-white shadow-sm">
-                    ซื้อคู่ประหยัด ฿20
-                  </div>
-                  <div className="flex items-center justify-center gap-3">
-                    <ProductImage
-                      imageUrl={product.imageUrl}
-                      emoji={product.emoji}
-                      size="md"
-                      className="h-32 w-32 rounded-3xl shadow-sm"
-                    />
-                    <span className="text-3xl font-extrabold text-brand">
-                      +
-                    </span>
-                    <ProductImage
-                      imageUrl={bundleProduct.imageUrl}
-                      emoji={bundleProduct.emoji}
-                      size="md"
-                      className="h-32 w-32 rounded-3xl shadow-sm"
-                    />
-                  </div>
-                  <div className="mt-5 text-center">
-                    <p className="text-sm font-bold text-ink">
-                      {product.name} + {bundleProduct.name}
-                    </p>
-                    <p className="mt-1 text-2xl font-extrabold text-brand">
-                      {formatBaht(bundleDealPrice)}
-                    </p>
-                  </div>
-                </div>
-              ) : activeGalleryItem.type === "detail" ? (
+              {activeGalleryItem.type === "detail" ? (
                 <div className="flex aspect-square w-full flex-col justify-center bg-[#fff8f6] p-7">
                   <p className="mb-3 text-xs font-extrabold uppercase tracking-[0.2em] text-brand">
                     PonPon Detail
@@ -493,6 +460,7 @@ export default function ProductDetailPage({
                   emoji={activeGalleryItem.emoji}
                   size="lg"
                   fit="contain"
+                  priority={activeGallery === "main"}
                   className="aspect-square w-full"
                 />
               )}
@@ -512,25 +480,7 @@ export default function ProductDetailPage({
                     )}
                     aria-label={`ดู${item.label}`}
                   >
-                    {item.type === "bundle" && bundleProduct ? (
-                      <span className="relative flex h-full w-full items-center justify-center rounded-xl bg-[#fff8f6]">
-                        <ProductImage
-                          imageUrl={product.imageUrl}
-                          emoji={product.emoji}
-                          size="sm"
-                          className="absolute left-1.5 h-9 w-9 rounded-lg shadow-sm"
-                        />
-                        <ProductImage
-                          imageUrl={bundleProduct.imageUrl}
-                          emoji={bundleProduct.emoji}
-                          size="sm"
-                          className="absolute right-1.5 h-9 w-9 rounded-lg shadow-sm"
-                        />
-                        <span className="relative z-10 flex h-5 w-5 items-center justify-center rounded-full bg-brand text-xs font-extrabold text-white shadow-sm">
-                          +
-                        </span>
-                      </span>
-                    ) : item.type === "detail" ? (
+                    {item.type === "detail" ? (
                       <span className="flex h-full w-full items-center justify-center rounded-xl bg-brand-soft text-[10px] font-extrabold text-brand">
                         Detail
                       </span>
@@ -764,86 +714,85 @@ export default function ProductDetailPage({
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={() => router.push("/coupons")}
-            className="mt-4 w-full rounded-2xl bg-brand-soft/65 px-3 py-2.5 text-left ring-1 ring-brand/10 transition hover:bg-brand-soft"
-          >
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex min-w-0 items-center gap-2.5">
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white text-brand shadow-sm">
-                  <BadgePercent className="h-4 w-4" />
-                </span>
-                <div className="min-w-0">
-                  <p className="truncate text-xs font-extrabold text-ink">
-                    {productPromotion
-                      ? `${productPromotion.title} · CODE: ${productPromotion.code}`
-                      : "ดูคูปองที่ใช้ได้กับสินค้านี้"}
-                  </p>
-                </div>
-              </div>
-              <span className="shrink-0 rounded-full bg-white px-3 py-1 text-[11px] font-extrabold text-brand shadow-sm">
-                ดูคูปอง
+          <section className="mt-4">
+            <div className="mb-2.5 flex items-center justify-between gap-3">
+              <h2 className="flex items-center gap-1.5 text-sm font-extrabold text-ink">
+                <TicketPercent className="h-[18px] w-[18px] text-brand" />
+                คูปองสำหรับคุณ
+              </h2>
+              <span className="shrink-0 text-[10px] font-bold text-ink-soft">
+                เก็บไว้ใช้ตอนชำระเงิน
               </span>
             </div>
-          </button>
 
-          {bundleProduct && (
-            <section className="mt-3 rounded-3xl bg-white p-3.5 shadow-[0_10px_26px_rgba(65,25,25,0.07)] ring-1 ring-black/[0.05]">
-              <div className="mb-3 flex items-center justify-between">
-                <h2 className="flex items-center gap-2 text-sm font-extrabold text-ink">
-                  <Gift className="h-4 w-4 text-brand" />
-                  ซื้อคู่แล้วคุ้ม
-                </h2>
-                <span className="rounded-full bg-brand px-2.5 py-1 text-[10px] font-extrabold text-white">
-                  ประหยัด ฿20
-                </span>
-              </div>
+            <div className="no-scrollbar -mx-1 flex gap-2.5 overflow-x-auto px-1 pb-1">
+              {productCoupons.map((coupon) => {
+                const isClaimed = claimedProductCoupons.includes(coupon.id);
 
-              <div className="flex items-center gap-2">
-                <ProductImage
-                  imageUrl={product.imageUrl}
-                  emoji={product.emoji}
-                  size="sm"
-                  className="h-16 w-16 shrink-0 rounded-2xl"
-                />
-                <span className="text-lg font-extrabold text-brand">+</span>
-                <ProductImage
-                  imageUrl={bundleProduct.imageUrl}
-                  emoji={bundleProduct.emoji}
-                  size="sm"
-                  className="h-16 w-16 shrink-0 rounded-2xl"
-                />
-                <div className="min-w-0 flex-1 pl-1">
-                  <p className="truncate text-xs font-bold text-ink">
-                    {product.name}
-                  </p>
-                  <p className="truncate text-xs font-bold text-ink">
-                    {bundleProduct.name}
-                  </p>
-                  <div className="mt-1 flex items-baseline gap-1.5">
-                    <span className="text-base font-extrabold text-brand">
-                      {formatBaht(bundleDealPrice)}
-                    </span>
-                    <span className="text-xs text-ink-soft line-through">
-                      {formatBaht(bundleTotal)}
-                    </span>
-                  </div>
-                </div>
-              </div>
+                return (
+                  <article
+                    key={coupon.id}
+                    className="relative flex min-h-[4.5rem] min-w-[17.5rem] overflow-hidden rounded-[1.15rem] bg-white shadow-[0_8px_22px_rgba(190,9,14,0.10)] ring-1 ring-brand/15"
+                  >
+                    <div className="flex w-[5.75rem] shrink-0 flex-col items-center justify-center bg-brand px-2 py-3 text-center text-white">
+                      <span className="text-xl font-extrabold leading-none">
+                        {coupon.value}
+                      </span>
+                      <span className="mt-1 text-[10px] font-extrabold leading-none text-white">
+                        {coupon.title}
+                      </span>
+                    </div>
 
-              <button
-                type="button"
-                onClick={handleAddBundle}
-                disabled={purchaseDisabled}
-                className="mt-3 flex h-10 w-full items-center justify-center rounded-full bg-brand-soft text-sm font-extrabold text-brand transition active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-surface-muted disabled:text-ink-soft/50 disabled:active:scale-100"
+                    <div className="flex min-w-0 flex-1 items-center justify-between gap-2 px-3 py-2.5">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-extrabold text-ink">
+                          {coupon.detail}
+                        </p>
+                        <p className="mt-1 text-[10px] font-extrabold tracking-wide text-ink-soft">
+                          CODE: {coupon.code}
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setClaimedProductCoupons((current) =>
+                            current.includes(coupon.id)
+                              ? current
+                              : [...current, coupon.id]
+                          )
+                        }
+                        disabled={isClaimed}
+                        className={cn(
+                          "brand-button flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[10px] font-extrabold text-white shadow-[0_7px_16px_rgba(237,23,28,0.32)] transition active:scale-95 disabled:shadow-none",
+                          isClaimed
+                            ? "bg-[#d9fbe7] text-[#12a85a]"
+                            : "bg-brand"
+                        )}
+                        aria-label={
+                          isClaimed ? "เก็บคูปองแล้ว" : "เก็บคูปอง"
+                        }
+                      >
+                        {isClaimed ? <Check className="h-4 w-4" /> : "เก็บ"}
+                      </button>
+                    </div>
+
+                    <span className="absolute -left-2 top-1/2 h-4 w-4 -translate-y-1/2 rounded-full bg-surface-muted" />
+                    <span className="absolute bottom-0 left-[5.75rem] top-0 border-l border-dashed border-white/50" />
+                  </article>
+                );
+              })}
+              <Link
+                href="/coupons"
+                className="flex min-h-[4.5rem] min-w-[8rem] shrink-0 flex-col items-center justify-center rounded-[1.15rem] border border-dashed border-brand/30 bg-white px-3 text-center text-brand shadow-[0_8px_22px_rgba(190,9,14,0.08)] transition active:scale-95"
               >
-                {hasSelectedAllOptions
-                  ? "เพิ่มชุดนี้ลงตะกร้า"
-                  : "เลือกตัวเลือกสินค้าก่อน"}
-              </button>
-            </section>
-          )}
+                <TicketPercent className="h-5 w-5" />
+                <span className="mt-1 text-xs font-extrabold leading-tight">
+                  ดูคูปองทั้งหมด
+                </span>
+              </Link>
+            </div>
+          </section>
 
           <section className="mt-3 rounded-3xl bg-white p-2.5 shadow-sm ring-1 ring-black/[0.04] md:hidden">
             <div className="grid grid-cols-4 gap-2">

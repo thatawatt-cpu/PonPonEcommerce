@@ -3,7 +3,6 @@
 import Link from "next/link";
 import {
   ArrowRight,
-  BadgePercent,
   Gift,
   ShieldCheck,
   Truck,
@@ -14,11 +13,14 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { CartItem } from "@/components/cart/cart-item";
 import { CartSummary } from "@/components/cart/cart-summary";
-import { useCartHydrated, useCartStore } from "@/store/cart-store";
+import {
+  getCartItemKey,
+  useCartHydrated,
+  useCartStore,
+} from "@/store/cart-store";
 import { formatBaht } from "@/lib/format";
 
 const FREE_SHIPPING_THRESHOLD = 399;
-const COUPON_THRESHOLD = 499;
 
 export default function CartPage() {
   const hydrated = useCartHydrated();
@@ -34,7 +36,6 @@ export default function CartPage() {
     FREE_SHIPPING_THRESHOLD - subtotal,
     0
   );
-  const couponRemaining = Math.max(COUPON_THRESHOLD - subtotal, 0);
   const shippingProgress = Math.min(
     (subtotal / FREE_SHIPPING_THRESHOLD) * 100,
     100
@@ -105,33 +106,12 @@ export default function CartPage() {
               </div>
               <div className="space-y-2">
               {items.map((item) => (
-                <CartItem key={item.productId} item={item} />
+                <CartItem key={getCartItemKey(item)} item={item} />
               ))}
               </div>
             </section>
 
             <section className="overflow-hidden rounded-card bg-white shadow-[0_10px_30px_rgba(65,25,25,0.07)] ring-1 ring-black/[0.04]">
-              <div className="flex items-center justify-between gap-3 border-b border-black/[0.05] px-4 py-3">
-                <div className="flex min-w-0 items-center gap-3">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-soft text-brand">
-                    <BadgePercent className="h-5 w-5" />
-                  </span>
-                  <div className="min-w-0">
-                    <h2 className="text-sm font-extrabold text-ink">
-                      คูปองพร้อมใช้
-                    </h2>
-                    <p className="truncate text-xs font-semibold text-ink-soft">
-                      {couponRemaining > 0
-                        ? `เพิ่มอีก ${formatBaht(couponRemaining)} รับส่วนลด ฿50`
-                        : "ใช้โค้ด PONPON50 ลดได้ทันที"}
-                    </p>
-                  </div>
-                </div>
-                <span className="shrink-0 rounded-full bg-brand-soft px-3 py-1.5 text-xs font-extrabold text-brand">
-                  เก็บ
-                </span>
-              </div>
-
               <div className="px-4 py-3">
               <CartSummary
                 subtotal={subtotal}

@@ -6,6 +6,7 @@ import { ArrowUpRight, ChevronRight, Zap } from "lucide-react";
 import { ProductImage } from "@/components/product/product-image";
 import { getDiscountPercent } from "@/features/products/product-utils";
 import { formatBaht } from "@/lib/format";
+import { isLineWebView } from "@/lib/webview";
 import type { Product } from "@/types/product";
 
 const INITIAL_SECONDS = 2 * 60 * 60 + 45 * 60 + 18;
@@ -14,9 +15,13 @@ function Countdown() {
   const [seconds, setSeconds] = useState(INITIAL_SECONDS);
 
   useEffect(() => {
+    const intervalMs = isLineWebView() ? 10000 : 1000;
+    const decrement = intervalMs / 1000;
     const timer = window.setInterval(() => {
-      setSeconds((current) => (current > 0 ? current - 1 : INITIAL_SECONDS));
-    }, 1000);
+      setSeconds((current) =>
+        current > 0 ? Math.max(current - decrement, 0) : INITIAL_SECONDS
+      );
+    }, intervalMs);
     return () => window.clearInterval(timer);
   }, []);
 
@@ -46,7 +51,7 @@ function FlashSaleItem({ product }: { product: Product }) {
   const discount = getDiscountPercent(product) ?? 15;
 
   return (
-    <article className="w-32 shrink-0 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-black/[0.04] md:w-40">
+    <article className="w-32 shrink-0 overflow-hidden rounded-2xl bg-white shadow-[0_8px_24px_rgba(65,25,25,0.08)] ring-1 ring-black/[0.04] md:w-40">
       <Link href={`/products/${product.id}`} className="group block">
         <div className="relative">
           <ProductImage
@@ -58,12 +63,12 @@ function FlashSaleItem({ product }: { product: Product }) {
             -{discount}%
           </span>
         </div>
-        <div className="px-2.5 pb-2.5 pt-2">
+        <div className="px-2.5 pb-3.5 pt-2.5">
           <h3 className="truncate text-xs font-bold text-ink">
             {product.name}
           </h3>
-          <div className="mt-1 flex items-end justify-between gap-1">
-            <div className="flex min-w-0 items-baseline gap-1">
+          <div className="mt-1.5 flex items-center justify-between gap-1">
+            <div className="flex min-w-0 items-center gap-1">
               <span className="text-sm font-extrabold text-brand">
                 {formatBaht(product.price)}
               </span>
@@ -99,7 +104,7 @@ export function FlashSaleSection({ products }: { products: Product[] }) {
         <Countdown />
       </div>
 
-      <div className="rounded-t-[1.25rem] bg-[#fff8f6] pb-3 pt-3">
+      <div className="rounded-t-[1.25rem] bg-[#fff8f6] pb-4 pt-3.5">
         <div className="mb-2 flex items-center justify-between px-3.5">
           <div className="flex gap-1.5 text-[10px] font-bold">
             <span className="rounded-full bg-brand px-2.5 py-1 text-white">
@@ -121,7 +126,7 @@ export function FlashSaleSection({ products }: { products: Product[] }) {
           </Link>
         </div>
 
-        <div className="no-scrollbar flex gap-2.5 overflow-x-auto px-3.5">
+        <div className="no-scrollbar flex gap-2.5 overflow-x-auto px-3.5 pb-1.5">
           {products.map((product) => (
             <FlashSaleItem key={product.id} product={product} />
           ))}

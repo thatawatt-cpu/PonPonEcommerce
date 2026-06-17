@@ -322,6 +322,56 @@ body {
   scrollbar-width: none;
 }
 
+/* LINE's in-app browser is noticeably more sensitive to paint-heavy effects.
+   Keep the regular browser polish, but simplify effects only inside LINE LIFF. */
+html.line-webview body {
+  background-image: linear-gradient(180deg, #fff 0, #f8f5f3 30rem);
+}
+
+html.line-webview *,
+html.line-webview *::before,
+html.line-webview *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
+}
+
+html.line-webview [class*="backdrop-blur"] {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
+html.line-webview .animate-fade-in,
+html.line-webview .animate-fade-up,
+html.line-webview .animate-pop,
+html.line-webview .animate-scale-in,
+html.line-webview .animate-pulse,
+html.line-webview .animate-spin {
+  animation: none !important;
+  opacity: 1 !important;
+  transform: none !important;
+}
+
+html.line-webview .brand-button::before,
+html.line-webview .product-card-action::before {
+  display: none !important;
+}
+
+html.line-webview .brand-button:hover,
+html.line-webview .group:hover .product-card-action,
+html.line-webview .group:hover .reorder-action {
+  filter: none;
+  transform: none;
+  text-shadow: none;
+}
+
+html.line-webview .promo-action-bar,
+html.line-webview nav[class*="fixed"] {
+  background-color: rgb(255 255 255 / 0.98) !important;
+  box-shadow: 0 -4px 16px rgb(65 25 25 / 0.08);
+}
+
 /* Respect users who prefer reduced motion: neutralise animations/transitions. */
 @media (prefers-reduced-motion: reduce) {
   *,
