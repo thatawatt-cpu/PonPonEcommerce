@@ -24,7 +24,7 @@ export function ReorderSection({ products }: { products: Product[] }) {
         {products.map((product) => (
           <Link
             key={product.id}
-            href={`/products/${product.id}`}
+            href={`/products/${product.slug}`}
             className="group flex min-w-64 items-center gap-3 rounded-card bg-white p-2.5 shadow-[0_8px_22px_rgba(65,25,25,0.07)] ring-1 ring-black/[0.04]"
           >
             <ProductImage

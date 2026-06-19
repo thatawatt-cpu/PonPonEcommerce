@@ -167,6 +167,7 @@ export async function exchangeLineIdToken(input: {
     },
     body: JSON.stringify({
       idToken: input.idToken,
+      ...(input.accessToken && { accessToken: input.accessToken }),
     }),
   });
 
@@ -176,8 +177,13 @@ export async function exchangeLineIdToken(input: {
   });
 
   if (!response.ok) {
+    const errBody = await response.json().catch(() => null) as Record<string, unknown> | null;
+    const detail = errBody
+      ? (errBody.error ?? errBody.message ?? errBody.title ?? JSON.stringify(errBody))
+      : null;
+    console.error("[ponpon-auth] exchange error body", errBody);
     throw new Error(
-      `PonPon auth exchange failed with status ${response.status}`
+      `PonPon auth exchange failed with status ${response.status}${detail ? `: ${detail}` : ""}`
     );
   }
 

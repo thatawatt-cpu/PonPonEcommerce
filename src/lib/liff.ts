@@ -37,6 +37,20 @@ function isLocalHost(): boolean {
   return ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
 }
 
+function waitForLiffSdk(timeoutMs = 8000): Promise<RuntimeLiff> {
+  return new Promise((resolve, reject) => {
+    if (window.liff) return resolve(window.liff);
+    const start = Date.now();
+    const check = () => {
+      if (window.liff) return resolve(window.liff);
+      if (Date.now() - start >= timeoutMs)
+        return reject(new Error("LIFF SDK did not load within timeout"));
+      setTimeout(check, 50);
+    };
+    check();
+  });
+}
+
 function shouldUseMockLiff(): boolean {
   return PONPON_SKIP_LINE_LIFF || isLocalHost();
 }
@@ -51,9 +65,11 @@ export async function initLiff(
 ): Promise<{ ready: true }> {
   if (initPromise) return initPromise;
 
-  const runtime = typeof window !== "undefined" ? window.liff ?? null : null;
-
   initPromise = (async () => {
+    const runtime = shouldUseMockLiff()
+      ? null
+      : await waitForLiffSdk().catch(() => null);
+
     if (runtime?.init) {
       if (liffId === "MOCK_LIFF_ID") {
         throw new Error("NEXT_PUBLIC_LIFF_ID is not configured.");

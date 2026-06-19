@@ -21,12 +21,14 @@ export default function OrderSuccessPage({
   searchParams,
 }: {
   searchParams: Promise<{
+    orderId?: string;
     orderNo?: string;
     points?: string;
     spend?: string;
   }>;
 }) {
   const {
+    orderId,
     orderNo = "ORD001",
     points: pointsParam = "0",
     spend: spendParam = "0",
@@ -82,7 +84,7 @@ export default function OrderSuccessPage({
       ) : null}
 
       <div className="mt-6 w-full space-y-2.5">
-        <Link href={`/orders/${orderNo}`} className="block">
+        <Link href={`/orders/${orderId ?? orderNo}`} className="block">
           <Button size="lg" fullWidth>
             <PackageSearch className="h-5 w-5" />
             ติดตามออเดอร์

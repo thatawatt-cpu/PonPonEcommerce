@@ -71,7 +71,7 @@ export default function FavoritesPage() {
                   className="flex items-center gap-3 p-3 transition hover:-translate-y-0.5 hover:shadow-card"
                 >
                   <Link
-                    href={`/products/${product.id}`}
+                    href={`/products/${product.slug}`}
                     className="flex min-w-0 flex-1 items-center gap-3"
                   >
                     <ProductImage

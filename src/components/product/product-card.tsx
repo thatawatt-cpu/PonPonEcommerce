@@ -6,8 +6,8 @@ import { Price } from "@/components/ui/price";
 import { ProductImage } from "@/components/product/product-image";
 import type { Product } from "@/types/product";
 
-function formatSoldCount(count?: number) {
-  if (!count || count <= 0) return "ยังไม่มีขาย";
+function formatSoldCount(count?: number): string | null {
+  if (!count || count <= 0) return null;
   if (count >= 10000) return `ขายแล้ว ${Math.floor(count / 1000)}พัน+`;
   if (count >= 1000) {
     const value = count / 1000;
@@ -36,16 +36,17 @@ export function ProductCard({
   metaLabel?: string;
 }) {
   const discountPercent = getDiscountPercent(product);
+  const soldCountLabel = formatSoldCount(product.soldCount);
   const visibleBadges = product.badges
     .filter((badge) => badge !== "ลดราคา" || discountPercent === null)
     .slice(0, discountPercent === null ? 2 : 1);
 
   return (
     <Card
-      className="group flex h-full animate-fade-up flex-col overflow-hidden transition active:scale-[0.98] motion-reduce:active:scale-100"
+      className="cv-auto group flex h-full animate-fade-up flex-col overflow-hidden transition active:scale-[0.98] motion-reduce:active:scale-100"
       style={{ animationDelay: `${Math.min(index, 9) * 55}ms` }}
     >
-      <Link href={`/products/${product.id}`} className="flex flex-1 flex-col">
+      <Link href={`/products/${product.slug}`} className="flex flex-1 flex-col">
         <div className="relative overflow-hidden">
           <ProductImage
             imageUrl={product.imageUrl}
@@ -64,17 +65,19 @@ export function ProductCard({
                   <Badge
                     key={b}
                     label={b}
-                    className="shrink-0 rounded-full border border-white/80 px-2 py-1 text-[10px] font-extrabold shadow-[0_3px_9px_rgba(65,25,25,0.14)] backdrop-blur-sm"
+                    className="shrink-0 rounded-full border border-white/80 px-2 py-1 text-[10px] font-extrabold shadow-[0_3px_9px_rgba(65,25,25,0.14)] "
                   />
                 ))}
               </div>
             ) : null}
           </div>
-          <span className="absolute right-2 top-2 max-w-[52%] truncate rounded-full border border-white/75 bg-white/85 px-2 py-1 text-[10px] font-extrabold text-ink shadow-[0_4px_12px_rgba(65,25,25,0.12)] backdrop-blur-sm">
-            {formatSoldCount(product.soldCount)}
-          </span>
+          {soldCountLabel !== null && (
+            <span className="absolute right-2 top-2 max-w-[52%] truncate rounded-full border border-white/75 bg-white px-2 py-1 text-[10px] font-extrabold text-ink shadow-[0_4px_12px_rgba(65,25,25,0.12)] ">
+              {soldCountLabel}
+            </span>
+          )}
           {metaLabel ? (
-            <span className="absolute bottom-2 left-2 max-w-[calc(100%-1rem)] truncate rounded-full border border-white/75 bg-white/85 px-2 py-1 text-[10px] font-extrabold text-ink-soft shadow-[0_4px_12px_rgba(65,25,25,0.12)] backdrop-blur-sm">
+            <span className="absolute bottom-2 left-2 max-w-[calc(100%-1rem)] truncate rounded-full border border-white/75 bg-white px-2 py-1 text-[10px] font-extrabold text-ink-soft shadow-[0_4px_12px_rgba(65,25,25,0.12)] ">
               {metaLabel}
             </span>
           ) : null}

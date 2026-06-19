@@ -49,7 +49,7 @@ export function BottomNavigation() {
   const count = hydrated ? rawCount : 0;
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-brand/10 bg-white/95 pt-1.5 backdrop-blur-xl pb-safe">
+    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-brand/10 bg-white pt-1.5 pb-safe">
       <ul className="mx-auto flex max-w-md items-stretch justify-around md:max-w-3xl md:px-6">
         {NAV_ITEMS.map((item) => {
           const active = isActive(pathname, item);
@@ -75,10 +75,7 @@ export function BottomNavigation() {
                     strokeWidth={active ? 2.5 : 2.2}
                   />
                   {isCart && count > 0 && (
-                    <span
-                      key={count}
-                      className="absolute -right-2 -top-2 flex h-[18px] min-w-[18px] animate-pop items-center justify-center rounded-full bg-brand px-0.5 text-[10px] font-bold leading-none text-white ring-2 ring-white"
-                    >
+                    <span className="absolute -right-2 -top-2 flex h-[18px] min-w-[18px] animate-pop items-center justify-center rounded-full bg-brand px-0.5 text-[10px] font-bold leading-none text-white ring-2 ring-white">
                       {count}
                     </span>
                   )}

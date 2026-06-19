@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import { ProductImage } from "@/components/product/product-image";
 import { QuantitySelector } from "@/components/product/quantity-selector";
 import { Price } from "@/components/ui/price";
-import { getProductById } from "@/features/products/product-service";
 import { getCartItemKey, useCartStore } from "@/store/cart-store";
 import { cn } from "@/lib/utils";
 import type { CartItem as CartItemType } from "@/types/cart";
@@ -29,11 +28,10 @@ export function CartItem({ item }: { item: CartItemType }) {
   const optionText = item.selectedOptions
     ? Object.values(item.selectedOptions).join(" · ")
     : null;
-  const currentProduct = getProductById(item.productId);
-  const displayName = currentProduct?.name ?? item.name;
-  const displayImageUrl = currentProduct?.imageUrl ?? item.imageUrl;
-  const displayEmoji = currentProduct?.emoji ?? item.emoji;
-  const unitPrice = currentProduct?.price ?? item.price;
+  const displayName = item.name;
+  const displayImageUrl = item.imageUrl;
+  const displayEmoji = item.emoji;
+  const unitPrice = item.price;
   const itemKey = getCartItemKey(item);
 
   const closeSwipe = () => setSwipeOffset(0);

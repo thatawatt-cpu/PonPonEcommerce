@@ -131,26 +131,28 @@ export default function CartPage() {
 
       {/* Sticky checkout bar */}
       {!isEmpty && (
-        <div className="promo-action-bar fixed inset-x-0 bottom-above-nav z-30 mx-auto max-w-md border-t border-brand/10 bg-white/95 px-4 pb-4 pt-3 backdrop-blur-xl md:max-w-3xl md:px-6">
-          <div className="mb-2 flex items-end justify-between gap-3">
-            <div>
-              <p className="text-xs font-semibold text-ink-soft">
-                ยอดชำระทั้งหมด
-              </p>
-              <p className="text-xl font-extrabold text-brand">
-                {formatBaht(total)}
+        <div className="promo-action-bar fixed inset-x-0 bottom-above-nav z-30 border-t border-brand/10 bg-white/95 px-4 pb-3 pt-3 backdrop-blur md:px-6">
+          <div className="mx-auto max-w-md md:max-w-3xl">
+            <div className="mb-2 flex items-end justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold text-ink-soft">
+                  ยอดชำระทั้งหมด
+                </p>
+                <p className="text-xl font-extrabold text-brand">
+                  {formatBaht(total)}
+                </p>
+              </div>
+              <p className="text-right text-[11px] font-semibold text-ink-soft">
+                รวม {totalItems} ชิ้น
               </p>
             </div>
-            <p className="text-right text-[11px] font-semibold text-ink-soft">
-              รวม {totalItems} ชิ้น
-            </p>
+            <Link href="/checkout" className="block">
+              <Button size="lg" fullWidth>
+                ไปชำระเงิน
+                <ArrowRight className="h-5 w-5" />
+              </Button>
+            </Link>
           </div>
-          <Link href="/checkout" className="block">
-            <Button size="lg" fullWidth>
-              ไปชำระเงิน
-              <ArrowRight className="h-5 w-5" />
-            </Button>
-          </Link>
         </div>
       )}
     </>

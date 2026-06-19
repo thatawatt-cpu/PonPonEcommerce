@@ -17,7 +17,6 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Price } from "@/components/ui/price";
 import { PAYMENT_ACCOUNT } from "@/lib/constants";
-import { getOrderByNo } from "@/features/orders/order-service";
 
 const QR_EXPIRES_IN_SECONDS = 5 * 60;
 
@@ -25,20 +24,20 @@ export default function PaymentPage({
   searchParams,
 }: {
   searchParams: Promise<{
+    orderId?: string;
     orderNo?: string;
     amount?: string;
     points?: string;
   }>;
 }) {
-  const { orderNo = "ORD001", amount, points = "0" } = use(searchParams);
+  const { orderId, orderNo = "ORD001", amount, points = "0" } = use(searchParams);
   const router = useRouter();
   const [remainingSeconds, setRemainingSeconds] = useState(
     QR_EXPIRES_IN_SECONDS,
   );
   const [processing, setProcessing] = useState(false);
 
-  const mockOrder = getOrderByNo(orderNo);
-  const payAmount = mockOrder?.total ?? (amount ? Number(amount) : 0);
+  const payAmount = amount ? Number(amount) : 0;
   const isExpired = remainingSeconds <= 0;
   const minutes = Math.floor(remainingSeconds / 60)
     .toString()
@@ -61,8 +60,9 @@ export default function PaymentPage({
     setProcessing(true);
 
     window.setTimeout(() => {
+      const id = orderId ?? orderNo;
       router.push(
-        `/order/success?orderNo=${orderNo}&points=${points}&spend=${payAmount}`,
+        `/order/success?orderId=${id}&orderNo=${orderNo}&points=${points}&spend=${payAmount}`,
       );
     }, 900);
   };
@@ -183,32 +183,34 @@ export default function PaymentPage({
         </Card>
       </PageContainer>
 
-      <div className="promo-action-bar fixed inset-x-0 bottom-above-nav z-30 mx-auto max-w-md border-t border-brand/10 bg-white/95 px-4 pb-4 pt-3 backdrop-blur-xl md:max-w-3xl md:px-6">
-        {isExpired ? (
-          <Button
-            size="lg"
-            fullWidth
-            onClick={handleRefreshQr}
-            disabled={processing}
-          >
-            <RefreshCw className="h-5 w-5" />
-            สร้าง QR ใหม่
-          </Button>
-        ) : (
-          <Button
-            size="lg"
-            fullWidth
-            onClick={handleConfirmPaid}
-            disabled={processing}
-          >
-            {processing ? (
-              <Loader2 className="h-5 w-5 animate-spin" />
-            ) : (
-              <CheckCircle2 className="h-5 w-5" />
-            )}
-            {processing ? "กำลังตรวจสอบ..." : "ชำระเงินแล้ว"}
-          </Button>
-        )}
+      <div className="promo-action-bar fixed inset-x-0 bottom-above-nav z-30 border-t border-brand/10 bg-white/95 px-4 pb-3 pt-3 backdrop-blur md:px-6">
+        <div className="mx-auto max-w-md md:max-w-3xl">
+          {isExpired ? (
+            <Button
+              size="lg"
+              fullWidth
+              onClick={handleRefreshQr}
+              disabled={processing}
+            >
+              <RefreshCw className="h-5 w-5" />
+              สร้าง QR ใหม่
+            </Button>
+          ) : (
+            <Button
+              size="lg"
+              fullWidth
+              onClick={handleConfirmPaid}
+              disabled={processing}
+            >
+              {processing ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : (
+                <CheckCircle2 className="h-5 w-5" />
+              )}
+              {processing ? "กำลังตรวจสอบ..." : "ชำระเงินแล้ว"}
+            </Button>
+          )}
+        </div>
       </div>
 
       {processing && (

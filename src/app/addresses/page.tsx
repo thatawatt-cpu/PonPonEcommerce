@@ -246,11 +246,13 @@ export default function AddressesPage() {
         })}
       </PageContainer>
 
-      <div className="promo-action-bar fixed inset-x-0 bottom-above-nav z-30 mx-auto max-w-md border-t border-brand/10 bg-white/95 px-4 pb-4 pt-3 backdrop-blur-xl md:max-w-3xl md:px-6">
-        <Button size="lg" fullWidth onClick={openCreate}>
-          <Plus className="h-5 w-5" />
-          เพิ่มที่อยู่ใหม่
-        </Button>
+      <div className="promo-action-bar fixed inset-x-0 bottom-above-nav z-30 border-t border-brand/10 bg-white/95 px-4 pb-3 pt-3 backdrop-blur md:px-6">
+        <div className="mx-auto max-w-md md:max-w-3xl">
+          <Button size="lg" fullWidth onClick={openCreate}>
+            <Plus className="h-5 w-5" />
+            เพิ่มที่อยู่ใหม่
+          </Button>
+        </div>
       </div>
 
       {formOpen && (

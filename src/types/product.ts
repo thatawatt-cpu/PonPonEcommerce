@@ -30,6 +30,7 @@ export interface ProductDetailSection {
 export interface ProductDetailContent {
   title?: string;
   summary?: string;
+  richDescription?: string;
   highlights: string[];
   infoCards?: ProductDetailInfoCard[];
   sizeGuide?: ProductSizeGuide;
@@ -37,6 +38,7 @@ export interface ProductDetailContent {
 }
 
 export interface ProductVariantStock {
+  id?: string;
   options: Record<string, string>;
   stock: number;
 }

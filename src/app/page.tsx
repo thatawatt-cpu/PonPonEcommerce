@@ -5,64 +5,86 @@ import { PageContainer } from "@/components/layout/page-container";
 import { CategoryIcon } from "@/components/product/category-icon";
 import { ProductCard } from "@/components/product/product-card";
 import { FlashSaleSection } from "@/components/product/flash-sale-section";
-import { CouponSection } from "@/components/home/coupon-section";
 import { PromoHeroCarousel } from "@/components/home/promo-hero-carousel";
 import { ShopBenefits } from "@/components/home/shop-benefits";
 import { ReorderSection } from "@/components/home/reorder-section";
+import { CouponSectionLazy } from "@/components/home/coupon-section-lazy";
 import {
-  getAllProducts,
-  getBestSellers,
-  getCategories,
-  getFeaturedProducts,
-} from "@/features/products/product-service";
+  getAllProductsServer,
+  getCategoriesServer,
+} from "@/features/products/product-service.server";
+import { getHomeSlidesServer } from "@/features/home-slides/home-slides-service.server";
+import { getActiveFlashSaleServer } from "@/features/flash-sales/flash-sales-service.server";
 
-export default function HomePage() {
-  const categories = getCategories().filter((category) => category.id !== "all");
-  const bestSellers = getBestSellers();
-  const featured = getFeaturedProducts();
-  const allProducts = getAllProducts();
-  const flashSaleProducts = [...bestSellers, ...featured]
-    .filter(
-      (product, index, items) =>
-        items.findIndex((item) => item.id === product.id) === index
-    )
-    .slice(0, 4);
-  const reorderProducts = ["1", "2", "4"]
-    .map((id) => allProducts.find((product) => product.id === id))
-    .filter((product) => product !== undefined);
+export default async function HomePage() {
+  const [products, rawCategories, homeSlides, flashSale] = await Promise.all([
+    getAllProductsServer({ pageSize: 24 }),
+    getCategoriesServer(),
+    getHomeSlidesServer(),
+    getActiveFlashSaleServer(),
+  ]);
+
+  const categories = rawCategories.filter((c) => c.id !== "all");
+  const bestSellers = products.filter((p) => p.isBestSeller);
+  const featured = products.filter((p) => p.isFeatured);
+
+  const displayBestSellers =
+    bestSellers.length > 0 ? bestSellers : products.slice(0, 6);
+  const displayFeatured =
+    featured.length > 0 ? featured : products.slice(0, 6);
+
+  const flashSaleProductMap = new Map(
+    flashSale?.products.map((p) => [p.productId, p]) ?? []
+  );
+  const flashSaleProducts = flashSaleProductMap.size > 0
+    ? products
+        .filter((p) => flashSaleProductMap.has(p.id))
+        .map((p) => {
+          const fsp = flashSaleProductMap.get(p.id)!;
+          return { ...p, price: fsp.salePrice, compareAtPrice: fsp.originalPrice };
+        })
+    : [...displayBestSellers, ...displayFeatured]
+        .filter(
+          (product, index, items) =>
+            items.findIndex((item) => item.id === product.id) === index
+        )
+        .slice(0, 4);
+
+  const reorderProducts = products.slice(0, 3);
 
   return (
     <>
       <AppHeader />
       <PageContainer className="pt-3.5">
-        <PromoHeroCarousel />
+        <PromoHeroCarousel slides={homeSlides} />
 
-        <section className="mt-4 rounded-card bg-white px-2 py-3 shadow-[0_8px_24px_rgba(65,25,25,0.06)]">
-          <div className="grid grid-cols-5 gap-1">
-            {categories.map((category) => {
-              return (
-                <Link
-                  key={category.id}
-                  href={`/products?category=${category.id}`}
-                  className="group flex min-w-0 flex-col items-center gap-1.5"
-                >
-                  <span className="flex h-12 w-12 items-center justify-center rounded-full bg-brand-soft text-brand transition group-active:scale-90 md:h-14 md:w-14">
-                    <CategoryIcon
-                      categoryId={category.id}
-                      className="h-5 w-5 md:h-6 md:w-6"
-                    />
-                  </span>
-                  <span className="w-full truncate text-center text-[10px] font-semibold text-ink-soft md:text-xs">
-                    {category.name}
-                  </span>
-                </Link>
-              );
-            })}
+        <section className="mt-4 rounded-card bg-white shadow-[0_8px_24px_rgba(65,25,25,0.06)]">
+          <div className="no-scrollbar flex overflow-x-auto px-2 py-3 md:grid md:grid-cols-5 md:overflow-visible md:px-4">
+            {categories.map((category) => (
+              <Link
+                key={category.id}
+                href={`/products?category=${encodeURIComponent(category.id)}`}
+                className="group flex w-16 shrink-0 flex-col items-center gap-1.5 px-1 md:w-auto md:py-2"
+              >
+                <span className="flex h-12 w-12 items-center justify-center rounded-full bg-brand-soft text-brand transition group-active:scale-90 md:h-14 md:w-14">
+                  <CategoryIcon
+                    categoryId={category.id}
+                    className="h-5 w-5 md:h-6 md:w-6"
+                  />
+                </span>
+                <span className="w-full text-center text-[10px] font-semibold leading-tight text-ink-soft md:text-xs">
+                  {category.name}
+                </span>
+              </Link>
+            ))}
           </div>
         </section>
 
-        <FlashSaleSection products={flashSaleProducts} />
-        <CouponSection />
+        <FlashSaleSection
+          products={flashSaleProducts}
+          slots={flashSale?.slots}
+        />
+        <CouponSectionLazy />
         <ShopBenefits />
 
         <section className="mt-5">
@@ -79,7 +101,7 @@ export default function HomePage() {
             </Link>
           </div>
           <div className="grid grid-cols-2 gap-2.5 md:grid-cols-3 md:gap-4">
-            {bestSellers.map((product, index) => (
+            {displayBestSellers.map((product, index) => (
               <ProductCard key={product.id} product={product} index={index} />
             ))}
           </div>
@@ -101,7 +123,7 @@ export default function HomePage() {
             </Link>
           </div>
           <div className="grid grid-cols-2 gap-2.5 md:grid-cols-3 md:gap-4">
-            {featured.map((product, index) => (
+            {displayFeatured.map((product, index) => (
               <ProductCard key={product.id} product={product} index={index} />
             ))}
           </div>

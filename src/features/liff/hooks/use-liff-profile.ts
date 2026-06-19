@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getPonPonMe } from "@/features/auth/ponpon-auth";
-import { PONPON_SKIP_LINE_LIFF } from "@/lib/auth-config";
-import { initLiff } from "@/lib/liff";
+import { PONPON_LIFF_ID, PONPON_SKIP_LINE_LIFF } from "@/lib/auth-config";
+import { getLiffProfile, initLiff, isLiffLoggedIn } from "@/lib/liff";
 import { mockCustomerProfile } from "@/lib/mock-data";
 import type { LiffProfile } from "@/types/liff";
 
@@ -33,14 +32,19 @@ export function useLiffProfile(): UseLiffProfileResult {
           return;
         }
 
-        await initLiff();
-        const result = await getPonPonMe();
+        await initLiff(PONPON_LIFF_ID);
+
+        if (!isLiffLoggedIn()) {
+          if (!cancelled) setError("กรุณาเปิดแอปผ่าน LINE");
+          return;
+        }
+
+        const timeout = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("โหลดโปรไฟล์ช้าเกินไป")), 8000)
+        );
+        const result = await Promise.race([getLiffProfile(), timeout]);
         if (!cancelled) {
-          setProfile({
-            displayName: result.displayName,
-            lineUserId: result.id,
-            pictureUrl: result.pictureUrl ?? "",
-          });
+          setProfile(result);
         }
       } catch (err) {
         if (!cancelled) {

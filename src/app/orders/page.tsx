@@ -1,13 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   ArrowUpRight,
   ChevronRight,
   Clock3,
-  PackageSearch,
+  Loader2,
   PackageCheck,
+  PackageSearch,
   Search,
   ShoppingBag,
   X,
@@ -17,12 +18,11 @@ import { PageContainer } from "@/components/layout/page-container";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
-import { ProductImage } from "@/components/product/product-image";
 import { OrderStatusBadge } from "@/components/ui/status-badge";
-import { getOrders } from "@/features/orders/order-service";
-import { getOrderItemCount } from "@/features/orders/order-utils";
+import { fetchOrders } from "@/features/orders/order-api";
 import { formatBaht, formatDate } from "@/lib/format";
-import type { Order, OrderStatus } from "@/types/order";
+import type { ApiOrderListItem } from "@/types/api";
+import type { OrderStatus, PaymentStatus } from "@/types/order";
 
 type OrderFilter =
   | "all"
@@ -73,12 +73,37 @@ const helperByStatus: Record<OrderStatus, string> = {
   cancelled: "ออเดอร์นี้ถูกยกเลิก",
 };
 
-function OrderCard({ order }: { order: Order }) {
-  const progress = progressByStatus[order.orderStatus];
-  const isShipped = order.orderStatus === "shipped";
+function mapStatus(status: string): OrderStatus {
+  const known: OrderStatus[] = [
+    "pending",
+    "reviewing_payment",
+    "paid",
+    "preparing",
+    "shipped",
+    "completed",
+    "cancelled",
+  ];
+  const lower = status.toLowerCase().replace(/[-\s]/g, "_") as OrderStatus;
+  return known.includes(lower) ? lower : "pending";
+}
+
+function mapPaymentStatus(status: string): PaymentStatus {
+  const map: Record<string, PaymentStatus> = {
+    pending: "pending",
+    reviewing: "reviewing",
+    paid: "paid",
+    failed: "failed",
+  };
+  return map[status.toLowerCase()] ?? "pending";
+}
+
+function OrderCard({ order }: { order: ApiOrderListItem }) {
+  const orderStatus = mapStatus(order.status);
+  const progress = progressByStatus[orderStatus];
+  const isShipped = orderStatus === "shipped";
 
   return (
-    <Link href={`/orders/${order.orderNo}`} className="group block">
+    <Link href={`/orders/${order.id}`} className="group block">
       <Card className="overflow-hidden transition duration-200 group-active:scale-[0.985]">
         <div className="flex items-center justify-between border-b border-black/[0.05] px-4 py-3">
           <div className="flex items-center gap-2">
@@ -90,43 +115,32 @@ function OrderCard({ order }: { order: Order }) {
               )}
             </span>
             <div>
-              <p className="text-sm font-extrabold text-ink">{order.orderNo}</p>
+              <p className="text-sm font-extrabold text-ink">{order.number}</p>
               <p className="text-[10px] font-medium text-ink-soft">
-                {formatDate(order.createdAt)}
+                {order.orderDate ? formatDate(order.orderDate) : "—"}
               </p>
             </div>
           </div>
-          <OrderStatusBadge status={order.orderStatus} />
+          <OrderStatusBadge status={orderStatus} />
         </div>
 
         <div className="px-4 py-3.5">
-          <div className="flex items-center gap-3">
-            <div className="flex shrink-0 -space-x-3">
-              {order.items.slice(0, 3).map((item, index) => (
-                <ProductImage
-                  key={`${item.productId}-${index}`}
-                  imageUrl={item.imageUrl}
-                  emoji={item.emoji}
-                  size="sm"
-                  className="h-12 w-12 rounded-2xl ring-2 ring-white"
-                />
-              ))}
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-brand-soft text-brand">
+              <ShoppingBag className="h-5 w-5" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-bold text-ink">
-                {order.items[0]?.name}
-              </p>
-              <p className="mt-0.5 text-xs text-ink-soft">
-                {getOrderItemCount(order)} ชิ้น
-                {order.items.length > 1
-                  ? ` · อีก ${order.items.length - 1} รายการ`
-                  : ""}
-              </p>
+              <p className="text-sm font-bold text-ink">ออเดอร์ {order.number}</p>
+              {order.trackingNo && (
+                <p className="mt-0.5 text-xs text-ink-soft">
+                  เลขพัสดุ: {order.trackingNo}
+                </p>
+              )}
             </div>
             <div className="shrink-0 text-right">
               <p className="text-xs text-ink-soft">ยอดรวม</p>
               <p className="text-base font-extrabold text-brand">
-                {formatBaht(order.total)}
+                {formatBaht(order.amount)}
               </p>
             </div>
           </div>
@@ -134,7 +148,7 @@ function OrderCard({ order }: { order: Order }) {
           <div className="mt-4">
             <div className="mb-1.5 flex items-center justify-between gap-3">
               <p className="truncate text-[11px] font-semibold text-ink-soft">
-                {helperByStatus[order.orderStatus]}
+                {helperByStatus[orderStatus]}
               </p>
               <span className="shrink-0 text-[10px] font-bold text-brand">
                 {progress}%
@@ -151,7 +165,7 @@ function OrderCard({ order }: { order: Order }) {
 
         <div className="flex items-center justify-between bg-surface-muted/65 px-4 py-2.5">
           <span className="text-[11px] font-semibold text-ink-soft">
-            อัปเดตล่าสุด {formatDate(order.createdAt)}
+            อัปเดตล่าสุด {order.orderDate ? formatDate(order.orderDate) : "—"}
           </span>
           <span className="flex items-center gap-1 text-xs font-extrabold text-brand">
             ติดตามออเดอร์
@@ -164,36 +178,80 @@ function OrderCard({ order }: { order: Order }) {
 }
 
 export default function OrdersPage() {
-  const orders = getOrders();
+  const [orders, setOrders] = useState<ApiOrderListItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] = useState<OrderFilter>("all");
   const [query, setQuery] = useState("");
-  const activeOrders = orders.filter(
-    (order) =>
-      order.orderStatus !== "completed" &&
-      order.orderStatus !== "cancelled"
-  ).length;
-  const normalizedQuery = query.trim().toLocaleLowerCase("th");
-  const filteredOrders = useMemo(() => {
-    const filter = orderFilters.find((item) => item.value === activeFilter);
 
+  useEffect(() => {
+    fetchOrders({ pageSize: 100 })
+      .then(setOrders)
+      .catch((err: unknown) => {
+        setError(
+          err instanceof Error ? err.message : "โหลดรายการออเดอร์ไม่สำเร็จ"
+        );
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
+  const activeOrders = orders.filter((o) => {
+    const s = mapStatus(o.status);
+    return s !== "completed" && s !== "cancelled";
+  }).length;
+
+  const normalizedQuery = query.trim().toLocaleLowerCase("th");
+
+  const filteredOrders = useMemo(() => {
+    const filter = orderFilters.find((f) => f.value === activeFilter);
     return orders.filter((order) => {
+      const orderStatus = mapStatus(order.status);
       const matchesStatus =
-        !filter?.statuses || filter.statuses.includes(order.orderStatus);
+        !filter?.statuses || filter.statuses.includes(orderStatus);
       const matchesQuery =
         !normalizedQuery ||
-        order.orderNo.toLocaleLowerCase("th").includes(normalizedQuery) ||
-        order.items.some((item) =>
-          item.name.toLocaleLowerCase("th").includes(normalizedQuery)
-        );
-
+        order.number.toLocaleLowerCase("th").includes(normalizedQuery) ||
+        order.id.includes(normalizedQuery);
       return matchesStatus && matchesQuery;
     });
   }, [activeFilter, normalizedQuery, orders]);
 
   const getFilterCount = (statuses?: OrderStatus[]) =>
     statuses
-      ? orders.filter((order) => statuses.includes(order.orderStatus)).length
+      ? orders.filter((o) => statuses.includes(mapStatus(o.status))).length
       : orders.length;
+
+  if (loading) {
+    return (
+      <>
+        <AppHeader title="ออเดอร์ของฉัน" />
+        <PageContainer className="flex items-center justify-center pt-20">
+          <div className="flex flex-col items-center gap-3 text-ink-soft">
+            <Loader2 className="h-8 w-8 animate-spin text-brand" />
+            <p className="text-sm font-semibold">กำลังโหลดออเดอร์...</p>
+          </div>
+        </PageContainer>
+      </>
+    );
+  }
+
+  if (error) {
+    return (
+      <>
+        <AppHeader title="ออเดอร์ของฉัน" />
+        <PageContainer className="pt-4">
+          <EmptyState
+            emoji="⚠️"
+            title="โหลดออเดอร์ไม่สำเร็จ"
+            description={error}
+            action={
+              <Button onClick={() => window.location.reload()}>ลองใหม่</Button>
+            }
+          />
+        </PageContainer>
+      </>
+    );
+  }
 
   return (
     <>
@@ -277,7 +335,7 @@ export default function OrdersPage() {
                   aria-label="ค้นหาประวัติคำสั่งซื้อ"
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
-                  placeholder="ค้นหาเลขออเดอร์ หรือชื่อสินค้า"
+                  placeholder="ค้นหาเลขออเดอร์"
                   className="w-full rounded-2xl border border-black/[0.06] bg-surface-muted/70 py-3 pl-10 pr-10 text-sm text-ink outline-none transition placeholder:text-ink-soft/65 focus:border-brand/30 focus:bg-white focus:ring-3 focus:ring-brand/10"
                 />
                 {query && (
@@ -304,7 +362,7 @@ export default function OrdersPage() {
                 <EmptyState
                   emoji=""
                   title="ไม่พบประวัติที่ค้นหา"
-                  description="ลองเปลี่ยนสถานะ หรือตรวจสอบเลขออเดอร์และชื่อสินค้าอีกครั้ง"
+                  description="ลองเปลี่ยนสถานะ หรือตรวจสอบเลขออเดอร์อีกครั้ง"
                   action={
                     <button
                       type="button"

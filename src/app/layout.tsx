@@ -46,7 +46,7 @@ export default function RootLayout({
         />
         <Script
           src="https://static.line-scdn.net/liff/edge/2/sdk.js"
-          strategy="beforeInteractive"
+          strategy="afterInteractive"
         />
         {/*
           Mobile-first shell. Pages set their own column width via PageContainer

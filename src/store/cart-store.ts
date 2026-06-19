@@ -6,12 +6,12 @@ import { useSyncExternalStore } from "react";
 import type { CartItem } from "@/types/cart";
 import type { Product } from "@/types/product";
 import { SHIPPING_FEE } from "@/lib/constants";
-import { getProductById } from "@/features/products/product-service";
 
 interface AddItemPayload {
   product: Product;
   quantity?: number;
   selectedOptions?: Record<string, string>;
+  variantId?: string | null;
 }
 
 interface CartState {
@@ -56,7 +56,7 @@ export const useCartStore = create<CartState>()(
     (set, get) => ({
       items: [],
 
-      addItem: ({ product, quantity = 1, selectedOptions }) =>
+      addItem: ({ product, quantity = 1, selectedOptions, variantId }) =>
         set((state) => {
           const normalizedOptions = normalizeOptions(selectedOptions);
           const itemKey = getCartItemKey({
@@ -80,6 +80,7 @@ export const useCartStore = create<CartState>()(
           }
           const newItem: CartItem = {
             productId: product.id,
+            variantId: variantId ?? null,
             name: product.name,
             price: product.price,
             imageUrl: product.imageUrl,
@@ -122,8 +123,7 @@ export const useCartStore = create<CartState>()(
 
       subtotal: () =>
         get().items.reduce((sum, item) => {
-          const currentProduct = getProductById(item.productId);
-          return sum + (currentProduct?.price ?? item.price) * item.quantity;
+          return sum + item.price * item.quantity;
         }, 0),
 
       shippingFee: () => (get().items.length > 0 ? SHIPPING_FEE : 0),

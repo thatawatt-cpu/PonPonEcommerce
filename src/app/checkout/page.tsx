@@ -3,7 +3,7 @@
 import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Check, ChevronRight, Coins, MapPin } from "lucide-react";
+import { Check, ChevronRight, Coins, Loader2, MapPin } from "lucide-react";
 import { AppHeader } from "@/components/layout/app-header";
 import { PageContainer } from "@/components/layout/page-container";
 import { Card } from "@/components/ui/card";
@@ -15,7 +15,7 @@ import { PaymentMethodSelector } from "@/components/checkout/payment-method-sele
 import { OrderSummary } from "@/components/checkout/order-summary";
 import { CartSummary } from "@/components/cart/cart-summary";
 import { useCartHydrated, useCartStore } from "@/store/cart-store";
-import { placeOrder } from "@/features/checkout/checkout-service";
+import { createOrder } from "@/features/orders/order-api";
 import { mockCustomerProfile } from "@/lib/mock-data";
 import {
   initialAddresses,
@@ -69,6 +69,8 @@ export default function CheckoutPage({
   const [errors, setErrors] = useState<
     Partial<Record<keyof ShippingInfo, string>>
   >({});
+  const [placing, setPlacing] = useState(false);
+  const [placeError, setPlaceError] = useState<string | null>(null);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -156,24 +158,46 @@ export default function CheckoutPage({
     return Object.keys(next).length === 0;
   };
 
-  const handleConfirm = () => {
-    if (!validate()) return;
-    const order = placeOrder({
-      shipping,
-      items,
-      paymentMethod: method,
-      discountAmount,
-      couponCode: appliedCode,
-    });
-    clearCart();
-    if (method === "cod") {
-      router.push(
-        `/order/success?orderNo=${order.orderNo}&points=${earnedPoints}&spend=${order.total}`,
+  const handleConfirm = async () => {
+    if (!validate() || placing) return;
+    setPlacing(true);
+    setPlaceError(null);
+
+    try {
+      const order = await createOrder({
+        clientRequestId: crypto.randomUUID(),
+        customerName: shipping.customerName,
+        customerEmail: null,
+        customerPhone: shipping.phone,
+        customerAddress: shipping.address,
+        shippingName: shipping.customerName,
+        shippingPhone: shipping.phone,
+        shippingAddress: shipping.address,
+        shippingChannel: null,
+        shippingAmount: shippingFee,
+        description: appliedCode ? `คูปอง: ${appliedCode}` : (shipping.note || null),
+        items: items.map((item) => ({
+          productId: item.productId,
+          variantId: item.variantId ?? null,
+          quantity: item.quantity,
+        })),
+      });
+
+      clearCart();
+      if (method === "cod") {
+        router.push(
+          `/order/success?orderId=${order.id}&orderNo=${order.number}&points=${earnedPoints}&spend=${order.amount}`,
+        );
+      } else {
+        router.push(
+          `/payment?orderId=${order.id}&orderNo=${order.number}&amount=${order.amount}&points=${earnedPoints}`,
+        );
+      }
+    } catch (err) {
+      setPlaceError(
+        err instanceof Error ? err.message : "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง",
       );
-    } else {
-      router.push(
-        `/payment?orderNo=${order.orderNo}&amount=${order.total}&points=${earnedPoints}`,
-      );
+      setPlacing(false);
     }
   };
 
@@ -358,10 +382,24 @@ export default function CheckoutPage({
         </Card>
       </PageContainer>
 
-      <div className="promo-action-bar fixed inset-x-0 bottom-above-nav z-30 mx-auto max-w-md border-t border-brand/10 bg-white/95 px-4 pb-4 pt-3 backdrop-blur-xl md:max-w-3xl md:px-6">
-        <Button size="lg" fullWidth onClick={handleConfirm}>
-          ยืนยันคำสั่งซื้อ
-        </Button>
+      <div className="promo-action-bar fixed inset-x-0 bottom-above-nav z-30 border-t border-brand/10 bg-white/95 px-4 pb-3 pt-3 backdrop-blur md:px-6">
+        <div className="mx-auto max-w-md md:max-w-3xl">
+          {placeError && (
+            <p className="mb-2 rounded-2xl bg-red-50 px-3 py-2 text-center text-xs font-semibold text-red-600">
+              {placeError}
+            </p>
+          )}
+          <Button size="lg" fullWidth onClick={handleConfirm} disabled={placing}>
+            {placing ? (
+              <>
+                <Loader2 className="h-5 w-5 animate-spin" />
+                กำลังสร้างออเดอร์...
+              </>
+            ) : (
+              "ยืนยันคำสั่งซื้อ"
+            )}
+          </Button>
+        </div>
       </div>
     </>
   );

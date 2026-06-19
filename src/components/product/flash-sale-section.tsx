@@ -6,23 +6,30 @@ import { ArrowUpRight, ChevronRight, Zap } from "lucide-react";
 import { ProductImage } from "@/components/product/product-image";
 import { getDiscountPercent } from "@/features/products/product-utils";
 import { formatBaht } from "@/lib/format";
-import { isLineWebView } from "@/lib/webview";
 import type { Product } from "@/types/product";
 
-const INITIAL_SECONDS = 2 * 60 * 60 + 45 * 60 + 18;
+function secondsUntilSlotEnd(slots: string[]): number {
+  const now = new Date();
+  const nowSec = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+  for (const slot of slots) {
+    const [h, m] = slot.split(":").map(Number);
+    const slotSec = h * 3600 + (m ?? 0) * 60;
+    if (slotSec > nowSec) return slotSec - nowSec;
+  }
+  // last slot active — count down to midnight
+  return 24 * 3600 - nowSec;
+}
 
-function Countdown() {
-  const [seconds, setSeconds] = useState(INITIAL_SECONDS);
+function Countdown({ slots }: { slots: string[] }) {
+  const [seconds, setSeconds] = useState(0);
 
   useEffect(() => {
-    const intervalMs = isLineWebView() ? 10000 : 1000;
-    const decrement = intervalMs / 1000;
-    const timer = window.setInterval(() => {
-      setSeconds((current) =>
-        current > 0 ? Math.max(current - decrement, 0) : INITIAL_SECONDS
-      );
-    }, intervalMs);
+    const update = () => setSeconds(secondsUntilSlotEnd(slots));
+    update();
+    const timer = window.setInterval(update, 1000);
     return () => window.clearInterval(timer);
+  // slots มาจาก server props ไม่เปลี่ยนระหว่าง page lifetime
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const values = [
@@ -47,17 +54,18 @@ function Countdown() {
   );
 }
 
-function FlashSaleItem({ product }: { product: Product }) {
+function FlashSaleItem({ product, priority = false }: { product: Product; priority?: boolean }) {
   const discount = getDiscountPercent(product) ?? 15;
 
   return (
     <article className="w-32 shrink-0 overflow-hidden rounded-2xl bg-white shadow-[0_8px_24px_rgba(65,25,25,0.08)] ring-1 ring-black/[0.04] md:w-40">
-      <Link href={`/products/${product.id}`} className="group block">
+      <Link href={`/products/${product.slug}`} className="group block">
         <div className="relative">
           <ProductImage
             imageUrl={product.imageUrl}
             emoji={product.emoji}
             className="aspect-square w-full"
+            priority={priority}
           />
           <span className="absolute left-1.5 top-1.5 rounded-md bg-brand px-1.5 py-0.5 text-[10px] font-extrabold text-white">
             -{discount}%
@@ -88,7 +96,27 @@ function FlashSaleItem({ product }: { product: Product }) {
   );
 }
 
-export function FlashSaleSection({ products }: { products: Product[] }) {
+function activeSlotIndex(slots: string[]): number {
+  if (slots.length === 0) return 0;
+  const now = new Date();
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  let active = 0;
+  for (let i = 0; i < slots.length; i++) {
+    const [h, m] = slots[i].split(":").map(Number);
+    if (nowMinutes >= h * 60 + (m ?? 0)) active = i;
+  }
+  return active;
+}
+
+export function FlashSaleSection({
+  products,
+  slots = ["09:00", "12:00", "15:00"],
+}: {
+  products: Product[];
+  slots?: string[];
+}) {
+  const activeIdx = activeSlotIndex(slots);
+
   return (
     <section className="mt-4 overflow-hidden rounded-card bg-brand shadow-[0_12px_28px_rgba(190,9,14,0.2)]">
       <div className="flex items-center justify-between gap-3 px-4 py-3 text-white">
@@ -101,21 +129,24 @@ export function FlashSaleSection({ products }: { products: Product[] }) {
             ดีลแรง หมดเวลาแล้วราคากลับทันที
           </p>
         </div>
-        <Countdown />
+        <Countdown slots={slots} />
       </div>
 
       <div className="rounded-t-[1.25rem] bg-[#fff8f6] pb-4 pt-3.5">
         <div className="mb-2 flex items-center justify-between px-3.5">
           <div className="flex gap-1.5 text-[10px] font-bold">
-            <span className="rounded-full bg-brand px-2.5 py-1 text-white">
-              09:00
-            </span>
-            <span className="rounded-full bg-white px-2.5 py-1 text-ink-soft shadow-sm">
-              12:00
-            </span>
-            <span className="rounded-full bg-white px-2.5 py-1 text-ink-soft shadow-sm">
-              15:00
-            </span>
+            {slots.map((slot, index) => (
+              <span
+                key={slot}
+                className={
+                  index === activeIdx
+                    ? "rounded-full bg-brand px-2.5 py-1 text-white"
+                    : "rounded-full bg-white px-2.5 py-1 text-ink-soft shadow-sm"
+                }
+              >
+                {slot}
+              </span>
+            ))}
           </div>
           <Link
             href="/products"
@@ -127,8 +158,8 @@ export function FlashSaleSection({ products }: { products: Product[] }) {
         </div>
 
         <div className="no-scrollbar flex gap-2.5 overflow-x-auto px-3.5 pb-1.5">
-          {products.map((product) => (
-            <FlashSaleItem key={product.id} product={product} />
+          {products.map((product, index) => (
+            <FlashSaleItem key={product.id} product={product} priority={index < 2} />
           ))}
         </div>
       </div>
