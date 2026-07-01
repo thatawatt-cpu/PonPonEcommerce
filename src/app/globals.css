@@ -514,7 +514,6 @@ html.line-webview body {
 html.line-webview *,
 html.line-webview *::before,
 html.line-webview *::after {
-  transition-duration: 0.001ms !important;
   scroll-behavior: auto !important;
 }
 

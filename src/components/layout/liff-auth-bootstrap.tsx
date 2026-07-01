@@ -11,6 +11,7 @@ import {
 } from "@/lib/liff";
 
 const REAUTH_KEY = "ponpon.reauth_at";
+const LOGIN_REDIRECT_KEY = "ponpon.liff_login_redirected";
 const REAUTH_DEBOUNCE_MS = 60_000;
 
 function getIdTokenExpiry(token: string): number | null {
@@ -34,6 +35,7 @@ let bootstrapPromise: Promise<void> | null = null;
 async function bootstrapLineSession(): Promise<void> {
   const lastReauthAt = Number(localStorage.getItem(REAUTH_KEY) ?? 0);
   const recentlyAttempted = Date.now() - lastReauthAt < REAUTH_DEBOUNCE_MS;
+  const loginRedirected = sessionStorage.getItem(LOGIN_REDIRECT_KEY) === "1";
 
   console.info("[ponpon-auth] bootstrap start", {
     skipLiff: PONPON_SKIP_LINE_LIFF,
@@ -48,11 +50,13 @@ async function bootstrapLineSession(): Promise<void> {
   await initLiff(PONPON_LIFF_ID);
 
   if (!isLiffLoggedIn()) {
-    if (PONPON_SKIP_LINE_LIFF) {
-      console.warn("[ponpon-auth] not logged in (dev mode) — no JWT obtained");
+    if (loginRedirected) {
+      console.warn("[ponpon-auth] already redirected to LINE login in this session");
       return;
     }
-    console.info("[ponpon-auth] not logged in, redirecting to LINE login");
+
+    console.info("[ponpon-auth] not logged in yet, waiting for explicit login flow");
+    sessionStorage.setItem(LOGIN_REDIRECT_KEY, "1");
     await loginWithLine();
     return;
   }
@@ -76,6 +80,7 @@ async function bootstrapLineSession(): Promise<void> {
   if (expired && !PONPON_SKIP_LINE_LIFF && !recentlyAttempted) {
     console.info("[ponpon-auth] idToken expired — redirecting for fresh LIFF session");
     localStorage.setItem(REAUTH_KEY, String(Date.now()));
+    sessionStorage.setItem(LOGIN_REDIRECT_KEY, "1");
     await loginWithLine();
     return;
   }
@@ -93,6 +98,7 @@ async function bootstrapLineSession(): Promise<void> {
   try {
     const session = await exchangeLineIdToken({ idToken, accessToken });
     localStorage.removeItem(REAUTH_KEY);
+    sessionStorage.removeItem(LOGIN_REDIRECT_KEY);
     console.info("[ponpon-auth] jwt received", {
       hasJwt: Boolean(session.jwt),
       hasRefreshToken: Boolean(session.refreshToken),
@@ -104,6 +110,7 @@ async function bootstrapLineSession(): Promise<void> {
     if (is401 && !PONPON_SKIP_LINE_LIFF && !recentlyAttempted) {
       console.info("[ponpon-auth] token rejected by backend — retrying with fresh LINE login");
       localStorage.setItem(REAUTH_KEY, String(Date.now()));
+      sessionStorage.setItem(LOGIN_REDIRECT_KEY, "1");
       await loginWithLine();
       return;
     }
