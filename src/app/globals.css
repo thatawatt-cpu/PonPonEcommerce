@@ -514,8 +514,6 @@ html.line-webview body {
 html.line-webview *,
 html.line-webview *::before,
 html.line-webview *::after {
-  animation-duration: 0.001ms !important;
-  animation-iteration-count: 1 !important;
   transition-duration: 0.001ms !important;
   scroll-behavior: auto !important;
 }
@@ -525,15 +523,21 @@ html.line-webview [class*="backdrop-blur"] {
   backdrop-filter: none !important;
 }
 
+/* LIFF-safe motion:
+   - keep lightweight entrance animations available
+   - keep spinner working for loading states
+   - neutralize heavier background/repeat motion */
+html.line-webview .animate-spin {
+  animation: spin 1s linear infinite !important;
+}
+
 html.line-webview .animate-fade-in,
 html.line-webview .animate-fade-up,
 html.line-webview .animate-pop,
-html.line-webview .animate-scale-in,
-html.line-webview .animate-pulse,
-html.line-webview .animate-spin {
-  animation: none !important;
-  opacity: 1 !important;
-  transform: none !important;
+html.line-webview .animate-scale-in {
+  animation-duration: 0.18s !important;
+  animation-timing-function: ease-out !important;
+  animation-iteration-count: 1 !important;
 }
 
 html.line-webview .brand-button::before,
