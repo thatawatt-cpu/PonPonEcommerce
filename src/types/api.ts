@@ -24,6 +24,11 @@ export interface ApiProductImage {
   isPrimary: boolean;
 }
 
+export interface ApiProductVariantOption {
+  name: string;
+  value: string;
+}
+
 export interface ApiProductVariant {
   id: string;
   zortProductId: number;
@@ -37,7 +42,8 @@ export interface ApiProductVariant {
   unitText: string;
   imageUrl: string | null;
   isActiveFromZort: boolean;
-  status: string;
+  status: string | number;
+  options: ApiProductVariantOption[];
 }
 
 export interface ApiProductDetail extends ApiProductListItem {
@@ -68,6 +74,7 @@ export interface ApiProductDetail extends ApiProductListItem {
   missingFromZortAt: string | null;
   images: ApiProductImage[];
   variants: ApiProductVariant[];
+  options: ApiProductVariantOption[];
 }
 
 export interface ApiCategory {
@@ -106,6 +113,21 @@ export interface ApiCreateOrderResponse {
   status: string;
   paymentStatus: string;
   amount: number;
+  shippingAmount: number;
+  discountAmount: number;
+  paymentExpiresAt: string;
+}
+
+export interface ApiOrderPreviewItem {
+  id: string;
+  productId: string | null;
+  variantId: string | null;
+  sku: string;
+  name: string;
+  quantity: number;
+  totalPrice: number;
+  imageUrl: string | null;
+  options: ApiProductVariantOption[];
 }
 
 export interface ApiOrderListItem {
@@ -118,10 +140,22 @@ export interface ApiOrderListItem {
   shippingChannel: string | null;
   trackingNo: string | null;
   orderDate: string | null;
+  itemsCount: number;
+  itemsPreview: ApiOrderPreviewItem[];
+}
+
+export interface ApiOrderListResponse {
+  items: ApiOrderListItem[];
+  page: number;
+  pageSize: number;
+  total: number;
+  hasMore: boolean;
 }
 
 export interface ApiOrderDetailItem {
   id: string;
+  productId: string | null;
+  variantId: string | null;
   sku: string;
   name: string;
   quantity: number;
@@ -130,6 +164,8 @@ export interface ApiOrderDetailItem {
   discount: string | null;
   discountAmount: number;
   totalPrice: number;
+  imageUrl: string | null;
+  options: ApiProductVariantOption[];
 }
 
 export interface ApiOrderPayment {
@@ -216,4 +252,67 @@ export interface ApiOrderDetail {
   currency: string | null;
   items: ApiOrderDetailItem[];
   payments: ApiOrderPayment[];
+}
+
+// ─── Payments ────────────────────────────────────────────────────────────────
+
+export type ApiMobileBankingType =
+  | "mobile_banking_kbank"
+  | "mobile_banking_scb"
+  | "mobile_banking_bbl"
+  | "mobile_banking_ktb"
+  | "mobile_banking_bay";
+
+export type ApiPaymentChargeStatus =
+  | "pending"
+  | "successful"
+  | "failed"
+  | "expired";
+
+export interface ApiPromptPayPaymentRequest {
+  orderId: string;
+}
+
+export interface ApiPromptPayPaymentResponse {
+  chargeId: string;
+  qrCodeUrl: string;
+  amount: number;
+  currency: "THB";
+  expiresAt: string;
+}
+
+export interface ApiMobileBankingPaymentRequest {
+  orderId: string;
+  bankType: ApiMobileBankingType;
+  returnUri: string;
+}
+
+export interface ApiMobileBankingPaymentResponse {
+  chargeId: string;
+  status: ApiPaymentChargeStatus;
+  authorizeUri: string;
+}
+
+export interface ApiCreditCardPaymentRequest {
+  orderId: string;
+  tokenId: string;
+  amount: number;
+  currency: "THB";
+  description: string;
+  returnUri: string;
+}
+
+export interface ApiCreditCardPaymentResponse {
+  chargeId: string;
+  status: ApiPaymentChargeStatus;
+  authorizeUri: string | null;
+}
+
+export interface ApiPaymentStatusResponse {
+  chargeId: string;
+  status: ApiPaymentChargeStatus;
+  paid: boolean;
+  paidAt: string | null;
+  failureCode: string | null;
+  failureMessage: string | null;
 }

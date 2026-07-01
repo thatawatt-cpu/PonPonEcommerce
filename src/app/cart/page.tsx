@@ -1,10 +1,14 @@
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   ArrowRight,
+  Check,
+  Clock,
   Gift,
-  ShieldCheck,
+  Trash2,
   Truck,
 } from "lucide-react";
 import { AppHeader } from "@/components/layout/app-header";
@@ -18,24 +22,119 @@ import {
   useCartHydrated,
   useCartStore,
 } from "@/store/cart-store";
+import { storeCartSelectionCheckout } from "@/features/checkout/cart-selection-checkout";
+import { SHIPPING_FEE } from "@/lib/constants";
 import { formatBaht } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
 const FREE_SHIPPING_THRESHOLD = 399;
 
 export default function CartPage() {
+  const router = useRouter();
   const hydrated = useCartHydrated();
 
   const items = useCartStore((s) => s.items);
-  const totalItems = useCartStore((s) => s.totalItems());
+  const removeItem = useCartStore((s) => s.removeItem);
   const subtotal = useCartStore((s) => s.subtotal());
-  const shippingFee = useCartStore((s) => s.shippingFee());
-  const total = useCartStore((s) => s.total());
 
-  const isEmpty = !hydrated || items.length === 0;
-  const freeShippingRemaining = Math.max(
-    FREE_SHIPPING_THRESHOLD - subtotal,
+  const itemKeys = useMemo(
+    () => items.map((item) => getCartItemKey(item)),
+    [items]
+  );
+  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(
+    () => new Set(itemKeys)
+  );
+  const [checkoutError, setCheckoutError] = useState("");
+  const [selectionTouched, setSelectionTouched] = useState(false);
+
+  useEffect(() => {
+    if (!hydrated) return;
+
+    const timer = window.setTimeout(() => {
+      setSelectedKeys((prev) => {
+        if (!selectionTouched && prev.size === 0 && itemKeys.length > 0) {
+          return new Set(itemKeys);
+        }
+
+        const existingKeys = new Set(itemKeys);
+        const next = new Set(
+          [...prev].filter((key) => existingKeys.has(key))
+        );
+        const unchanged =
+          next.size === prev.size && [...next].every((key) => prev.has(key));
+
+        return unchanged ? prev : next;
+      });
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [hydrated, itemKeys, selectionTouched]);
+
+  const allSelected =
+    itemKeys.length > 0 && itemKeys.every((k) => selectedKeys.has(k));
+  const someSelected = selectedKeys.size > 0;
+  const selectedItems = useMemo(
+    () =>
+      items
+        .map((item) => ({ key: getCartItemKey(item), item }))
+        .filter(({ key }) => selectedKeys.has(key)),
+    [items, selectedKeys]
+  );
+  const selectedSubtotal = selectedItems.reduce(
+    (sum, { item }) => sum + item.price * item.quantity,
     0
   );
+  const selectedShippingFee = selectedItems.length > 0 ? SHIPPING_FEE : 0;
+  const selectedTotal = selectedSubtotal + selectedShippingFee;
+  const selectedQuantity = selectedItems.reduce(
+    (sum, { item }) => sum + item.quantity,
+    0
+  );
+  const totalItems = selectedQuantity;
+
+  const toggleSelectAll = () => {
+    setCheckoutError("");
+    setSelectionTouched(true);
+    if (allSelected) {
+      setSelectedKeys(new Set());
+    } else {
+      setSelectedKeys(new Set(itemKeys));
+    }
+  };
+
+  const toggleItem = (key: string, checked: boolean) => {
+    setCheckoutError("");
+    setSelectionTouched(true);
+    setSelectedKeys((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(key);
+      else next.delete(key);
+      return next;
+    });
+  };
+
+  const deleteSelected = () => {
+    setSelectionTouched(true);
+    for (const key of selectedKeys) {
+      removeItem(key);
+    }
+    setSelectedKeys(new Set());
+  };
+
+  const handleCheckout = () => {
+    if (selectedItems.length === 0) {
+      setCheckoutError("กรุณาเลือกสินค้าก่อนชำระเงิน");
+      return false;
+    }
+
+    storeCartSelectionCheckout(selectedItems);
+    router.push("/checkout?mode=cart-selection");
+    return true;
+  };
+
+  const isLoadingCart = !hydrated;
+  const isEmpty = hydrated && items.length === 0;
+  const freeShippingRemaining = Math.max(FREE_SHIPPING_THRESHOLD - subtotal, 0);
   const shippingProgress = Math.min(
     (subtotal / FREE_SHIPPING_THRESHOLD) * 100,
     100
@@ -44,8 +143,23 @@ export default function CartPage() {
   return (
     <>
       <AppHeader title="ตะกร้าของฉัน" showCart={false} />
-      <PageContainer className="space-y-4 pt-4 pb-52">
-        {isEmpty ? (
+
+      <PageContainer className="space-y-3 pb-56 pt-3 md:max-w-5xl md:px-8 xl:max-w-6xl">
+        {isLoadingCart ? (
+          <div className="space-y-3">
+            <div className="h-36 animate-pulse rounded-3xl bg-white/70" />
+            <div className="overflow-hidden rounded-3xl bg-white ring-1 ring-black/[0.04]">
+              <div className="border-b border-black/[0.05] px-4 py-3">
+                <div className="h-5 w-36 animate-pulse rounded-full bg-surface-muted" />
+              </div>
+              <div className="space-y-3 px-3 py-3 md:px-4 md:py-4">
+                <div className="h-28 animate-pulse rounded-2xl bg-surface-muted" />
+                <div className="h-28 animate-pulse rounded-2xl bg-surface-muted" />
+              </div>
+            </div>
+            <div className="h-32 animate-pulse rounded-3xl bg-white/70" />
+          </div>
+        ) : isEmpty ? (
           <EmptyState
             emoji="🛒"
             title="ตะกร้ายังว่างอยู่"
@@ -58,100 +172,160 @@ export default function CartPage() {
           />
         ) : (
           <>
-            <section className="overflow-hidden rounded-card bg-brand p-4 text-white shadow-[0_14px_30px_rgba(190,9,14,0.22)]">
-              <div className="flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-xs font-semibold text-white/75">
-                    พร้อมเช็กเอาต์
-                  </p>
-                  <h1 className="mt-0.5 text-xl font-extrabold">
-                    {totalItems} ชิ้นในตะกร้า
-                  </h1>
-                </div>
-                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/16">
-                  <Gift className="h-6 w-6" />
-                </span>
-              </div>
-
-              <div className="mt-4 rounded-2xl bg-white/14 p-3">
-                <div className="mb-2 flex items-center justify-between gap-3 text-xs font-bold">
-                  <span className="flex items-center gap-1.5">
-                    <Truck className="h-4 w-4" />
-                    {freeShippingRemaining > 0
-                      ? `เพิ่มอีก ${formatBaht(freeShippingRemaining)} ได้ส่งฟรี`
-                      : "คุณได้ส่งฟรีแล้ว"}
+            {/* ── Free-shipping promo banner ── */}
+            <section className="overflow-hidden rounded-3xl bg-brand p-5 text-white shadow-[0_12px_32px_rgba(190,9,14,0.22)]">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0 flex-1">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-white/20 px-2.5 py-1 text-[10px] font-extrabold">
+                    <Gift className="h-3 w-3" />
+                    โปรโมชั่นของคุณ
                   </span>
-                  <span>{Math.round(shippingProgress)}%</span>
+
+                  <h2 className="mt-2 text-[1.1rem] font-extrabold leading-snug">
+                    {freeShippingRemaining > 0
+                      ? "คุณใกล้ได้รับสิทธิ์จัดส่งฟรี!"
+                      : "คุณได้สิทธิ์จัดส่งฟรีแล้ว! 🎉"}
+                  </h2>
+                  <p className="mt-0.5 text-sm font-semibold text-white/80">
+                    {freeShippingRemaining > 0
+                      ? `เพิ่มอีก ${formatBaht(freeShippingRemaining)} ได้จัดส่งฟรี`
+                      : "ขอบคุณที่ช้อปกับ PonPon"}
+                  </p>
+
+                  <div className="mt-3.5">
+                    <div className="mb-1.5 flex items-center justify-between text-xs font-bold text-white/70">
+                      <span className="flex items-center gap-1">
+                        <Truck className="h-3.5 w-3.5" />
+                        ส่งฟรีเมื่อครบ {formatBaht(FREE_SHIPPING_THRESHOLD)}
+                      </span>
+                      <span>{Math.round(shippingProgress)}%</span>
+                    </div>
+                    <div className="h-2 overflow-hidden rounded-full bg-white/20">
+                      <div
+                        className="h-full rounded-full bg-white shadow-[0_0_8px_rgba(255,255,255,0.6)] transition-all duration-500"
+                        style={{ width: `${Math.max(shippingProgress, 2)}%` }}
+                      />
+                    </div>
+                  </div>
                 </div>
-                <div className="h-2 overflow-hidden rounded-full bg-white/20">
-                  <div
-                    className="h-full rounded-full bg-white shadow-[0_0_10px_rgba(255,255,255,0.55)]"
-                    style={{ width: `${shippingProgress}%` }}
-                  />
+
+                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-white/15 text-3xl">
+                  🎁
                 </div>
               </div>
             </section>
 
-            <section className="rounded-card bg-white p-3 shadow-[0_10px_30px_rgba(65,25,25,0.07)] ring-1 ring-black/[0.04]">
-              <div className="mb-2 flex items-center justify-between px-1">
-                <h2 className="text-sm font-extrabold text-ink">
-                  รายการสินค้า
-                </h2>
-                <Link
-                  href="/products"
-                  className="text-xs font-bold text-brand"
+            {/* ── Cart items ── */}
+            <section className="overflow-hidden rounded-3xl bg-white ring-1 ring-black/[0.04]">
+              {/* Select-all row */}
+              <div className="flex items-center justify-between border-b border-black/[0.05] px-4 py-3">
+                <button
+                  type="button"
+                  onClick={toggleSelectAll}
+                  className="flex items-center gap-2.5 text-sm font-bold text-ink active:opacity-70"
                 >
-                  ช้อปเพิ่ม
-                </Link>
+                  <span
+                    className={cn(
+                      "flex h-5 w-5 items-center justify-center rounded-md border-2 transition",
+                      allSelected ? "border-brand bg-brand" : "border-black/20"
+                    )}
+                  >
+                    {allSelected && (
+                      <Check className="h-3.5 w-3.5 text-white" strokeWidth={3} />
+                    )}
+                  </span>
+                  เลือกทั้งหมด ({items.length})
+                </button>
+
+                {someSelected && (
+                  <button
+                    type="button"
+                    onClick={deleteSelected}
+                    className="flex items-center gap-1 text-xs font-bold text-brand transition active:opacity-70"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    ลบที่เลือก
+                  </button>
+                )}
               </div>
-              <div className="space-y-2">
-              {items.map((item) => (
-                <CartItem key={getCartItemKey(item)} item={item} />
-              ))}
+
+              {/* Item list */}
+              <div className="space-y-2 px-3 py-3 md:px-4 md:py-4">
+                {items.map((item) => {
+                  const key = getCartItemKey(item);
+                  return (
+                    <CartItem
+                      key={key}
+                      item={item}
+                      checked={selectedKeys.has(key)}
+                      onCheckedChange={(checked) => toggleItem(key, checked)}
+                    />
+                  );
+                })}
+              </div>
+
+              {/* Reservation note */}
+              <div className="flex items-center gap-2 border-t border-black/[0.05] px-4 py-2.5">
+                <Clock className="h-3.5 w-3.5 shrink-0 text-brand/60" />
+                <p className="text-xs font-semibold text-ink-soft">
+                  ระบบจะจองสินค้าในตะกร้าไว้ให้คุณ 30 นาที
+                </p>
               </div>
             </section>
 
-            <section className="overflow-hidden rounded-card bg-white shadow-[0_10px_30px_rgba(65,25,25,0.07)] ring-1 ring-black/[0.04]">
-              <div className="px-4 py-3">
+            {/* ── Order summary ── */}
+            <section className="rounded-3xl bg-white px-4 py-4 ring-1 ring-black/[0.04]">
               <CartSummary
-                subtotal={subtotal}
-                shippingFee={shippingFee}
-                total={total}
+                subtotal={selectedSubtotal}
+                shippingFee={selectedShippingFee}
+                total={selectedTotal}
               />
-              </div>
-
-              <div className="flex items-center gap-2 bg-surface-muted/65 px-4 py-3 text-xs font-bold text-ink-soft">
-                <ShieldCheck className="h-4 w-4 text-brand" />
-                ชำระปลอดภัย แพ็กดี และติดตามออเดอร์ได้ทุกขั้นตอน
-              </div>
             </section>
+
           </>
         )}
       </PageContainer>
 
-      {/* Sticky checkout bar */}
-      {!isEmpty && (
-        <div className="promo-action-bar fixed inset-x-0 bottom-above-nav z-30 border-t border-brand/10 bg-white/95 px-4 pb-3 pt-3 backdrop-blur md:px-6">
-          <div className="mx-auto max-w-md md:max-w-3xl">
-            <div className="mb-2 flex items-end justify-between gap-3">
-              <div>
-                <p className="text-xs font-semibold text-ink-soft">
-                  ยอดชำระทั้งหมด
+      {/* ── Sticky checkout bar ── */}
+      {!isLoadingCart && !isEmpty && (
+        <div className="promo-action-bar fixed inset-x-0 bottom-above-nav z-30 border-t border-black/[0.05] bg-white/95 backdrop-blur">
+          <div className="mx-auto max-w-[430px] px-4 pb-3 pt-3 md:max-w-5xl md:px-8 xl:max-w-6xl">
+            <div className="flex items-center gap-3">
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-semibold text-ink-soft">
+                  ยอดรวมทั้งหมด
                 </p>
-                <p className="text-xl font-extrabold text-brand">
-                  {formatBaht(total)}
-                </p>
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-xl font-extrabold text-brand">
+                    {formatBaht(selectedTotal)}
+                  </span>
+                  <span className="text-xs font-semibold text-ink-soft">
+                    รวม {totalItems} ชิ้น
+                  </span>
+                </div>
               </div>
-              <p className="text-right text-[11px] font-semibold text-ink-soft">
-                รวม {totalItems} ชิ้น
-              </p>
+              <Link
+                href="/checkout?mode=cart-selection"
+                className="shrink-0"
+                onClick={(event) => {
+                  event.preventDefault();
+                  handleCheckout();
+                }}
+              >
+                <Button
+                  size="lg"
+                  className="gap-1.5 px-6"
+                >
+                  ไปชำระเงิน
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+              </Link>
             </div>
-            <Link href="/checkout" className="block">
-              <Button size="lg" fullWidth>
-                ไปชำระเงิน
-                <ArrowRight className="h-5 w-5" />
-              </Button>
-            </Link>
+            {checkoutError && (
+              <p className="mt-2 rounded-2xl bg-red-50 px-3 py-2 text-center text-xs font-semibold text-red-600">
+                {checkoutError}
+              </p>
+            )}
           </div>
         </div>
       )}

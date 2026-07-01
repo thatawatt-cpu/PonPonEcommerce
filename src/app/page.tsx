@@ -55,11 +55,11 @@ export default async function HomePage() {
   return (
     <>
       <AppHeader />
-      <PageContainer className="pt-3.5">
+      <PageContainer className="pt-3.5 md:max-w-5xl md:px-8 xl:max-w-6xl">
         <PromoHeroCarousel slides={homeSlides} />
 
-        <section className="mt-4 rounded-card bg-white shadow-[0_8px_24px_rgba(65,25,25,0.06)]">
-          <div className="no-scrollbar flex overflow-x-auto px-2 py-3 md:grid md:grid-cols-5 md:overflow-visible md:px-4">
+        <section className="home-panel-shadow mt-4 rounded-card bg-white">
+          <div className="no-scrollbar flex overflow-x-auto px-2 py-3 md:grid md:grid-cols-5 md:overflow-visible md:px-4 lg:grid-cols-10">
             {categories.map((category) => (
               <Link
                 key={category.id}
@@ -100,7 +100,7 @@ export default async function HomePage() {
               ดูทั้งหมด
             </Link>
           </div>
-          <div className="grid grid-cols-2 gap-2.5 md:grid-cols-3 md:gap-4">
+          <div className="grid grid-cols-2 gap-2.5 md:grid-cols-3 md:gap-4 lg:grid-cols-4">
             {displayBestSellers.map((product, index) => (
               <ProductCard key={product.id} product={product} index={index} />
             ))}
@@ -122,7 +122,7 @@ export default async function HomePage() {
               ดูทั้งหมด
             </Link>
           </div>
-          <div className="grid grid-cols-2 gap-2.5 md:grid-cols-3 md:gap-4">
+          <div className="grid grid-cols-2 gap-2.5 md:grid-cols-3 md:gap-4 lg:grid-cols-4">
             {displayFeatured.map((product, index) => (
               <ProductCard key={product.id} product={product} index={index} />
             ))}

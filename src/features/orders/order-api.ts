@@ -5,6 +5,7 @@ import type {
   ApiCreateOrderRequest,
   ApiCreateOrderResponse,
   ApiOrderListItem,
+  ApiOrderListResponse,
   ApiOrderDetail,
 } from "@/types/api";
 
@@ -29,14 +30,23 @@ export async function createOrder(
 }
 
 export async function fetchOrders(params?: {
-  status?: string;
-  paymentStatus?: string;
+  status?: string[];
+  paymentstatus?: string | string[];
+  paymentStatus?: string | string[];
   page?: number;
   pageSize?: number;
-}): Promise<ApiOrderListItem[]> {
+}): Promise<ApiOrderListResponse> {
   const qs = new URLSearchParams();
-  if (params?.status) qs.set("status", params.status);
-  if (params?.paymentStatus) qs.set("paymentStatus", params.paymentStatus);
+  if (params?.status) {
+    for (const s of params.status) qs.append("status", s);
+  }
+  const paymentStatus = params?.paymentstatus ?? params?.paymentStatus;
+  if (paymentStatus) {
+    const paymentStatuses = Array.isArray(paymentStatus)
+      ? paymentStatus
+      : [paymentStatus];
+    for (const s of paymentStatuses) qs.append("paymentstatus", s);
+  }
   if (params?.page != null) qs.set("page", String(params.page));
   if (params?.pageSize != null) qs.set("pageSize", String(params.pageSize));
 
@@ -48,7 +58,20 @@ export async function fetchOrders(params?: {
     throw new Error(`โหลดรายการออเดอร์ไม่สำเร็จ (${response.status})`);
   }
 
-  return response.json();
+  const data = (await response.json()) as ApiOrderListResponse | ApiOrderListItem[];
+
+  if (Array.isArray(data)) {
+    const pageSize = params?.pageSize ?? 10;
+    return {
+      items: data,
+      page: params?.page ?? 1,
+      pageSize,
+      total: data.length,
+      hasMore: data.length === pageSize,
+    };
+  }
+
+  return data;
 }
 
 export async function fetchOrderById(id: string): Promise<ApiOrderDetail> {
@@ -61,9 +84,23 @@ export async function fetchOrderById(id: string): Promise<ApiOrderDetail> {
   return response.json();
 }
 
-export async function cancelOrder(id: string): Promise<void> {
+export interface CancelOrderInput {
+  reason: string;
+  detail?: string;
+}
+
+export async function cancelOrder(
+  id: string,
+  input: CancelOrderInput
+): Promise<void> {
+  const reason = input.detail?.trim()
+    ? `${input.reason.trim()} - ${input.detail.trim()}`
+    : input.reason.trim();
+
   const response = await ponponFetch(`/api/orders/${id}/cancel`, {
     method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ reason }),
   });
 
   if (!response.ok) {
@@ -71,6 +108,35 @@ export async function cancelOrder(id: string): Promise<void> {
     throw new Error(
       (err as { message?: string } | null)?.message ??
         `ยกเลิกออเดอร์ไม่สำเร็จ (${response.status})`
+    );
+  }
+}
+
+export interface CreateReturnRequestInput {
+  reason: string;
+  photos: File[];
+}
+
+export async function createReturnRequest(
+  id: string,
+  input: CreateReturnRequestInput
+): Promise<void> {
+  const body = new FormData();
+  body.append("reason", input.reason.trim());
+  for (const photo of input.photos) {
+    body.append("photos", photo, photo.name);
+  }
+
+  const response = await ponponFetch(`/api/orders/${id}/return-request`, {
+    method: "POST",
+    body,
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => null);
+    throw new Error(
+      (err as { message?: string } | null)?.message ??
+        `ส่งคำขอคืนสินค้าไม่สำเร็จ (${response.status})`
     );
   }
 }

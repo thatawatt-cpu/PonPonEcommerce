@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   ArrowUpRight,
@@ -19,10 +19,14 @@ import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
 import { OrderStatusBadge } from "@/components/ui/status-badge";
+import { ProductImage } from "@/components/product/product-image";
 import { fetchOrders } from "@/features/orders/order-api";
 import { formatBaht, formatDate } from "@/lib/format";
-import type { ApiOrderListItem } from "@/types/api";
-import type { OrderStatus, PaymentStatus } from "@/types/order";
+import type {
+  ApiOrderListItem,
+  ApiOrderPreviewItem,
+} from "@/types/api";
+import type { OrderStatus } from "@/types/order";
 
 type OrderFilter =
   | "all"
@@ -32,117 +36,434 @@ type OrderFilter =
   | "completed"
   | "cancelled";
 
-const orderFilters: {
+const orderTabs: {
   value: OrderFilter;
   label: string;
-  statuses?: OrderStatus[];
+  status: string[] | null;
+  paymentstatus: string[] | null;
 }[] = [
-  { value: "all", label: "ทั้งหมด" },
+  {
+    value: "all",
+    label: "ทั้งหมด",
+    status: null,
+    paymentstatus: null,
+  },
   {
     value: "payment",
     label: "รอชำระ",
-    statuses: ["pending", "reviewing_payment"],
+    status: ["0"],
+    paymentstatus: ["0"],
   },
   {
     value: "preparing",
-    label: "กำลังเตรียม",
-    statuses: ["paid", "preparing"],
+    label: "เตรียมสินค้า",
+    status: ["3", "5"],
+    paymentstatus: ["1"],
   },
-  { value: "shipped", label: "จัดส่งแล้ว", statuses: ["shipped"] },
-  { value: "completed", label: "สำเร็จ", statuses: ["completed"] },
-  { value: "cancelled", label: "ยกเลิก", statuses: ["cancelled"] },
+  {
+    value: "shipped",
+    label: "จัดส่งแล้ว",
+    status: ["6"],
+    paymentstatus: ["1"],
+  },
+  {
+    value: "completed",
+    label: "สำเร็จ",
+    status: ["1"],
+    paymentstatus: ["1"],
+  },
+  {
+    value: "cancelled",
+    label: "ยกเลิก/คืน",
+    status: ["2", "4", "7"],
+    paymentstatus: null,
+  },
 ];
 
 const progressByStatus: Record<OrderStatus, number> = {
   pending: 10,
-  reviewing_payment: 28,
-  paid: 45,
-  preparing: 62,
-  shipped: 82,
-  completed: 100,
-  cancelled: 0,
+  waiting: 28,
+  packed: 55,
+  shipping: 78,
+  success: 100,
+  voided: 0,
+  returned: 0,
+  failed_shipment: 0,
 };
 
 const helperByStatus: Record<OrderStatus, string> = {
   pending: "กรุณาชำระเงินเพื่อยืนยันออเดอร์",
-  reviewing_payment: "ร้านกำลังตรวจสอบหลักฐานการชำระเงิน",
-  paid: "ชำระเงินแล้ว รอร้านเตรียมสินค้า",
-  preparing: "ร้านกำลังแพ็กสินค้าให้คุณ",
-  shipped: "สินค้าออกเดินทางแล้ว",
-  completed: "จัดส่งสำเร็จ ขอบคุณที่อุดหนุน",
-  cancelled: "ออเดอร์นี้ถูกยกเลิก",
+  waiting: "ร้านกำลังเตรียมสินค้า",
+  packed: "แพ็กสินค้าแล้ว",
+  shipping: "กำลังจัดส่ง",
+  success: "จัดส่งสำเร็จ ขอบคุณที่อุดหนุน",
+  voided: "ออเดอร์นี้ถูกยกเลิก",
+  returned: "สินค้าถูกส่งคืน",
+  failed_shipment: "การจัดส่งไม่สำเร็จ กรุณาติดต่อร้านค้า",
 };
 
+const ORDER_PAGE_CONTAINER_CLASS = "pt-4 md:max-w-5xl md:px-8 xl:max-w-6xl";
+const ORDER_PAGE_SIZE = 10;
+const EMPTY_ORDERS: ApiOrderListItem[] = [];
+const FALLBACK_ORDER_PAGE_SIZE = 100;
+
+const orderFilterParams = orderTabs.reduce(
+  (params, filter) => {
+    params[filter.value] = {
+      status: filter.status,
+      paymentstatus: filter.paymentstatus,
+    };
+    return params;
+  },
+  {} as Record<
+    OrderFilter,
+    { status: string[] | null; paymentstatus: string[] | null }
+  >
+);
+
+interface OrderPreviewItem {
+  id: string;
+  sku: string;
+  name: string;
+  quantity: number;
+  totalPrice: number;
+  imageUrl?: string | null;
+  optionLabels: string[];
+}
+
 function mapStatus(status: string): OrderStatus {
-  const known: OrderStatus[] = [
-    "pending",
-    "reviewing_payment",
-    "paid",
-    "preparing",
-    "shipped",
-    "completed",
-    "cancelled",
-  ];
-  const lower = status.toLowerCase().replace(/[-\s]/g, "_") as OrderStatus;
-  return known.includes(lower) ? lower : "pending";
-}
-
-function mapPaymentStatus(status: string): PaymentStatus {
-  const map: Record<string, PaymentStatus> = {
+  const map: Record<string, OrderStatus> = {
+    "0": "pending",
+    "1": "success",
+    "2": "voided",
+    "3": "waiting",
+    "4": "returned",
+    "5": "packed",
+    "6": "shipping",
+    "7": "failed_shipment",
     pending: "pending",
-    reviewing: "reviewing",
-    paid: "paid",
-    failed: "failed",
+    success: "success",
+    voided: "voided",
+    cancelled: "voided",
+    canceled: "voided",
+    waiting: "waiting",
+    returned: "returned",
+    packed: "packed",
+    shipping: "shipping",
+    failed_shipment: "failed_shipment",
+    "failed shipment": "failed_shipment",
   };
-  return map[status.toLowerCase()] ?? "pending";
+  return map[String(status).toLowerCase()] ?? "pending";
 }
 
-function OrderCard({ order }: { order: ApiOrderListItem }) {
-  const orderStatus = mapStatus(order.status);
-  const progress = progressByStatus[orderStatus];
-  const isShipped = orderStatus === "shipped";
+function normalizeStatusValue(status: unknown): string {
+  return String(status ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
+}
+
+function getOrderStatusCode(status: unknown): string {
+  const normalized = normalizeStatusValue(status);
+  const map: Record<string, string> = {
+    pending: "0",
+    success: "1",
+    voided: "2",
+    cancelled: "2",
+    canceled: "2",
+    waiting: "3",
+    returned: "4",
+    packed: "5",
+    shipping: "6",
+    failed_shipment: "7",
+  };
+
+  return map[normalized] ?? normalized;
+}
+
+function getPaymentStatusCode(status: unknown): string {
+  const normalized = normalizeStatusValue(status);
+  const map: Record<string, string> = {
+    pending: "0",
+    unpaid: "0",
+    awaiting_payment: "0",
+    waiting_payment: "0",
+    paid: "1",
+    success: "1",
+    successful: "1",
+    completed: "1",
+    fully_paid: "1",
+    voided: "2",
+    cancelled: "2",
+    canceled: "2",
+    partial_payment: "3",
+    partial: "3",
+    excess_payment: "4",
+    overpaid: "4",
+  };
+
+  return map[normalized] ?? normalized;
+}
+
+function getOrderPaymentStatusValue(order: ApiOrderListItem): unknown {
+  const paymentStatus =
+    (order as ApiOrderListItem & { paymentstatus?: unknown }).paymentstatus ??
+    order.paymentStatus;
+
+  if (paymentStatus != null && String(paymentStatus).trim()) {
+    return paymentStatus;
+  }
+
+  const paymentAmount = Number(order.paymentAmount);
+  return Number.isFinite(paymentAmount) && paymentAmount > 0 ? "1" : paymentStatus;
+}
+
+function matchesOrderFilter(
+  order: ApiOrderListItem,
+  filter: { status: string[] | null; paymentstatus: string[] | null }
+): boolean {
+  const orderStatus = getOrderStatusCode(order.status);
+  const paymentStatus = getPaymentStatusCode(getOrderPaymentStatusValue(order));
 
   return (
-    <Link href={`/orders/${order.id}`} className="group block">
-      <Card className="overflow-hidden transition duration-200 group-active:scale-[0.985]">
-        <div className="flex items-center justify-between border-b border-black/[0.05] px-4 py-3">
-          <div className="flex items-center gap-2">
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-soft text-brand">
+    (!filter.status || filter.status.includes(orderStatus)) &&
+    (!filter.paymentstatus || filter.paymentstatus.includes(paymentStatus))
+  );
+}
+
+async function fetchOrdersWithClientFallback(
+  filter: OrderFilter,
+  nextPage: number,
+  pageSize: number
+) {
+  const filterParams = orderFilterParams[filter];
+  const response = await fetchOrders({
+    page: nextPage,
+    pageSize,
+    status: filterParams.status ?? undefined,
+    paymentstatus: filterParams.paymentstatus ?? undefined,
+  });
+
+  if (filter === "all" || response.items.length > 0 || nextPage !== 1) {
+    return response;
+  }
+
+  const fallbackResponse = await fetchOrders({
+    page: 1,
+    pageSize: FALLBACK_ORDER_PAGE_SIZE,
+  });
+  const fallbackItems = fallbackResponse.items.filter((order) =>
+    matchesOrderFilter(order, filterParams)
+  );
+
+  return {
+    items: fallbackItems.slice(0, pageSize),
+    page: 1,
+    pageSize,
+    total: fallbackItems.length,
+    hasMore: fallbackItems.length > pageSize,
+  };
+}
+
+function formatVariantOptions(
+  options?: { name: string; value: string }[]
+): string[] {
+  return (
+    options
+    ?.filter((option) => option.value)
+    .map((option) => `${option.name}: ${option.value}`)
+      ?? []
+  );
+}
+
+function mapOrderItemToPreview(item: ApiOrderPreviewItem): OrderPreviewItem {
+  return {
+    id: item.id,
+    sku: item.sku,
+    name: item.name,
+    quantity: Math.round(item.quantity),
+    totalPrice: item.totalPrice,
+    imageUrl: item.imageUrl,
+    optionLabels: formatVariantOptions(item.options),
+  };
+}
+
+
+function OrderCardSkeleton() {
+  return (
+    <Card className="overflow-hidden bg-white">
+      <div className="flex items-center justify-between gap-3 border-b border-black/[0.05] px-4 py-3">
+        <div className="flex items-center gap-2.5">
+          <div className="h-8 w-8 shrink-0 animate-pulse rounded-full bg-brand-soft/80" />
+          <div className="space-y-1.5">
+            <div className="h-3.5 w-24 animate-pulse rounded-full bg-black/[0.07]" />
+            <div className="h-2.5 w-16 animate-pulse rounded-full bg-black/[0.05]" />
+          </div>
+        </div>
+        <div className="h-6 w-16 animate-pulse rounded-full bg-black/[0.06]" />
+      </div>
+
+      <div className="px-4 py-3">
+        <div className="flex min-w-0 items-start gap-3">
+          <div className="h-20 w-20 shrink-0 animate-pulse rounded-xl bg-brand-soft/70" />
+          <div className="min-w-0 flex-1 space-y-2.5 pt-1">
+            <div className="h-4 w-4/5 animate-pulse rounded-full bg-black/[0.07]" />
+            <div className="h-3 w-2/5 animate-pulse rounded-full bg-black/[0.05]" />
+            <div className="ml-auto h-4 w-20 animate-pulse rounded-full bg-black/[0.07]" />
+          </div>
+        </div>
+        <div className="mt-4 space-y-1.5">
+          <div className="h-2.5 w-2/5 animate-pulse rounded-full bg-black/[0.05]" />
+          <div className="h-1.5 w-full animate-pulse rounded-full bg-brand-soft/60" />
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between gap-3 border-t border-black/[0.05] bg-surface-muted/45 px-4 py-3">
+        <div className="space-y-1.5">
+          <div className="h-2.5 w-24 animate-pulse rounded-full bg-black/[0.05]" />
+          <div className="h-4 w-20 animate-pulse rounded-full bg-black/[0.07]" />
+        </div>
+        <div className="h-8 w-24 animate-pulse rounded-full bg-brand-soft/70" />
+      </div>
+    </Card>
+  );
+}
+
+function OrderCard({
+  order,
+  previewItems = [],
+  isPreviewLoading = false,
+  itemsCount,
+}: {
+  order: ApiOrderListItem;
+  previewItems?: OrderPreviewItem[];
+  isPreviewLoading?: boolean;
+  itemsCount: number;
+}) {
+  const [itemsExpanded, setItemsExpanded] = useState(false);
+  const orderStatus = mapStatus(order.status);
+  const progress = progressByStatus[orderStatus];
+  const isShipped = orderStatus === "shipping";
+  const visiblePreviewItems = itemsExpanded ? previewItems : previewItems.slice(0, 1);
+  const hiddenPreviewCount = Math.max(itemsCount - visiblePreviewItems.length, 0);
+  const previewHiddenCount = Math.max(previewItems.length - visiblePreviewItems.length, 0);
+  const hasMoreItems = Math.max(itemsCount, previewItems.length) > 1;
+
+  return (
+      <Card className="overflow-hidden bg-white">
+        <div className="flex items-center justify-between gap-3 border-b border-black/[0.05] px-4 py-3">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-soft text-brand">
               {isShipped ? (
                 <PackageCheck className="h-4 w-4" />
               ) : (
                 <Clock3 className="h-4 w-4" />
               )}
             </span>
-            <div>
-              <p className="text-sm font-extrabold text-ink">{order.number}</p>
-              <p className="text-[10px] font-medium text-ink-soft">
+            <div className="min-w-0">
+              <p className="line-clamp-1 text-sm font-extrabold text-ink">
+                PonPon Official
+              </p>
+              <p className="line-clamp-1 text-[10px] font-semibold text-ink-soft">
                 {order.orderDate ? formatDate(order.orderDate) : "—"}
               </p>
             </div>
           </div>
-          <OrderStatusBadge status={orderStatus} />
+          <div className="shrink-0 text-right">
+            <OrderStatusBadge status={orderStatus} />
+          </div>
         </div>
 
-        <div className="px-4 py-3.5">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-brand-soft text-brand">
-              <ShoppingBag className="h-5 w-5" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-bold text-ink">ออเดอร์ {order.number}</p>
-              {order.trackingNo && (
-                <p className="mt-0.5 text-xs text-ink-soft">
-                  เลขพัสดุ: {order.trackingNo}
-                </p>
+        <div className="px-4 py-3">
+          <div className="space-y-3">
+              {isPreviewLoading ? (
+                <div className="flex min-w-0 items-start gap-3">
+                  <div className="h-20 w-20 shrink-0 animate-pulse rounded-xl bg-brand-soft/80 sm:h-24 sm:w-24" />
+                  <div className="min-w-0 flex-1 space-y-2.5 pt-1">
+                    <div className="h-4 w-4/5 animate-pulse rounded-full bg-black/[0.06]" />
+                    <div className="h-3.5 w-1/3 animate-pulse rounded-full bg-black/[0.05]" />
+                    <div className="ml-auto h-4 w-20 animate-pulse rounded-full bg-black/[0.06]" />
+                  </div>
+                </div>
+              ) : visiblePreviewItems.length > 0 ? (
+                <>
+                  {visiblePreviewItems.map((item) => (
+                    <div key={item.id} className="flex min-w-0 items-start gap-3">
+                      {item.imageUrl ? (
+                        <ProductImage
+                          imageUrl={item.imageUrl}
+                          emoji="📦"
+                          size="sm"
+                          className="h-20 w-20 shrink-0 rounded-xl sm:h-24 sm:w-24"
+                        />
+                      ) : (
+                        <div className="flex h-20 w-20 shrink-0 flex-col items-center justify-center rounded-xl bg-surface-muted text-ink-soft ring-1 ring-black/[0.04] sm:h-24 sm:w-24">
+                          <ShoppingBag className="h-5 w-5" />
+                          <span className="mt-1 text-[10px] font-bold">ไม่มีรูป</span>
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1 pt-0.5">
+                        <div className="flex min-w-0 items-start justify-between gap-3">
+                          <p className="line-clamp-2 text-sm font-bold leading-snug text-ink sm:text-[15px]">
+                            {item.name}
+                          </p>
+                          <p className="shrink-0 text-xs font-bold text-ink-soft">
+                            x{item.quantity}
+                          </p>
+                        </div>
+                        {item.optionLabels.length > 0 && (
+                          <p className="mt-1 line-clamp-1 text-xs font-semibold text-ink-soft">
+                            {item.optionLabels.join(" · ")}
+                          </p>
+                        )}
+                        <div className="mt-3 text-right">
+                          <span className="text-sm font-extrabold text-brand">
+                            {formatBaht(item.totalPrice)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  {hasMoreItems && (
+                    <button
+                      type="button"
+                      onClick={() => setItemsExpanded((value) => !value)}
+                      className="flex w-full items-center justify-center gap-1.5 border-t border-black/[0.05] pt-2 text-sm font-bold text-ink-soft transition hover:text-brand active:scale-[0.99]"
+                    >
+                      {itemsExpanded ? "ย่อรายการ" : "ดูเพิ่มเติม"}
+                      {!itemsExpanded && hiddenPreviewCount > 0 && (
+                        <span className="text-xs font-semibold">
+                          ({hiddenPreviewCount} รายการ)
+                        </span>
+                      )}
+                      <ChevronRight
+                        className={`h-4 w-4 transition ${
+                          itemsExpanded ? "-rotate-90" : "rotate-90"
+                        }`}
+                      />
+                    </button>
+                  )}
+                  {itemsExpanded && hiddenPreviewCount > previewHiddenCount && (
+                    <p className="text-center text-xs font-bold text-brand">
+                      + อีก {hiddenPreviewCount - previewHiddenCount} รายการในรายละเอียด
+                    </p>
+                  )}
+                </>
+              ) : (
+                <div className="flex min-w-0 items-start gap-3">
+                  <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl bg-brand-soft text-brand sm:h-24 sm:w-24">
+                    <ShoppingBag className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="line-clamp-2 text-sm font-bold text-ink">ออเดอร์ {order.number}</p>
+                    {order.trackingNo && (
+                      <p className="mt-0.5 text-xs text-ink-soft">
+                        เลขพัสดุ: {order.trackingNo}
+                      </p>
+                    )}
+                  </div>
+                </div>
               )}
-            </div>
-            <div className="shrink-0 text-right">
-              <p className="text-xs text-ink-soft">ยอดรวม</p>
-              <p className="text-base font-extrabold text-brand">
-                {formatBaht(order.amount)}
-              </p>
-            </div>
           </div>
 
           <div className="mt-4">
@@ -163,83 +484,167 @@ function OrderCard({ order }: { order: ApiOrderListItem }) {
           </div>
         </div>
 
-        <div className="flex items-center justify-between bg-surface-muted/65 px-4 py-2.5">
-          <span className="text-[11px] font-semibold text-ink-soft">
-            อัปเดตล่าสุด {order.orderDate ? formatDate(order.orderDate) : "—"}
-          </span>
-          <span className="flex items-center gap-1 text-xs font-extrabold text-brand">
+        <div className="flex items-center justify-between gap-3 border-t border-black/[0.05] bg-surface-muted/45 px-4 py-3">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold text-ink-soft">
+              {isPreviewLoading
+                ? "กำลังโหลดรายการสินค้า"
+                : `สินค้ารวม ${itemsCount || previewItems.length || 1} รายการ`}
+            </p>
+            <p className="text-base font-extrabold text-ink">
+              รวม {formatBaht(order.amount)}
+            </p>
+          </div>
+          <Link
+            href={`/orders/${order.id}`}
+            className="flex shrink-0 items-center gap-1 rounded-full border border-brand bg-white px-4 py-2 text-xs font-extrabold text-brand transition active:scale-95"
+          >
             ติดตามออเดอร์
             <ChevronRight className="h-4 w-4" />
-          </span>
+          </Link>
         </div>
       </Card>
-    </Link>
   );
 }
 
+type TabPagination = { page: number; hasMore: boolean };
+
 export default function OrdersPage() {
-  const [orders, setOrders] = useState<ApiOrderListItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [ordersCache, setOrdersCache] = useState<Partial<Record<OrderFilter, ApiOrderListItem[]>>>({});
+  const [paginationCache, setPaginationCache] = useState<Partial<Record<OrderFilter, TabPagination>>>({});
+  const [loadingTab, setLoadingTab] = useState<OrderFilter | null>("all");
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
   const [activeFilter, setActiveFilter] = useState<OrderFilter>("all");
   const [query, setQuery] = useState("");
+  const [loadedTabs, setLoadedTabs] = useState<Set<OrderFilter>>(
+    () => new Set()
+  );
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
+  const fetchingRef = useRef(false);
+  const loadedTabsRef = useRef<Set<OrderFilter>>(new Set());
+
+  const orders = ordersCache[activeFilter] ?? EMPTY_ORDERS;
+  const { page = 0, hasMore = true } = paginationCache[activeFilter] ?? {};
+  const loading = loadingTab === activeFilter;
+  const activeTabLoaded = loadedTabs.has(activeFilter);
+  const shouldShowInitialLoading =
+    loading || (!activeTabLoaded && orders.length === 0);
+
+  const loadOrdersPage = useCallback(
+    async (filter: OrderFilter, nextPage: number, mode: "replace" | "append" = "append") => {
+      if (fetchingRef.current) return;
+
+      fetchingRef.current = true;
+      setLoadMoreError(null);
+      if (mode === "replace") {
+        setError(null);
+        setLoadingTab(filter);
+      } else {
+        setLoadingMore(true);
+      }
+
+      try {
+        const response = await fetchOrdersWithClientFallback(
+          filter,
+          nextPage,
+          ORDER_PAGE_SIZE
+        );
+
+        setOrdersCache((prev) => {
+          const current = prev[filter] ?? [];
+          const items =
+            mode === "replace"
+              ? response.items
+              : (() => {
+                  const seen = new Set(current.map((o) => o.id));
+                  return [...current, ...response.items.filter((o) => !seen.has(o.id))];
+                })();
+          return { ...prev, [filter]: items };
+        });
+        setPaginationCache((prev) => ({
+          ...prev,
+          [filter]: { page: response.page, hasMore: response.hasMore },
+        }));
+        loadedTabsRef.current.add(filter);
+        setLoadedTabs((prev) => new Set(prev).add(filter));
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "โหลดรายการออเดอร์ไม่สำเร็จ";
+        if (mode === "replace") {
+          setError(message);
+        } else {
+          setLoadMoreError(message);
+        }
+      } finally {
+        fetchingRef.current = false;
+        setLoadingTab(null);
+        setLoadingMore(false);
+      }
+    },
+    []
+  );
 
   useEffect(() => {
-    fetchOrders({ pageSize: 100 })
-      .then(setOrders)
-      .catch((err: unknown) => {
-        setError(
-          err instanceof Error ? err.message : "โหลดรายการออเดอร์ไม่สำเร็จ"
-        );
-      })
-      .finally(() => setLoading(false));
-  }, []);
+    if (loadedTabs.has(activeFilter)) return;
 
-  const activeOrders = orders.filter((o) => {
+    const timer = window.setTimeout(() => {
+      fetchingRef.current = false;
+      void loadOrdersPage(activeFilter, 1, "replace");
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [activeFilter, loadOrdersPage, loadedTabs]);
+
+  useEffect(() => {
+    const target = loadMoreRef.current;
+    if (!target || shouldShowInitialLoading || !hasMore) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting && !fetchingRef.current) {
+          void loadOrdersPage(activeFilter, page + 1);
+        }
+      },
+      { rootMargin: "480px 0px" }
+    );
+
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [activeFilter, hasMore, loadOrdersPage, page, shouldShowInitialLoading]);
+
+  const activeOrders = (ordersCache.all ?? []).filter((o) => {
     const s = mapStatus(o.status);
-    return s !== "completed" && s !== "cancelled";
+    return s !== "success" && s !== "voided" && s !== "returned" && s !== "failed_shipment";
   }).length;
 
   const normalizedQuery = query.trim().toLocaleLowerCase("th");
 
+  const handleFilterChange = (filter: OrderFilter) => {
+    const filterLoaded = loadedTabs.has(filter);
+    setActiveFilter(filter);
+    if (!filterLoaded && (ordersCache[filter]?.length ?? 0) === 0) {
+      setLoadingTab(filter);
+    }
+  };
+
   const filteredOrders = useMemo(() => {
-    const filter = orderFilters.find((f) => f.value === activeFilter);
     return orders.filter((order) => {
-      const orderStatus = mapStatus(order.status);
-      const matchesStatus =
-        !filter?.statuses || filter.statuses.includes(orderStatus);
-      const matchesQuery =
+      return (
         !normalizedQuery ||
         order.number.toLocaleLowerCase("th").includes(normalizedQuery) ||
-        order.id.includes(normalizedQuery);
-      return matchesStatus && matchesQuery;
+        order.id.includes(normalizedQuery)
+      );
     });
-  }, [activeFilter, normalizedQuery, orders]);
+  }, [normalizedQuery, orders]);
 
-  const getFilterCount = (statuses?: OrderStatus[]) =>
-    statuses
-      ? orders.filter((o) => statuses.includes(mapStatus(o.status))).length
-      : orders.length;
-
-  if (loading) {
-    return (
-      <>
-        <AppHeader title="ออเดอร์ของฉัน" />
-        <PageContainer className="flex items-center justify-center pt-20">
-          <div className="flex flex-col items-center gap-3 text-ink-soft">
-            <Loader2 className="h-8 w-8 animate-spin text-brand" />
-            <p className="text-sm font-semibold">กำลังโหลดออเดอร์...</p>
-          </div>
-        </PageContainer>
-      </>
-    );
-  }
 
   if (error) {
     return (
       <>
         <AppHeader title="ออเดอร์ของฉัน" />
-        <PageContainer className="pt-4">
+        <PageContainer className={ORDER_PAGE_CONTAINER_CLASS}>
           <EmptyState
             emoji="⚠️"
             title="โหลดออเดอร์ไม่สำเร็จ"
@@ -256,8 +661,8 @@ export default function OrdersPage() {
   return (
     <>
       <AppHeader title="ออเดอร์ของฉัน" />
-      <PageContainer className="pt-4">
-        {orders.length === 0 ? (
+      <PageContainer className={ORDER_PAGE_CONTAINER_CLASS}>
+        {activeFilter === "all" && orders.length === 0 && !shouldShowInitialLoading ? (
           <EmptyState
             emoji="📦"
             title="ยังไม่มีคำสั่งซื้อ"
@@ -295,33 +700,20 @@ export default function OrdersPage() {
 
             <section className="mb-4 overflow-hidden rounded-card bg-white shadow-[0_9px_26px_rgba(65,25,25,0.07)] ring-1 ring-black/[0.04]">
               <div className="no-scrollbar flex overflow-x-auto border-b border-black/[0.05] px-2 pt-1">
-                {orderFilters.map((filter) => {
+                {orderTabs.map((filter) => {
                   const isActive = activeFilter === filter.value;
-                  const count = getFilterCount(filter.statuses);
-
                   return (
                     <button
                       key={filter.value}
                       type="button"
-                      onClick={() => setActiveFilter(filter.value)}
+                      onClick={() => handleFilterChange(filter.value)}
                       className={`relative flex shrink-0 items-center gap-1.5 px-3 py-3 text-xs font-bold transition ${
                         isActive ? "text-brand" : "text-ink-soft"
                       }`}
                     >
                       {filter.label}
-                      {count > 0 && (
-                        <span
-                          className={`flex min-w-5 items-center justify-center rounded-full px-1.5 py-0.5 text-[9px] ${
-                            isActive
-                              ? "bg-brand text-white"
-                              : "bg-surface-muted text-ink-soft"
-                          }`}
-                        >
-                          {count}
-                        </span>
-                      )}
                       {isActive && (
-                        <span className="absolute inset-x-3 bottom-0 h-0.5 rounded-full bg-brand" />
+                        <span className="absolute bottom-0 left-1/2 h-0.5 w-10 -translate-x-1/2 rounded-full bg-brand" />
                       )}
                     </button>
                   );
@@ -351,11 +743,40 @@ export default function OrdersPage() {
               </div>
             </section>
 
-            {filteredOrders.length > 0 ? (
+            {shouldShowInitialLoading ? (
+              <div className="space-y-3">
+                <OrderCardSkeleton />
+                <OrderCardSkeleton />
+                <OrderCardSkeleton />
+              </div>
+            ) : filteredOrders.length > 0 ? (
               <div className="space-y-3">
                 {filteredOrders.map((order) => (
-                  <OrderCard key={order.id} order={order} />
+                  <OrderCard
+                    key={order.id}
+                    order={order}
+                    previewItems={(order.itemsPreview ?? []).map(mapOrderItemToPreview)}
+                    itemsCount={order.itemsCount ?? order.itemsPreview?.length ?? 0}
+                  />
                 ))}
+              </div>
+            ) : orders.length === 0 ? (
+              <div className="rounded-card bg-white shadow-sm ring-1 ring-black/[0.04]">
+                <EmptyState
+                  emoji="🗂️"
+                  title="ไม่มีออเดอร์ในหมวดนี้"
+                  description="ยังไม่มีออเดอร์ที่ตรงกับสถานะนี้"
+                  action={
+                    <button
+                      type="button"
+                      onClick={() => handleFilterChange("all")}
+                      className="inline-flex items-center gap-2 rounded-full bg-brand-soft px-4 py-2 text-sm font-bold text-brand"
+                    >
+                      <PackageSearch className="h-4 w-4" />
+                      ดูออเดอร์ทั้งหมด
+                    </button>
+                  }
+                />
               </div>
             ) : (
               <div className="rounded-card bg-white shadow-sm ring-1 ring-black/[0.04]">
@@ -367,7 +788,7 @@ export default function OrdersPage() {
                     <button
                       type="button"
                       onClick={() => {
-                        setActiveFilter("all");
+                        handleFilterChange("all");
                         setQuery("");
                       }}
                       className="inline-flex items-center gap-2 rounded-full bg-brand-soft px-4 py-2 text-sm font-bold text-brand"
@@ -379,6 +800,34 @@ export default function OrdersPage() {
                 />
               </div>
             )}
+
+            <div ref={loadMoreRef} className="min-h-12">
+              {loadingMore && (
+                <div className="flex items-center justify-center gap-2 py-4 text-sm font-semibold text-ink-soft">
+                  <Loader2 className="h-4 w-4 animate-spin text-brand" />
+                  กำลังโหลดออเดอร์เพิ่ม...
+                </div>
+              )}
+              {loadMoreError && (
+                <div className="flex flex-col items-center gap-2 py-4 text-center">
+                  <p className="text-xs font-semibold text-ink-soft">
+                    {loadMoreError}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => void loadOrdersPage(activeFilter, page + 1)}
+                    className="rounded-full bg-brand-soft px-4 py-2 text-xs font-extrabold text-brand"
+                  >
+                    ลองโหลดเพิ่มอีกครั้ง
+                  </button>
+                </div>
+              )}
+              {!hasMore && orders.length > 0 && !loadingMore && !loadMoreError && (
+                <p className="py-4 text-center text-xs font-semibold text-ink-soft">
+                  แสดงครบแล้ว
+                </p>
+              )}
+            </div>
           </>
         )}
       </PageContainer>

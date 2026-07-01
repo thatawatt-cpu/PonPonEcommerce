@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
     if (value) url.searchParams.set(param, value);
   }
 
-  const res = await fetch(url.toString(), { next: { revalidate: 60 } });
+  const res = await fetch(url.toString(), { cache: "no-store" });
 
   const data = await res.json().catch(() => []);
   return NextResponse.json(data, { status: res.ok ? 200 : res.status });

@@ -20,12 +20,12 @@ export function ReorderSection({ products }: { products: Product[] }) {
         </Link>
       </div>
 
-      <div className="no-scrollbar -mx-3.5 flex gap-2.5 overflow-x-auto px-3.5 pb-1">
+      <div className="no-scrollbar -mx-3.5 flex gap-2.5 overflow-x-auto px-3.5 pb-1 md:mx-0 md:grid md:grid-cols-3 md:gap-3 md:overflow-visible md:px-0">
         {products.map((product) => (
           <Link
             key={product.id}
             href={`/products/${product.slug}`}
-            className="group flex min-w-64 items-center gap-3 rounded-card bg-white p-2.5 shadow-[0_8px_22px_rgba(65,25,25,0.07)] ring-1 ring-black/[0.04]"
+            className="home-panel-shadow group flex min-w-64 items-center gap-3 rounded-card bg-white p-2.5 ring-1 ring-black/[0.04] md:min-w-0"
           >
             <ProductImage
               imageUrl={product.imageUrl}

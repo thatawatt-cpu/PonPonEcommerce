@@ -15,7 +15,7 @@ const benefits: { label: string; detail: string; icon: LucideIcon }[] = [
 
 export function ShopBenefits() {
   return (
-    <section className="mt-4 rounded-card bg-white px-2 py-3 shadow-[0_8px_24px_rgba(65,25,25,0.06)]">
+    <section className="home-panel-shadow mt-4 rounded-card bg-white px-2 py-3">
       <div className="grid grid-cols-4 divide-x divide-black/[0.05]">
         {benefits.map(({ label, detail, icon: Icon }) => (
           <div key={label} className="flex min-w-0 flex-col items-center px-1 text-center">

@@ -100,12 +100,19 @@ export async function initLiff(
 
 /** In the mock, the user is always already logged in. */
 export function isLiffLoggedIn(): boolean {
+  if (shouldUseMockLiff()) return true;
   const runtime = typeof window !== "undefined" ? window.liff ?? null : null;
-  return runtime?.isLoggedIn?.() ?? shouldUseMockLiff();
+  return runtime?.isLoggedIn?.() ?? false;
 }
 
 /** Pretend to start the LINE login flow. No-op in the mock. */
 export async function loginWithLine(): Promise<void> {
+  if (shouldUseMockLiff()) {
+    console.info("[mock-liff] loginWithLine()");
+    await wait(undefined, 150);
+    return;
+  }
+
   const runtime = typeof window !== "undefined" ? window.liff ?? null : null;
 
   if (runtime?.login) {
@@ -113,12 +120,7 @@ export async function loginWithLine(): Promise<void> {
     return;
   }
 
-  if (!shouldUseMockLiff()) {
-    throw new Error("LIFF login is unavailable because the SDK is missing.");
-  }
-
-  console.info("[mock-liff] loginWithLine()");
-  await wait(undefined, 150);
+  throw new Error("LIFF login is unavailable because the SDK is missing.");
 }
 
 /** Read the LINE idToken/accessToken pair. */
@@ -126,20 +128,20 @@ export async function getLiffTokens(): Promise<{
   idToken: string;
   accessToken: string;
 }> {
-  const runtime = typeof window !== "undefined" ? window.liff ?? null : null;
+  if (!shouldUseMockLiff()) {
+    const runtime = typeof window !== "undefined" ? window.liff ?? null : null;
 
-  if (runtime?.getIDToken && runtime?.getAccessToken) {
-    const idToken = runtime.getIDToken();
-    const accessToken = runtime.getAccessToken();
+    if (runtime?.getIDToken && runtime?.getAccessToken) {
+      const idToken = runtime.getIDToken();
+      const accessToken = runtime.getAccessToken();
 
-    if (!idToken || !accessToken) {
-      throw new Error("LINE tokens are not available.");
+      if (!idToken || !accessToken) {
+        throw new Error("LINE tokens are not available.");
+      }
+
+      return { idToken, accessToken };
     }
 
-    return { idToken, accessToken };
-  }
-
-  if (!shouldUseMockLiff()) {
     throw new Error("LIFF tokens are unavailable because the SDK is missing.");
   }
 
@@ -154,6 +156,10 @@ export async function getLiffTokens(): Promise<{
 
 /** Return the mock LINE profile. */
 export async function getLiffProfile(): Promise<LiffProfile> {
+  if (shouldUseMockLiff()) {
+    return wait(mockCustomerProfile);
+  }
+
   const runtime = typeof window !== "undefined" ? window.liff ?? null : null;
 
   if (runtime?.getProfile) {
@@ -165,11 +171,7 @@ export async function getLiffProfile(): Promise<LiffProfile> {
     };
   }
 
-  if (!shouldUseMockLiff()) {
-    throw new Error("LIFF profile is unavailable because the SDK is missing.");
-  }
-
-  return wait(mockCustomerProfile);
+  throw new Error("LIFF profile is unavailable because the SDK is missing.");
 }
 
 /** Open an external URL. Falls back to window.open in the browser mock. */

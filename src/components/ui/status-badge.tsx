@@ -7,19 +7,21 @@ import type { OrderStatus, PaymentStatus } from "@/types/order";
 
 const orderStatusStyle: Record<OrderStatus, string> = {
   pending: "bg-surface-muted text-ink-soft",
-  reviewing_payment: "bg-warning-soft text-warning",
-  paid: "bg-success-soft text-success",
-  preparing: "bg-blue-50 text-blue-600",
-  shipped: "bg-indigo-50 text-indigo-600",
-  completed: "bg-success-soft text-success",
-  cancelled: "bg-red-50 text-red-500",
+  waiting: "bg-warning-soft text-warning",
+  packed: "bg-blue-50 text-blue-600",
+  shipping: "bg-indigo-50 text-indigo-600",
+  success: "bg-success-soft text-success",
+  voided: "bg-red-50 text-red-500",
+  returned: "bg-orange-50 text-orange-500",
+  failed_shipment: "bg-red-50 text-red-500",
 };
 
 const paymentStatusStyle: Record<PaymentStatus, string> = {
   pending: "bg-surface-muted text-ink-soft",
-  reviewing: "bg-warning-soft text-warning",
   paid: "bg-success-soft text-success",
-  failed: "bg-red-50 text-red-500",
+  voided: "bg-red-50 text-red-500",
+  partial_payment: "bg-warning-soft text-warning",
+  excess_payment: "bg-blue-50 text-blue-600",
 };
 
 export function OrderStatusBadge({

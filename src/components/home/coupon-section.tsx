@@ -42,13 +42,13 @@ export function CouponSection() {
         </span>
       </div>
 
-      <div className="no-scrollbar -mx-3.5 flex gap-2.5 overflow-x-auto px-3.5 pb-1">
+      <div className="no-scrollbar -mx-3.5 flex gap-2.5 overflow-x-auto px-3.5 pb-1 md:mx-0 md:grid md:grid-cols-2 md:gap-3 md:overflow-visible md:px-0">
         {coupons.map((coupon) => {
           const isClaimed = claimed.includes(coupon.id);
           return (
             <article
               key={coupon.id}
-              className="relative flex min-w-[18rem] flex-1 overflow-hidden rounded-card bg-white shadow-[0_8px_22px_rgba(65,25,25,0.08)] ring-1 ring-brand/10"
+              className="home-panel-shadow relative flex min-w-[18rem] flex-1 overflow-hidden rounded-card bg-white ring-1 ring-brand/10 md:min-w-0"
             >
               <div className="flex w-24 shrink-0 flex-col items-center justify-center bg-brand px-2 py-4 text-center text-white">
                 <span className="text-xl font-extrabold leading-none">

@@ -48,9 +48,13 @@ export function BottomNavigation() {
   );
   const count = hydrated ? rawCount : 0;
 
+  if (pathname.startsWith("/payment")) {
+    return null;
+  }
+
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-brand/10 bg-white pt-1.5 pb-safe">
-      <ul className="mx-auto flex max-w-md items-stretch justify-around md:max-w-3xl md:px-6">
+      <ul className="mx-auto flex w-full max-w-md items-stretch justify-around md:max-w-5xl md:px-8 xl:max-w-6xl">
         {NAV_ITEMS.map((item) => {
           const active = isActive(pathname, item);
           const Icon = item.icon;

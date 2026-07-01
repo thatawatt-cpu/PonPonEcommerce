@@ -60,6 +60,18 @@ export function clearStoredPonPonJwt(): void {
   window.localStorage.removeItem(JWT_STORAGE_KEY);
 }
 
+export function isStoredJwtValid(): boolean {
+  const jwt = getStoredPonPonJwt();
+  if (!jwt) return false;
+  try {
+    const payload = JSON.parse(atob(jwt.split(".")[1]));
+    if (typeof payload.exp !== "number") return true; // no expiry = treat as valid
+    return Date.now() < (payload.exp - 60) * 1000; // 60s buffer
+  } catch {
+    return false;
+  }
+}
+
 export function getStoredLineAccessToken(): string | null {
   if (!canUseStorage()) return null;
   return window.localStorage.getItem(LINE_ACCESS_TOKEN_KEY);

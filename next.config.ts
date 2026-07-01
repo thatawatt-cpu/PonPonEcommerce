@@ -37,6 +37,7 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "profile.line-scdn.net" },
       { protocol: "https", hostname: "image.zort.co.th" },
       { protocol: "https", hostname: "*.supabase.co" },
+      { protocol: "https", hostname: "api.omise.co" },
     ],
   },
 };

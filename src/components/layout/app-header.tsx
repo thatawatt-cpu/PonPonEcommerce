@@ -81,7 +81,7 @@ export function AppHeader({
           className
         )}
       >
-        <div className="relative mx-auto flex h-14 max-w-md items-center justify-between px-3.5 md:max-w-3xl md:px-6">
+        <div className="relative mx-auto flex h-14 w-full max-w-md items-center justify-between px-3.5 md:max-w-5xl md:px-8 xl:max-w-6xl">
           <div className="flex min-w-0 items-center">
             {showBack ? (
               <button

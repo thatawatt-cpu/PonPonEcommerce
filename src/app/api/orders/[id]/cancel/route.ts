@@ -1,23 +1,74 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PONPON_BACKEND_BASE_URL } from "@/lib/server/api-backend";
 
+const SKIP_AUTH =
+  process.env.NEXT_PUBLIC_SKIP_LINE_LIFF?.trim().toLowerCase() === "true";
+
+async function readBackendError(response: Response) {
+  const data = (await response.json().catch(() => null)) as
+    | { message?: string; error?: string }
+    | null;
+
+  return {
+    message:
+      data?.message ??
+      data?.error ??
+      `Order cancel request failed (${response.status})`,
+  };
+}
+
+interface CancelOrderRequest {
+  reason?: unknown;
+}
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const auth = request.headers.get("Authorization");
   if (!auth) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!SKIP_AUTH) {
+      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    }
+    console.warn(
+      "[orders/cancel] NEXT_PUBLIC_SKIP_LINE_LIFF=true; cancelling order without Authorization"
+    );
   }
 
   const { id } = await params;
+  const body = (await request.json().catch(() => null)) as
+    | CancelOrderRequest
+    | null;
+  const reason = typeof body?.reason === "string" ? body.reason.trim() : "";
+
+  if (!reason) {
+    return NextResponse.json(
+      { message: "กรุณาเลือกเหตุผลในการยกเลิกออเดอร์" },
+      { status: 400 }
+    );
+  }
+
+  if (reason.length > 1000) {
+    return NextResponse.json(
+      { message: "รายละเอียดเหตุผลยาวเกินกำหนด" },
+      { status: 400 }
+    );
+  }
 
   try {
+    const headers: Record<string, string> = {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    };
+    if (auth) headers.Authorization = auth;
+
     const response = await fetch(
-      `${PONPON_BACKEND_BASE_URL}/api/orders/${id}/cancel`,
+      `${PONPON_BACKEND_BASE_URL}/api/orders/${encodeURIComponent(id)}/cancel`,
       {
         method: "POST",
-        headers: { Authorization: auth, Accept: "application/json" },
+        headers,
+        body: JSON.stringify({ reason }),
+        cache: "no-store",
       }
     );
 
@@ -25,9 +76,13 @@ export async function POST(
       return new NextResponse(null, { status: 204 });
     }
 
-    const data = await response.json().catch(() => null);
-    return NextResponse.json(data, { status: response.status });
+    return NextResponse.json(await readBackendError(response), {
+      status: response.status,
+    });
   } catch {
-    return NextResponse.json({ error: "Backend unreachable" }, { status: 502 });
+    return NextResponse.json(
+      { message: "Backend unreachable" },
+      { status: 502 }
+    );
   }
 }

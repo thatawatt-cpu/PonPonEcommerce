@@ -27,7 +27,7 @@ export async function getAllProductsServer(params?: {
       url.searchParams.set("category", params.category);
     url.searchParams.set("pageSize", String(params?.pageSize ?? 100));
 
-    const res = await fetch(url.toString(), { next: { revalidate: 60 } });
+    const res = await fetch(url.toString(), { cache: "no-store" });
     if (!res.ok) return [];
 
     const data: ApiProductListItem[] = await res.json();
@@ -43,7 +43,7 @@ export async function getProductByIdServer(
 ): Promise<Product | null> {
   try {
     const res = await fetch(`${PONPON_BACKEND_BASE_URL}/api/products/${id}`, {
-      next: { revalidate: 30 },
+      cache: "no-store",
     });
     if (!res.ok) return null;
 
@@ -61,7 +61,7 @@ export async function getProductBySlugServer(
   try {
     const res = await fetch(
       `${PONPON_BACKEND_BASE_URL}/api/products/slug/${encodeURIComponent(slug)}`,
-      { next: { revalidate: 30 } }
+      { cache: "no-store" }
     );
     if (!res.ok) return null;
 

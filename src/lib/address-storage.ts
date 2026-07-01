@@ -1,55 +1,156 @@
-export interface SavedAddress {
+export interface CustomerAddress {
   id: string;
+  recipientName: string;
+  phone: string;
+  email: string | null;
+  addressLine1: string;
+  addressLine2: string | null;
+  subdistrict: string;
+  district: string;
+  province: string;
+  postcode: string;
+  country: string;
+  label: string | null;
+  isDefault: boolean;
+  fullAddress: string;
+}
+
+export interface CustomerAddressCreateRequest {
+  recipientName: string;
+  phone: string;
+  email?: string | null;
+  addressLine1: string;
+  addressLine2?: string | null;
+  subdistrict: string;
+  district: string;
+  province: string;
+  postcode: string;
+  country?: string;
+  label?: string | null;
+  isDefault?: boolean;
+}
+
+export interface SavedAddress extends CustomerAddress {
+  email: string;
+  addressLine2: string;
   label: string;
   customerName: string;
-  phone: string;
   address: string;
   note: string;
-  isDefault: boolean;
 }
 
-export const ADDRESS_STORAGE_KEY = "ponpon-addresses";
+export type AddressFormState = Omit<
+  CustomerAddressCreateRequest,
+  "country" | "isDefault"
+> & {
+  country: string;
+  isDefault: boolean;
+};
+
+const SELECTED_ADDRESS_STORAGE_KEY = "ponpon.selectedAddressId";
 
 export const initialAddresses: SavedAddress[] = [
-  {
-    id: "home",
-    label: "บ้าน",
-    customerName: "Pon Pon Customer",
-    phone: "081-234-5678",
-    address:
-      "123/45 หมู่บ้านน่ารัก ถ.สุขใจ แขวงป๋องป๋อง เขตยิ้มแย้ม กรุงเทพฯ 10110",
-    note: "ฝากวางไว้หน้าบ้านได้เลยค่ะ",
-    isDefault: true,
-  },
-  {
+  toSavedAddress({
     id: "office",
-    label: "ที่ทำงาน",
-    customerName: "Pon Pon Customer",
-    phone: "089-555-0123",
-    address:
-      "88 อาคาร PonPon ชั้น 12 ถ.พระราม 9 แขวงห้วยขวาง เขตห้วยขวาง กรุงเทพฯ 10310",
-    note: "ส่งที่เคาน์เตอร์ประชาสัมพันธ์",
-    isDefault: false,
-  },
+    recipientName: "Pon Pon Customer",
+    phone: "0895550123",
+    email: "",
+    addressLine1: "88 อาคาร PonPon ชั้น 12 ถ.พระราม 9",
+    addressLine2: "ส่งที่เคาน์เตอร์ประชาสัมพันธ์",
+    subdistrict: "ห้วยขวาง",
+    district: "ห้วยขวาง",
+    province: "กรุงเทพมหานคร",
+    postcode: "10310",
+    country: "TH",
+    label: "บ้าน",
+    isDefault: true,
+    fullAddress:
+      "88 อาคาร PonPon ชั้น 12 ถ.พระราม 9 ส่งที่เคาน์เตอร์ประชาสัมพันธ์ ห้วยขวาง ห้วยขวาง กรุงเทพมหานคร 10310",
+  }),
 ];
 
-export function loadSavedAddresses(): SavedAddress[] {
-  if (typeof window === "undefined") return initialAddresses;
-
-  const stored = window.localStorage.getItem(ADDRESS_STORAGE_KEY);
-  if (!stored) return initialAddresses;
-
-  try {
-    const parsed = JSON.parse(stored) as SavedAddress[];
-    return Array.isArray(parsed) && parsed.length > 0
-      ? parsed
-      : initialAddresses;
-  } catch {
-    window.localStorage.removeItem(ADDRESS_STORAGE_KEY);
-    return initialAddresses;
-  }
+export function buildFullAddress(address: {
+  addressLine1: string;
+  addressLine2?: string | null;
+  subdistrict: string;
+  district: string;
+  province: string;
+  postcode: string;
+}): string {
+  return [
+    address.addressLine1,
+    address.addressLine2,
+    address.subdistrict,
+    address.district,
+    address.province,
+    address.postcode,
+  ]
+    .filter(Boolean)
+    .join(" ");
 }
 
-export function saveAddresses(addresses: SavedAddress[]) {
-  window.localStorage.setItem(ADDRESS_STORAGE_KEY, JSON.stringify(addresses));
+export function toSavedAddress(address: CustomerAddress): SavedAddress {
+  return {
+    ...address,
+    email: address.email ?? "",
+    addressLine2: address.addressLine2 ?? "",
+    country: address.country || "TH",
+    label: address.label || "ที่อยู่",
+    fullAddress:
+      address.fullAddress ||
+      buildFullAddress({
+        addressLine1: address.addressLine1,
+        addressLine2: address.addressLine2,
+        subdistrict: address.subdistrict,
+        district: address.district,
+        province: address.province,
+        postcode: address.postcode,
+      }),
+    customerName: address.recipientName,
+    address:
+      address.fullAddress ||
+      buildFullAddress({
+        addressLine1: address.addressLine1,
+        addressLine2: address.addressLine2,
+        subdistrict: address.subdistrict,
+        district: address.district,
+        province: address.province,
+        postcode: address.postcode,
+      }),
+    note: address.addressLine2 ?? "",
+  };
+}
+
+export function createAddressPayload(
+  form: AddressFormState
+): CustomerAddressCreateRequest {
+  return {
+    recipientName: form.recipientName.trim(),
+    phone: form.phone.trim(),
+    email: form.email?.trim() || null,
+    addressLine1: form.addressLine1.trim(),
+    addressLine2: form.addressLine2?.trim() || null,
+    subdistrict: form.subdistrict.trim(),
+    district: form.district.trim(),
+    province: form.province.trim(),
+    postcode: form.postcode.trim(),
+    country: form.country.trim() || "TH",
+    label: form.label?.trim() || null,
+    isDefault: form.isDefault,
+  };
+}
+
+export function getSelectedAddressId(): string | null {
+  if (typeof window === "undefined") return null;
+  return window.localStorage.getItem(SELECTED_ADDRESS_STORAGE_KEY);
+}
+
+export function setSelectedAddressId(addressId: string): void {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(SELECTED_ADDRESS_STORAGE_KEY, addressId);
+}
+
+export function clearSelectedAddressId(): void {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(SELECTED_ADDRESS_STORAGE_KEY);
 }

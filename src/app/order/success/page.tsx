@@ -16,6 +16,7 @@ import { Card } from "@/components/ui/card";
 import { openExternalWindow } from "@/lib/liff";
 import { LINE_OA_URL } from "@/lib/constants";
 import { useMembershipStore } from "@/store/membership-store";
+import { markOrderPaid } from "@/features/payments/payment-api";
 
 export default function OrderSuccessPage({
   searchParams,
@@ -29,18 +30,28 @@ export default function OrderSuccessPage({
 }) {
   const {
     orderId,
-    orderNo = "ORD001",
+    orderNo: orderNoParam,
     points: pointsParam = "0",
     spend: spendParam = "0",
   } = use(searchParams);
   const creditOrder = useMembershipStore((state) => state.creditOrder);
   const earnedPoints = Math.max(Number(pointsParam) || 0, 0);
   const orderSpend = Math.max(Number(spendParam) || 0, 0);
+  const trackingOrderId = orderId || orderNoParam || "";
+  const orderNo = orderNoParam || orderId || "คำสั่งซื้อนี้";
+  const trackingHref = trackingOrderId
+    ? `/orders/${encodeURIComponent(trackingOrderId)}`
+    : "/orders";
 
   useEffect(() => {
     if (earnedPoints <= 0) return;
     creditOrder(orderNo, earnedPoints, orderSpend);
   }, [creditOrder, earnedPoints, orderNo, orderSpend]);
+
+  useEffect(() => {
+    if (!trackingOrderId) return;
+    markOrderPaid({ orderId: trackingOrderId, orderNo });
+  }, [orderNo, trackingOrderId]);
 
   return (
     <PageContainer className="flex min-h-dvh flex-col items-center justify-center pt-8 text-center">
@@ -84,7 +95,7 @@ export default function OrderSuccessPage({
       ) : null}
 
       <div className="mt-6 w-full space-y-2.5">
-        <Link href={`/orders/${orderId ?? orderNo}`} className="block">
+        <Link href={trackingHref} className="block">
           <Button size="lg" fullWidth>
             <PackageSearch className="h-5 w-5" />
             ติดตามออเดอร์

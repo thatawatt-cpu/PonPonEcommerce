@@ -39,22 +39,15 @@ export function mapApiProductToProduct(api: ApiProductListItem): Product {
 }
 
 export function mapApiProductDetailToProduct(api: ApiProductDetail): Product {
-  const primaryImage =
-    api.images?.find((img) => img.isPrimary)?.url ?? api.imageUrl ?? "";
-  const galleryImages =
-    api.images
-      ?.filter((img) => !img.isPrimary)
-      .sort((a, b) => a.sortOrder - b.sortOrder)
-      .map((img) => ({
-        id: img.id,
-        label: "รูปสินค้า",
-        imageUrl: img.url,
-      })) ?? [];
+  const sortedImages = api.images?.slice().sort((a, b) => a.sortOrder - b.sortOrder) ?? [];
+  const primaryImageObj = sortedImages.find((img) => img.isPrimary) ?? sortedImages[0];
+  const primaryImage = primaryImageObj?.url ?? api.imageUrl ?? "";
 
-  const activeVariants =
-    api.variants?.filter(
-      (v) => v.isActiveFromZort && v.status === "Active"
-    ) ?? [];
+  const galleryImages = sortedImages
+    .filter((img) => img.id !== primaryImageObj?.id)
+    .map((img) => ({ id: img.id, label: "รูปสินค้า", imageUrl: img.url }));
+
+  const activeVariants = api.variants?.filter((v) => v.isActiveFromZort) ?? [];
 
   return {
     id: api.id,
@@ -85,26 +78,57 @@ export function mapApiProductDetailToProduct(api: ApiProductDetail): Product {
             .filter(Boolean)
         : [],
     },
-    options:
-      activeVariants.length > 0
-        ? [
-            {
-              name: "variant",
-              label: "รุ่น",
-              choices: activeVariants.map((v) => ({
-                label: v.sku,
-                value: v.variantCode,
-                imageUrl: v.imageUrl ?? undefined,
-              })),
-            },
-          ]
-        : undefined,
+    options: (() => {
+      if (activeVariants.length === 0) return undefined;
+      // Derive option dimensions from OptionJson on each variant
+      const allOptions = activeVariants.flatMap((v) => v.options ?? []);
+      if (allOptions.length > 0) {
+        const optionNames = [...new Set(allOptions.map((o) => o.name))];
+        return optionNames.map((name) => ({
+          name,
+          label: name,
+          choices: [
+            ...new Map(
+              activeVariants
+                .flatMap((v) =>
+                  (v.options ?? [])
+                    .filter((o) => o.name === name)
+                    .map((o) => [
+                      o.value,
+                      {
+                        label: o.value,
+                        value: o.value,
+                        imageUrl: v.imageUrl ?? undefined,
+                      },
+                    ] as [string, { label: string; value: string; imageUrl: string | undefined }])
+                )
+            ).values(),
+          ],
+        }));
+      }
+      // Fallback: SKU-based selector
+      return [
+        {
+          name: "variant",
+          label: "รุ่น",
+          choices: activeVariants.map((v) => ({
+            label: v.sku,
+            value: v.variantCode,
+            imageUrl: v.imageUrl ?? undefined,
+          })),
+        },
+      ];
+    })(),
     variants:
       activeVariants.length > 0
         ? activeVariants.map((v) => ({
             id: v.id,
-            options: { variant: v.variantCode },
+            options:
+              v.options && v.options.length > 0
+                ? Object.fromEntries(v.options.map((o) => [o.name, o.value]))
+                : { variant: v.variantCode },
             stock: v.availableStock,
+            imageUrl: v.imageUrl ?? undefined,
           }))
         : undefined,
   };

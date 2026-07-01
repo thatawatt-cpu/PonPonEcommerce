@@ -1,73 +1,208 @@
 "use client";
 
-import { Check, QrCode, Truck, type LucideIcon } from "lucide-react";
+import Image from "next/image";
+import { Check, CreditCard, Landmark, QrCode } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { PAYMENT_METHOD_LABEL } from "@/lib/constants";
 import type { PaymentMethod } from "@/types/order";
+import type { ApiMobileBankingType } from "@/types/api";
 
 interface PaymentMethodSelectorProps {
   value: PaymentMethod;
   onChange: (value: PaymentMethod) => void;
+  bankType: ApiMobileBankingType;
+  onBankTypeChange: (value: ApiMobileBankingType) => void;
 }
 
-const OPTIONS: { value: PaymentMethod; icon: LucideIcon; hint: string }[] = [
+const BANK_ACCOUNTS = [
   {
-    value: "promptpay",
+    id: "mobile_banking_kbank",
+    name: "กสิกรไทย",
+    suffix: "K PLUS",
+    logoSrc: "/images/banks/kbank.png",
+  },
+  {
+    id: "mobile_banking_scb",
+    name: "ไทยพาณิชย์",
+    suffix: "SCB EASY",
+    logoSrc: "/images/banks/scb.png",
+  },
+  {
+    id: "mobile_banking_bbl",
+    name: "กรุงเทพ",
+    suffix: "Bualuang",
+    logoSrc: "/images/banks/bangkok-bank.png",
+  },
+  {
+    id: "mobile_banking_ktb",
+    name: "กรุงไทย",
+    suffix: "NEXT",
+    logoSrc: null,
+  },
+  {
+    id: "mobile_banking_bay",
+    name: "กรุงศรี",
+    suffix: "KMA",
+    logoSrc: null,
+  },
+] satisfies {
+  id: ApiMobileBankingType;
+  name: string;
+  suffix: string;
+  logoSrc: string | null;
+}[];
+
+const PAYMENT_OPTIONS = [
+  {
+    id: "promptpay",
+    title: "QR พร้อมเพย์",
+    description: "สแกนจ่ายผ่านแอปธนาคาร",
+    badge: "แนะนำ",
     icon: QrCode,
-    hint: "สแกน QR พร้อมเพย์เพื่อชำระเงิน",
+    iconClassName: "bg-brand-soft text-brand",
   },
   {
-    value: "cod",
-    icon: Truck,
-    hint: "จ่ายเงินสดเมื่อรับสินค้า",
+    id: "mobile_banking",
+    title: "โมบายแบงก์กิ้ง",
+    description: "ยืนยันผ่านแอปธนาคาร",
+    icon: Landmark,
+    iconClassName: "bg-blue-50 text-blue-600",
   },
-];
+  {
+    id: "credit_card",
+    title: "บัตรเครดิต / เดบิต",
+    description: "Visa และ Mastercard",
+    icon: CreditCard,
+    iconClassName: "bg-violet-50 text-violet-600",
+  },
+] satisfies {
+  id: PaymentMethod;
+  title: string;
+  description: string;
+  badge?: string;
+  icon: typeof QrCode;
+  iconClassName: string;
+}[];
 
 export function PaymentMethodSelector({
   value,
   onChange,
+  bankType,
+  onBankTypeChange,
 }: PaymentMethodSelectorProps) {
   return (
-    <div className="space-y-2.5">
-      {OPTIONS.map(({ value: method, icon: Icon, hint }) => {
-        const active = value === method;
-        return (
-          <button
-            key={method}
-            type="button"
-            onClick={() => onChange(method)}
-            className={cn(
-              "flex w-full items-center gap-3 rounded-2xl border p-3 text-left transition-colors",
-              active
-                ? "border-brand bg-brand-soft shadow-sm"
-                : "border-black/[0.07] bg-white",
-            )}
-          >
-            <span
+    <div className="space-y-3">
+      <div className="grid gap-2.5 sm:grid-cols-3">
+        {PAYMENT_OPTIONS.map((option) => {
+          const active = value === option.id;
+          const Icon = option.icon;
+
+          return (
+            <button
+              key={option.id}
+              type="button"
+              aria-pressed={active}
+              onClick={() => onChange(option.id)}
               className={cn(
-                "flex h-10 w-10 shrink-0 items-center justify-center rounded-full",
-                active ? "bg-brand text-white" : "bg-surface-muted text-ink-soft",
+                "relative flex min-h-20 items-center gap-3 rounded-2xl border p-3 text-left transition duration-150 active:scale-[0.99] sm:min-h-32 sm:flex-col sm:items-start",
+                active
+                  ? "border-brand bg-brand-soft/55 shadow-[0_8px_24px_rgba(237,23,28,0.1)]"
+                  : "border-black/[0.08] bg-white hover:border-brand/30"
               )}
             >
-              <Icon className="h-5 w-5" />
-            </span>
-            <span className="flex-1">
-              <span className="block text-sm font-semibold text-ink">
-                {PAYMENT_METHOD_LABEL[method]}
+              <span
+                className={cn(
+                  "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl",
+                  option.iconClassName
+                )}
+              >
+                <Icon className="h-5 w-5" />
               </span>
-              <span className="block text-xs text-ink-soft">{hint}</span>
-            </span>
-            <span
-              className={cn(
-                "flex h-5 w-5 items-center justify-center rounded-full border",
-                active ? "border-brand bg-brand text-white" : "border-black/20",
-              )}
-            >
-              {active && <Check className="h-3.5 w-3.5" />}
-            </span>
-          </button>
-        );
-      })}
+              <span className="min-w-0 flex-1">
+                <span className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-sm font-extrabold text-ink">
+                    {option.title}
+                  </span>
+                  {option.badge && (
+                    <span className="rounded-full bg-brand px-2 py-0.5 text-[9px] font-extrabold text-white">
+                      {option.badge}
+                    </span>
+                  )}
+                </span>
+                <span className="mt-0.5 block text-[11px] font-semibold leading-relaxed text-ink-soft">
+                  {option.description}
+                </span>
+              </span>
+              <span
+                className={cn(
+                  "flex h-6 w-6 shrink-0 items-center justify-center rounded-full border sm:absolute sm:right-3 sm:top-3",
+                  active
+                    ? "border-brand bg-brand text-white"
+                    : "border-black/20 bg-white"
+                )}
+              >
+                {active && <Check className="h-4 w-4" />}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {value === "mobile_banking" && (
+        <div className="animate-fade-in rounded-2xl border border-blue-100 bg-blue-50/45 p-3">
+          <div className="mb-2.5 flex items-center justify-between gap-3">
+            <p className="text-xs font-extrabold text-ink">
+              เลือกแอปธนาคาร
+            </p>
+            <p className="text-[10px] font-semibold text-ink-soft">
+              ระบบจะพาไปยืนยันในแอป
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {BANK_ACCOUNTS.map((bank) => {
+              const active = bankType === bank.id;
+
+              return (
+                <button
+                  key={bank.id}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => onBankTypeChange(bank.id)}
+                  className={cn(
+                    "flex min-h-16 items-center gap-2 rounded-xl border bg-white p-2.5 text-left transition active:scale-[0.98]",
+                    active
+                      ? "border-blue-500 ring-2 ring-blue-100"
+                      : "border-black/[0.07]"
+                  )}
+                >
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white ring-1 ring-black/10">
+                    {bank.logoSrc ? (
+                      <Image
+                        src={bank.logoSrc}
+                        alt=""
+                        width={36}
+                        height={36}
+                        className="h-full w-full object-contain"
+                      />
+                    ) : (
+                      <span className="text-[9px] font-extrabold text-ink-soft">
+                        {bank.suffix}
+                      </span>
+                    )}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block truncate text-xs font-extrabold text-ink">
+                      {bank.name}
+                    </span>
+                    <span className="block truncate text-[9px] font-semibold text-ink-soft">
+                      {bank.suffix}
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

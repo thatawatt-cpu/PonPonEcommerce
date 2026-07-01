@@ -78,8 +78,12 @@
 }
 
 :root {
-  --background: #f8f5f3;
+  --background: #fff8f7;
   --foreground: #211b1b;
+  --shadow-app-panel:
+    0 14px 28px -8px rgba(190, 9, 14, 0.24),
+    0 6px 16px -8px rgba(237, 23, 28, 0.18),
+    0 2px 8px rgba(65, 25, 25, 0.06);
 }
 
 html,
@@ -92,9 +96,6 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
-  background-image:
-    radial-gradient(circle at 15% -10%, rgb(237 23 28 / 0.08), transparent 28rem),
-    linear-gradient(180deg, #fff 0, #f8f5f3 30rem);
 }
 
 /* Bottom-nav bottom padding: 0.5rem base + safe-area inset on notched phones.
@@ -121,6 +122,188 @@ body {
   font-weight: 800;
   letter-spacing: -0.01em;
   color: var(--color-ink);
+}
+
+.promo-hero {
+  aspect-ratio: 16 / 9;
+}
+
+.promo-hero-shell {
+  box-shadow: var(--shadow-app-panel);
+}
+
+.app-panel-shadow,
+.home-panel-shadow {
+  box-shadow: var(--shadow-app-panel);
+}
+
+.home-red-panel-shadow {
+  box-shadow: var(--shadow-app-panel);
+}
+
+.product-detail-grid {
+  width: 100%;
+  max-width: 26.875rem;
+  padding-bottom: 1rem;
+}
+
+.product-detail-page {
+  padding-bottom: 0.5rem;
+}
+
+.product-detail-action-spacer {
+  height: 11.5rem;
+}
+
+.product-detail-action-inner {
+  width: 100%;
+  max-width: 26.875rem;
+  padding: 0.75rem 1rem;
+}
+
+.promo-hero-content {
+  height: 100%;
+}
+
+@media (min-width: 640px) {
+  .product-detail-grid {
+    max-width: 42rem;
+    padding-inline: 1.25rem;
+    padding-top: 1rem;
+  }
+
+  .product-detail-gallery,
+  .product-detail-info,
+  .product-detail-options,
+  .product-detail-trust,
+  .product-detail-wide {
+    overflow: hidden;
+    border-radius: var(--radius-card);
+    --tw-ring-shadow: 0 0 0 1px rgb(0 0 0 / 0.04);
+    box-shadow: var(--tw-ring-shadow), var(--shadow-app-panel);
+  }
+
+  .product-detail-action-inner {
+    max-width: 42rem;
+    padding-inline: 1.25rem;
+  }
+}
+
+@media (min-width: 768px) {
+  .product-detail-page {
+    padding-top: 1rem;
+  }
+
+  .product-detail-grid {
+    display: block;
+    max-width: 64rem;
+    padding-inline: 2rem;
+    padding-top: 1rem;
+    padding-bottom: 2rem;
+  }
+
+  .product-detail-main-media {
+    aspect-ratio: 4 / 3;
+  }
+
+  .product-detail-gallery {
+    position: relative;
+    top: auto;
+    overflow: hidden;
+    border-radius: var(--radius-card);
+    --tw-ring-shadow: 0 0 0 1px rgb(0 0 0 / 0.04);
+    box-shadow: var(--tw-ring-shadow), var(--shadow-app-panel);
+  }
+
+  .product-detail-info,
+  .product-detail-options,
+  .product-detail-trust,
+  .product-detail-wide {
+    margin-top: 0.875rem;
+    border-radius: var(--radius-card);
+    --tw-ring-shadow: 0 0 0 1px rgb(0 0 0 / 0.04);
+    box-shadow: var(--tw-ring-shadow), var(--shadow-app-panel);
+  }
+
+  .product-detail-info,
+  .product-detail-options,
+  .product-detail-wide {
+    padding: 1.25rem;
+  }
+
+  .product-detail-trust {
+    padding-inline: 1.25rem;
+  }
+
+  .product-detail-action-spacer {
+    height: 8.5rem;
+  }
+
+  .product-detail-action-inner {
+    display: grid;
+    max-width: 64rem;
+    grid-template-columns: minmax(0, 1fr) minmax(22rem, 26rem);
+    align-items: center;
+    gap: 1rem;
+    padding: 0.875rem 2rem;
+  }
+
+  .product-detail-action-buttons {
+    min-width: 0;
+  }
+
+  .promo-hero-content {
+    max-width: 54%;
+    padding: 2.5rem;
+  }
+
+  .promo-hero-badge {
+    padding: 0.25rem 0.625rem;
+    font-size: 0.75rem;
+  }
+
+  .promo-hero-title {
+    margin-top: 0.75rem;
+    font-size: 2.75rem;
+  }
+
+  .promo-hero-description {
+    margin-top: 0.75rem;
+    font-size: 1rem;
+  }
+
+  .promo-hero-cta {
+    min-height: 3rem;
+    margin-top: 1.5rem;
+    padding-inline: 1.5rem;
+    font-size: 1rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .product-detail-grid {
+    max-width: 64rem;
+  }
+
+  .product-detail-action-inner {
+    max-width: 64rem;
+    grid-template-columns: minmax(0, 1fr) minmax(24rem, 28rem);
+  }
+
+  .product-detail-main-media {
+    aspect-ratio: 16 / 10;
+  }
+
+  .promo-hero-title {
+    font-size: 3rem;
+  }
+}
+
+@media (min-width: 1280px) {
+  .product-detail-grid,
+  .product-detail-action-inner {
+    max-width: 72rem;
+  }
 }
 
 /* Compatibility fallbacks for older embedded browsers.
@@ -325,7 +508,7 @@ body {
 /* LINE's in-app browser is noticeably more sensitive to paint-heavy effects.
    Keep the regular browser polish, but simplify effects only inside LINE LIFF. */
 html.line-webview body {
-  background-image: linear-gradient(180deg, #fff 0, #f8f5f3 30rem);
+  background-image: none;
 }
 
 html.line-webview *,

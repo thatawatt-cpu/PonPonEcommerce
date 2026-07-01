@@ -1,17 +1,27 @@
 import type { CartItem } from "./cart";
 
-export type PaymentMethod = "promptpay" | "cod";
+export type PaymentMethod =
+  | "promptpay"
+  | "credit_card"
+  | "mobile_banking"
+  | "cod";
 
-export type PaymentStatus = "pending" | "reviewing" | "paid" | "failed";
+export type PaymentStatus =
+  | "pending"
+  | "paid"
+  | "voided"
+  | "partial_payment"
+  | "excess_payment";
 
 export type OrderStatus =
   | "pending"
-  | "reviewing_payment"
-  | "paid"
-  | "preparing"
-  | "shipped"
-  | "completed"
-  | "cancelled";
+  | "waiting"
+  | "packed"
+  | "shipping"
+  | "success"
+  | "voided"
+  | "returned"
+  | "failed_shipment";
 
 export type TimelineStepState = "completed" | "active" | "pending";
 

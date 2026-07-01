@@ -12,6 +12,7 @@ interface AddItemPayload {
   quantity?: number;
   selectedOptions?: Record<string, string>;
   variantId?: string | null;
+  imageUrl?: string;
 }
 
 interface CartState {
@@ -56,7 +57,7 @@ export const useCartStore = create<CartState>()(
     (set, get) => ({
       items: [],
 
-      addItem: ({ product, quantity = 1, selectedOptions, variantId }) =>
+      addItem: ({ product, quantity = 1, selectedOptions, variantId, imageUrl }) =>
         set((state) => {
           const normalizedOptions = normalizeOptions(selectedOptions);
           const itemKey = getCartItemKey({
@@ -73,6 +74,7 @@ export const useCartStore = create<CartState>()(
                   ? {
                       ...item,
                       quantity: item.quantity + quantity,
+                      imageUrl: imageUrl ?? item.imageUrl,
                     }
                   : item
               ),
@@ -83,7 +85,7 @@ export const useCartStore = create<CartState>()(
             variantId: variantId ?? null,
             name: product.name,
             price: product.price,
-            imageUrl: product.imageUrl,
+            imageUrl: imageUrl ?? product.imageUrl,
             emoji: product.emoji,
             quantity,
             selectedOptions: normalizedOptions,

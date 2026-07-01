@@ -49,9 +49,9 @@ export default function RootLayout({
           strategy="afterInteractive"
         />
         {/*
-          Mobile-first shell. Pages set their own column width via PageContainer
-          (max-w-md on phones, widening to max-w-3xl on tablet/desktop) so the
-          app also looks at home in LINE on iPad and on a PC browser.
+          Mobile-first shell. Pages set their own column width while shared
+          chrome widens on tablet/desktop so the app feels balanced on iPad
+          and in a PC browser.
         */}
         <div className="relative min-h-dvh w-full">
           <LiffAuthBootstrap />

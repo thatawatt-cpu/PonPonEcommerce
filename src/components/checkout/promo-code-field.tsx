@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Check, TicketPercent, X } from "lucide-react";
+import { Check, ChevronRight, X } from "lucide-react";
 
 interface PromoCodeFieldProps {
   value: string;
@@ -25,22 +25,15 @@ export function PromoCodeField({
   return (
     <div>
       <div className="mb-3 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-soft text-brand">
-            <TicketPercent className="h-4 w-4" />
-          </span>
-          <div>
-            <h2 className="text-sm font-bold text-ink">โค้ดส่วนลด</h2>
-            <p className="text-[11px] text-ink-soft">
-              กรอก Promo Code ก่อนชำระเงิน
-            </p>
-          </div>
-        </div>
+        <p className="text-xs font-semibold text-ink-soft">
+          กรอกโค้ด หรือเลือกจากคูปองที่มี
+        </p>
         <Link
           href="/coupons?returnTo=checkout"
-          className="text-xs font-extrabold text-brand"
+          className="flex shrink-0 items-center gap-0.5 text-xs font-extrabold text-brand"
         >
-          ดูคูปอง
+          เลือกคูปอง
+          <ChevronRight className="h-3.5 w-3.5" />
         </Link>
       </div>
 

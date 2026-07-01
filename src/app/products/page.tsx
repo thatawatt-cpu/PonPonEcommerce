@@ -21,7 +21,7 @@ export default async function ProductsPage({
   return (
     <>
       <AppHeader title="สินค้าทั้งหมด" />
-      <PageContainer className="pt-4">
+      <PageContainer className="pt-4 md:max-w-5xl md:px-8 xl:max-w-6xl">
         <ProductsClient
           products={products}
           categories={categories}

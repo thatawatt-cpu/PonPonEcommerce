@@ -23,32 +23,35 @@ export const LINE_OA_URL = "https://line.me/R/ti/p/@ponpon";
 
 export const PAYMENT_STATUS_LABEL: Record<PaymentStatus, string> = {
   pending: "รอชำระเงิน",
-  reviewing: "รอตรวจสอบการชำระเงิน",
   paid: "ชำระเงินแล้ว",
-  failed: "ชำระเงินไม่สำเร็จ",
+  voided: "ยกเลิก",
+  partial_payment: "ชำระบางส่วน",
+  excess_payment: "ชำระเกิน",
 };
 
 export const ORDER_STATUS_LABEL: Record<OrderStatus, string> = {
   pending: "รอชำระเงิน",
-  reviewing_payment: "รอตรวจสอบการชำระเงิน",
-  paid: "ชำระเงินแล้ว",
-  preparing: "กำลังเตรียมสินค้า",
-  shipped: "จัดส่งแล้ว",
-  completed: "สำเร็จ",
-  cancelled: "ยกเลิก",
+  waiting: "กำลังเตรียมสินค้า",
+  packed: "แพ็กสินค้าแล้ว",
+  shipping: "กำลังจัดส่ง",
+  success: "สำเร็จ",
+  voided: "ยกเลิก",
+  returned: "คืนสินค้า",
+  failed_shipment: "จัดส่งไม่สำเร็จ",
 };
 
 export const PAYMENT_METHOD_LABEL: Record<PaymentMethod, string> = {
   promptpay: "QR พร้อมเพย์",
+  credit_card: "Credit Card",
+  mobile_banking: "Mobile Banking",
   cod: "เก็บเงินปลายทาง (COD)",
 };
 
 /** Canonical order of statuses for building a tracking timeline. */
 export const ORDER_TIMELINE_SEQUENCE: OrderStatus[] = [
   "pending",
-  "reviewing_payment",
-  "paid",
-  "preparing",
-  "shipped",
-  "completed",
+  "waiting",
+  "packed",
+  "shipping",
+  "success",
 ];

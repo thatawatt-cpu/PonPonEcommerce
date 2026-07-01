@@ -46,7 +46,7 @@ export function ProductsClient({
 
   return (
     <div>
-      <div className="space-y-3">
+      <div className="home-panel-shadow space-y-3 rounded-card bg-white p-3 md:p-4">
         <ProductSearch value={query} onChange={handleQueryChange} />
         <CategoryFilter
           categories={categories}

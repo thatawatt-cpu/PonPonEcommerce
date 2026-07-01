@@ -41,6 +41,7 @@ export interface ProductVariantStock {
   id?: string;
   options: Record<string, string>;
   stock: number;
+  imageUrl?: string;
 }
 
 export interface Product {

@@ -58,7 +58,7 @@ function FlashSaleItem({ product, priority = false }: { product: Product; priori
   const discount = getDiscountPercent(product) ?? 15;
 
   return (
-    <article className="w-32 shrink-0 overflow-hidden rounded-2xl bg-white shadow-[0_8px_24px_rgba(65,25,25,0.08)] ring-1 ring-black/[0.04] md:w-40">
+    <article className="home-panel-shadow w-32 shrink-0 overflow-hidden rounded-2xl bg-white ring-1 ring-black/[0.04] md:w-40 lg:w-auto">
       <Link href={`/products/${product.slug}`} className="group block">
         <div className="relative">
           <ProductImage
@@ -118,7 +118,7 @@ export function FlashSaleSection({
   const activeIdx = activeSlotIndex(slots);
 
   return (
-    <section className="mt-4 overflow-hidden rounded-card bg-brand shadow-[0_12px_28px_rgba(190,9,14,0.2)]">
+    <section className="home-red-panel-shadow mt-4 overflow-hidden rounded-card bg-brand">
       <div className="flex items-center justify-between gap-3 px-4 py-3 text-white">
         <div className="min-w-0">
           <h2 className="flex items-center gap-1 text-lg font-extrabold leading-none">
@@ -157,7 +157,7 @@ export function FlashSaleSection({
           </Link>
         </div>
 
-        <div className="no-scrollbar flex gap-2.5 overflow-x-auto px-3.5 pb-1.5">
+        <div className="no-scrollbar flex gap-2.5 overflow-x-auto px-3.5 pb-1.5 lg:grid lg:grid-cols-[repeat(auto-fit,minmax(11rem,1fr))] lg:overflow-visible">
           {products.map((product, index) => (
             <FlashSaleItem key={product.id} product={product} priority={index < 2} />
           ))}

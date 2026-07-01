@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { exchangeLineIdToken } from "@/features/auth/ponpon-auth";
+import { exchangeLineIdToken, isStoredJwtValid } from "@/features/auth/ponpon-auth";
 import { PONPON_LIFF_ID, PONPON_SKIP_LINE_LIFF } from "@/lib/auth-config";
 import {
   getLiffTokens,
@@ -40,6 +40,11 @@ async function bootstrapLineSession(): Promise<void> {
     recentlyAttempted,
   });
 
+  if (PONPON_SKIP_LINE_LIFF) {
+    console.info("[ponpon-auth] skip mode — skipping LINE auth entirely");
+    return;
+  }
+
   await initLiff(PONPON_LIFF_ID);
 
   if (!isLiffLoggedIn()) {
@@ -77,6 +82,11 @@ async function bootstrapLineSession(): Promise<void> {
 
   if (expired) {
     console.warn("[ponpon-auth] idToken expired and already retried — continuing unauthenticated");
+    return;
+  }
+
+  if (isStoredJwtValid()) {
+    console.info("[ponpon-auth] stored JWT still valid — skipping exchange");
     return;
   }
 

@@ -1,60 +1,354 @@
 "use client";
 
+import type React from "react";
 import { use, useEffect, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, Loader2, XCircle } from "lucide-react";
+import {
+  AlertTriangle,
+  ChevronRight,
+  Headphones,
+  ImagePlus,
+  Loader2,
+  MapPin,
+  MessageCircle,
+  PackageCheck,
+  QrCode,
+  RotateCcw,
+  Store,
+  Truck,
+  X,
+  XCircle,
+} from "lucide-react";
 import { AppHeader } from "@/components/layout/app-header";
 import { PageContainer } from "@/components/layout/page-container";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
-import { OrderStatusCard } from "@/components/order/order-status-card";
-import { OrderTimeline } from "@/components/order/order-timeline";
-import { TrackingCard } from "@/components/order/tracking-card";
-import { ContactLineButton } from "@/components/order/contact-line-button";
-import { fetchOrderById, cancelOrder } from "@/features/orders/order-api";
+import { ProductImage } from "@/components/product/product-image";
+import {
+  fetchOrderById,
+  cancelOrder,
+  createReturnRequest,
+} from "@/features/orders/order-api";
+import { isStoredOrderPaid } from "@/features/payments/payment-api";
+import {
+  formatShippingLine,
+  getCarrierName,
+} from "@/features/shipping/shipping-utils";
 import { buildTimeline } from "@/features/orders/order-utils";
-import type { ApiOrderDetail } from "@/types/api";
+import { openExternalWindow } from "@/lib/liff";
+import { LINE_OA_URL } from "@/lib/constants";
+import { formatBaht, formatDateTime } from "@/lib/format";
+import type {
+  ApiOrderDetail,
+  ApiOrderDetailItem,
+  ApiProductDetail,
+  ApiProductListItem,
+  ApiProductVariantOption,
+} from "@/types/api";
 import type { Order, OrderStatus, PaymentStatus } from "@/types/order";
 import type { CartItem } from "@/types/cart";
 
-const CANCELLABLE_STATUSES: OrderStatus[] = ["pending", "reviewing_payment"];
+const CANCELLABLE_STATUSES: OrderStatus[] = ["pending", "waiting"];
+const RETURN_REQUEST_STATUSES: OrderStatus[] = ["success"];
+const REFUNDABLE_PAYMENT_STATUSES: PaymentStatus[] = [
+  "paid",
+  "partial_payment",
+  "excess_payment",
+];
+const CANCEL_REASON_OPTIONS = [
+  "ต้องการเปลี่ยนที่อยู่หรือข้อมูลจัดส่ง",
+  "สั่งสินค้าผิดหรือต้องการสั่งใหม่",
+  "ไม่ต้องการสินค้าแล้ว",
+  "อื่น ๆ",
+];
+const RETURN_REASON_OPTIONS = [
+  "สินค้าเสียหายหรือใช้งานไม่ได้",
+  "ได้รับสินค้าไม่ตรงกับที่สั่ง",
+  "สินค้าไม่ครบหรือมีชิ้นส่วนหาย",
+  "เปลี่ยนใจหรือสินค้าไม่เหมาะสม",
+  "อื่น ๆ",
+];
+const MAX_RETURN_IMAGES = 5;
+const MAX_RETURN_IMAGE_SIZE = 10 * 1024 * 1024;
+const ALLOWED_RETURN_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
+
+interface ReturnImage {
+  id: string;
+  file: File;
+  previewUrl: string;
+}
 
 function mapStatus(status: string): OrderStatus {
-  const known: OrderStatus[] = [
-    "pending",
-    "reviewing_payment",
-    "paid",
-    "preparing",
-    "shipped",
-    "completed",
-    "cancelled",
-  ];
-  const lower = status.toLowerCase().replace(/[-\s]/g, "_") as OrderStatus;
-  return known.includes(lower) ? lower : "pending";
-}
-
-function mapPaymentStatus(status: string): PaymentStatus {
-  const map: Record<string, PaymentStatus> = {
+  const map: Record<string, OrderStatus> = {
+    "0": "pending",
+    "1": "success",
+    "2": "voided",
+    "3": "waiting",
+    "4": "returned",
+    "5": "packed",
+    "6": "shipping",
+    "7": "failed_shipment",
     pending: "pending",
-    reviewing: "reviewing",
-    paid: "paid",
-    failed: "failed",
+    success: "success",
+    voided: "voided",
+    cancelled: "voided",
+    canceled: "voided",
+    waiting: "waiting",
+    returned: "returned",
+    packed: "packed",
+    shipping: "shipping",
+    failed_shipment: "failed_shipment",
+    "failed shipment": "failed_shipment",
   };
-  return map[status.toLowerCase()] ?? "pending";
+  return map[String(status).toLowerCase()] ?? "pending";
 }
 
-function mapApiOrderToOrder(api: ApiOrderDetail): Order {
+function normalizeStatusValue(status: unknown): string {
+  return String(status ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
+}
+
+function mapPaymentStatus(status: unknown): PaymentStatus {
+  const map: Record<string, PaymentStatus> = {
+    "0": "pending",
+    "1": "paid",
+    "2": "voided",
+    "3": "partial_payment",
+    "4": "excess_payment",
+    pending: "pending",
+    unpaid: "pending",
+    awaiting_payment: "pending",
+    waiting_payment: "pending",
+    paid: "paid",
+    success: "paid",
+    successful: "paid",
+    completed: "paid",
+    fully_paid: "paid",
+    voided: "voided",
+    cancelled: "voided",
+    canceled: "voided",
+    partial_payment: "partial_payment",
+    partial: "partial_payment",
+    excess_payment: "excess_payment",
+    overpaid: "excess_payment",
+  };
+  return map[normalizeStatusValue(status)] ?? "pending";
+}
+
+function getApiPaidAmount(api: ApiOrderDetail): number {
+  const paymentAmount = Number(api.paymentAmount);
+  const paymentsAmount =
+    api.payments?.reduce((sum, payment) => {
+      const amount = Number(payment.amount);
+      return Number.isFinite(amount) ? sum + amount : sum;
+    }, 0) ?? 0;
+
+  return Math.max(
+    Number.isFinite(paymentAmount) ? paymentAmount : 0,
+    paymentsAmount
+  );
+}
+
+function getPaymentStatusFromAmount(api: ApiOrderDetail): PaymentStatus | null {
+  const paidAmount = getApiPaidAmount(api);
+  if (paidAmount <= 0) return null;
+
+  const orderAmount = Number(api.amount);
+  if (!Number.isFinite(orderAmount) || orderAmount <= 0) return "paid";
+
+  const tolerance = 0.01;
+  if (paidAmount + tolerance < orderAmount) return "partial_payment";
+  if (paidAmount > orderAmount + tolerance) return "excess_payment";
+  return "paid";
+}
+
+function resolvePaymentStatus(api: ApiOrderDetail): PaymentStatus {
+  const status = mapPaymentStatus(api.paymentStatus);
+  const amountStatus = getPaymentStatusFromAmount(api);
+  const locallyPaid = isStoredOrderPaid({
+    orderId: api.id,
+    orderNo: api.number,
+  });
+
+  if (!amountStatus || status === "voided" || status === "excess_payment") {
+    return locallyPaid && status === "pending" ? "paid" : status;
+  }
+
+  if (status === "pending" || status === "partial_payment") {
+    return locallyPaid ? "paid" : amountStatus;
+  }
+
+  return status;
+}
+
+interface OrderItemFallback {
+  imageUrl: string | null;
+  options: ApiProductVariantOption[];
+}
+
+function getPrimaryProductImage(product: ApiProductDetail): string | null {
+  const sortedImages =
+    product.images?.slice().sort((a, b) => a.sortOrder - b.sortOrder) ?? [];
+
+  return (
+    sortedImages.find((image) => image.isPrimary)?.url ??
+    sortedImages[0]?.url ??
+    product.imageUrl ??
+    null
+  );
+}
+
+function getBaseSku(sku: string): string {
+  return sku.split("-")[0] || sku;
+}
+
+function shouldHydrateOrderItem(item: ApiOrderDetailItem): boolean {
+  return !item.imageUrl || (item.options?.length ?? 0) === 0;
+}
+
+function putFallback(
+  lookup: Map<string, OrderItemFallback>,
+  key: string | null | undefined,
+  fallback: OrderItemFallback
+) {
+  if (!key) return;
+  lookup.set(key, fallback);
+}
+
+async function fetchProductDetail(
+  productId: string
+): Promise<ApiProductDetail | null> {
+  const response = await fetch(`/api/products/${productId}`, {
+    cache: "no-store",
+  });
+
+  if (!response.ok) return null;
+  return (await response.json()) as ApiProductDetail;
+}
+
+async function fetchProductList(): Promise<ApiProductListItem[]> {
+  const response = await fetch("/api/products?page=1&pageSize=100", {
+    cache: "no-store",
+  });
+
+  if (!response.ok) return [];
+
+  const data = (await response.json()) as
+    | ApiProductListItem[]
+    | { items?: ApiProductListItem[] };
+  return Array.isArray(data) ? data : data.items ?? [];
+}
+
+async function buildOrderItemFallbacks(
+  items: ApiOrderDetailItem[]
+): Promise<Map<string, OrderItemFallback>> {
+  const missingItems = items.filter(shouldHydrateOrderItem);
+  const lookup = new Map<string, OrderItemFallback>();
+
+  if (missingItems.length === 0) return lookup;
+
+  const productIds = [
+    ...new Set(
+      missingItems
+        .map((item) => item.productId)
+        .filter((id): id is string => Boolean(id))
+    ),
+  ];
+
+  let products = (
+    await Promise.all(productIds.map((productId) => fetchProductDetail(productId)))
+  ).filter((product): product is ApiProductDetail => Boolean(product));
+
+  const foundBaseSkus = new Set(products.map((product) => product.baseSku));
+  const missingBaseSkus = new Set(
+    missingItems
+      .map((item) => getBaseSku(item.sku))
+      .filter((baseSku) => !foundBaseSkus.has(baseSku))
+  );
+
+  if (missingBaseSkus.size > 0) {
+    const productList = await fetchProductList();
+    const fallbackDetails = await Promise.all(
+      productList
+        .filter((product) => missingBaseSkus.has(product.baseSku))
+        .map((product) => fetchProductDetail(product.id))
+    );
+
+    products = products.concat(
+      fallbackDetails.filter(
+        (product): product is ApiProductDetail => Boolean(product)
+      )
+    );
+  }
+
+  for (const product of products) {
+    const productImage = getPrimaryProductImage(product);
+    const productFallback = {
+      imageUrl: productImage,
+      options: product.options ?? [],
+    };
+
+    putFallback(lookup, product.id, productFallback);
+    putFallback(lookup, product.baseSku, productFallback);
+    putFallback(lookup, product.sku, productFallback);
+
+    for (const variant of product.variants ?? []) {
+      const variantFallback = {
+        imageUrl: variant.imageUrl ?? productImage,
+        options: variant.options ?? product.options ?? [],
+      };
+
+      putFallback(lookup, variant.id, variantFallback);
+      putFallback(lookup, variant.sku, variantFallback);
+      putFallback(lookup, variant.variantCode, variantFallback);
+    }
+  }
+
+  return lookup;
+}
+
+function getOrderItemFallback(
+  item: ApiOrderDetailItem,
+  lookup: Map<string, OrderItemFallback>
+): OrderItemFallback | undefined {
+  return (
+    lookup.get(item.variantId ?? "") ??
+    lookup.get(item.sku) ??
+    lookup.get(item.productId ?? "") ??
+    lookup.get(getBaseSku(item.sku))
+  );
+}
+
+function mapApiOrderToOrder(
+  api: ApiOrderDetail,
+  fallbackLookup = new Map<string, OrderItemFallback>()
+): Order {
   const orderStatus = mapStatus(api.status);
-  const items: CartItem[] = api.items.map((item) => ({
-    productId: item.id,
-    name: item.name,
-    price: item.pricePerUnit,
-    imageUrl: "",
-    emoji: "📦",
-    quantity: Math.round(item.quantity),
-  }));
+  const items: CartItem[] = api.items.map((item) => {
+    const fallback = getOrderItemFallback(item, fallbackLookup);
+    const options =
+      item.options && item.options.length > 0
+        ? item.options
+        : fallback?.options ?? [];
+
+    return {
+      productId: item.productId ?? item.id,
+      variantId: item.variantId,
+      name: item.name,
+      price: item.pricePerUnit,
+      imageUrl: item.imageUrl ?? fallback?.imageUrl ?? "",
+      emoji: "📦",
+      quantity: Math.round(item.quantity),
+      selectedOptions: Object.fromEntries(
+        options.map((option) => [option.name, option.value])
+      ),
+    };
+  });
 
   return {
     id: api.id,
@@ -68,11 +362,235 @@ function mapApiOrderToOrder(api: ApiOrderDetail): Order {
     discountAmount: api.discountAmount,
     total: api.amount,
     paymentMethod: api.isCod ? "cod" : "promptpay",
-    paymentStatus: mapPaymentStatus(api.paymentStatus),
+    paymentStatus: resolvePaymentStatus(api),
     orderStatus,
     timeline: buildTimeline(orderStatus),
     createdAt: api.orderDate ?? new Date().toISOString(),
   };
+}
+
+function getStatusTitle(status: OrderStatus): string {
+  const map: Record<OrderStatus, string> = {
+    pending: "รอชำระเงินเพื่อยืนยันออเดอร์",
+    waiting: "ร้านกำลังเตรียมสินค้า",
+    packed: "แพ็กสินค้าแล้ว",
+    shipping: "กำลังจัดส่ง",
+    success: "คำสั่งซื้อของคุณสำเร็จแล้ว",
+    voided: "ออเดอร์นี้ถูกยกเลิก",
+    returned: "มีการคืนสินค้า",
+    failed_shipment: "จัดส่งไม่สำเร็จ",
+  };
+  return map[status];
+}
+
+function getStatusDescription(status: OrderStatus): string {
+  const map: Record<OrderStatus, string> = {
+    pending: "กรุณาชำระเงินเพื่อให้ร้านเริ่มเตรียมสินค้า",
+    waiting: "ร้านได้รับยอดชำระแล้วและกำลังเตรียมสินค้า",
+    packed: "ร้านแพ็กสินค้าเรียบร้อยแล้ว",
+    shipping: "พัสดุออกเดินทางแล้ว โปรดติดตามเลขพัสดุ",
+    success: "ขอบคุณที่อุดหนุน PonPon Official",
+    voided: "หากต้องการสั่งซื้ออีกครั้ง สามารถเลือกสินค้าใหม่ได้",
+    returned: "โปรดติดต่อร้านหากต้องการข้อมูลเพิ่มเติม",
+    failed_shipment: "โปรดติดต่อร้านเพื่อช่วยตรวจสอบการจัดส่ง",
+  };
+  return map[status];
+}
+
+function getLatestTimelineText(order: Order): string {
+  const active =
+    order.timeline.find((step) => step.state === "active") ??
+    [...order.timeline].reverse().find((step) => step.state === "completed");
+  return active?.label ?? getStatusTitle(order.orderStatus);
+}
+
+function formatOptions(options: Record<string, string> | undefined): string {
+  if (!options) return "";
+  return Object.entries(options)
+    .map(([name, value]) => `${name}: ${value}`)
+    .join(" · ");
+}
+
+function OrderProductCard({ order }: { order: Order }) {
+  return (
+    <Card className="overflow-hidden bg-white">
+      <div className="flex items-center gap-2 border-b border-black/[0.05] px-4 py-3">
+        <Store className="h-4 w-4 text-ink-soft" />
+        <p className="text-sm font-extrabold text-ink">PonPon Official</p>
+        <ChevronRight className="h-4 w-4 text-ink-soft" />
+      </div>
+
+      <div className="divide-y divide-black/[0.05]">
+        {order.items.map((item) => {
+          const optionText = formatOptions(item.selectedOptions);
+          return (
+            <div key={`${item.productId}-${optionText}`} className="flex gap-3 px-4 py-3">
+              <ProductImage
+                imageUrl={item.imageUrl || undefined}
+                emoji={item.emoji}
+                size="sm"
+                className="h-20 w-20 shrink-0 rounded-xl bg-surface-muted"
+              />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-start justify-between gap-3">
+                  <p className="line-clamp-2 text-sm font-bold leading-snug text-ink">
+                    {item.name}
+                  </p>
+                  <span className="shrink-0 text-xs font-bold text-ink-soft">
+                    x{item.quantity}
+                  </span>
+                </div>
+                {optionText && (
+                  <p className="mt-1 line-clamp-1 text-xs font-semibold text-ink-soft">
+                    {optionText}
+                  </p>
+                )}
+                <p className="mt-3 text-right text-sm font-extrabold text-brand">
+                  {formatBaht(item.price * item.quantity)}
+                </p>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="border-t border-black/[0.05] px-4 py-3">
+        <div className="flex items-center justify-between text-sm">
+          <span className="font-semibold text-ink-soft">
+            รวมค่าสินค้า
+          </span>
+          <span className="font-extrabold text-ink">
+            {formatBaht(order.subtotal)}
+          </span>
+        </div>
+        <div className="mt-1.5 flex items-center justify-between text-sm">
+          <span className="font-semibold text-ink-soft">ค่าจัดส่ง</span>
+          <span className="font-bold text-ink">{formatBaht(order.shippingFee)}</span>
+        </div>
+        {order.discountAmount ? (
+          <div className="mt-1.5 flex items-center justify-between text-sm">
+            <span className="font-semibold text-ink-soft">ส่วนลด</span>
+            <span className="font-bold text-success">
+              -{formatBaht(order.discountAmount)}
+            </span>
+          </div>
+        ) : null}
+        <div className="mt-3 flex items-center justify-end gap-2 border-t border-black/[0.05] pt-3">
+          <span className="text-sm font-semibold text-ink">รวมคำสั่งซื้อ:</span>
+          <span className="text-lg font-extrabold text-brand">
+            {formatBaht(order.total)}
+          </span>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function ServiceRow({
+  icon,
+  label,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  onClick?: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition active:scale-[0.99]"
+    >
+      <span className="text-ink-soft">{icon}</span>
+      <span className="flex-1 text-sm font-bold text-ink">{label}</span>
+      <ChevronRight className="h-4 w-4 text-ink-soft" />
+    </button>
+  );
+}
+
+function OrderMetaCard({ apiOrder, order }: { apiOrder: ApiOrderDetail; order: Order }) {
+  const [copied, setCopied] = useState(false);
+
+  const copyOrderNo = async () => {
+    try {
+      await navigator.clipboard.writeText(order.orderNo);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1200);
+    } catch {
+      setCopied(false);
+    }
+  };
+
+  return (
+    <Card className="overflow-hidden bg-white">
+      <div className="flex items-center justify-between gap-3 px-4 py-3">
+        <span className="text-sm font-bold text-ink">หมายเลขคำสั่งซื้อ</span>
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="truncate text-sm font-semibold text-ink-soft">
+            {order.orderNo}
+          </span>
+          <button
+            type="button"
+            onClick={copyOrderNo}
+            className="shrink-0 rounded-full border border-black/10 px-3 py-1 text-xs font-bold text-ink"
+          >
+            {copied ? "คัดลอกแล้ว" : "คัดลอก"}
+          </button>
+        </div>
+      </div>
+
+      <div className="divide-y divide-black/[0.05] border-t border-black/[0.05] px-4 text-sm">
+        <div className="flex justify-between gap-4 py-3">
+          <span className="text-ink-soft">ชำระผ่าน</span>
+          <span className="text-right font-semibold text-ink">
+            {order.paymentMethod === "cod" ? "เก็บเงินปลายทาง" : "PromptPay"}
+          </span>
+        </div>
+        <div className="flex justify-between gap-4 py-3">
+          <span className="text-ink-soft">สถานะชำระเงิน</span>
+          <span className="text-right font-semibold text-ink">
+            {order.paymentStatus === "pending"
+              ? "รอชำระเงิน"
+              : order.paymentStatus === "paid"
+                ? "ชำระแล้ว"
+                : order.paymentStatus === "partial_payment"
+                  ? "ชำระบางส่วน"
+                  : order.paymentStatus === "excess_payment"
+                    ? "ชำระเกิน"
+                    : "ยกเลิกการชำระ"}
+          </span>
+        </div>
+        <div className="flex justify-between gap-4 py-3">
+          <span className="text-ink-soft">เวลาที่สั่งซื้อ</span>
+          <span className="text-right font-semibold text-ink">
+            {apiOrder.orderDate ? formatDateTime(apiOrder.orderDate) : "-"}
+          </span>
+        </div>
+        {apiOrder.shippingDate && (
+          <div className="flex justify-between gap-4 py-3">
+            <span className="text-ink-soft">เวลาที่จัดส่งสินค้า</span>
+            <span className="text-right font-semibold text-ink">
+              {formatDateTime(apiOrder.shippingDate)}
+            </span>
+          </div>
+        )}
+        {apiOrder.trackingNo && (
+          <div className="flex justify-between gap-4 py-3">
+            <span className="text-ink-soft">เลขพัสดุ</span>
+            <span className="text-right font-semibold text-ink">
+              {apiOrder.trackingNo}
+            </span>
+          </div>
+        )}
+        <div className="flex justify-between gap-4 py-3">
+          <span className="text-ink-soft">ขนส่ง</span>
+          <span className="text-right font-semibold text-ink">
+            {getCarrierName(apiOrder.shippingChannel)}
+          </span>
+        </div>
+      </div>
+    </Card>
+  );
 }
 
 export default function OrderTrackingPage({
@@ -84,16 +602,30 @@ export default function OrderTrackingPage({
   const router = useRouter();
 
   const [order, setOrder] = useState<Order | null>(null);
+  const [apiOrder, setApiOrder] = useState<ApiOrderDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancelReasonDetail, setCancelReasonDetail] = useState("");
   const [cancelError, setCancelError] = useState<string | null>(null);
+  const [showReturnDialog, setShowReturnDialog] = useState(false);
+  const [returnReason, setReturnReason] = useState("");
+  const [returnReasonDetail, setReturnReasonDetail] = useState("");
+  const [returnImages, setReturnImages] = useState<ReturnImage[]>([]);
+  const [returnError, setReturnError] = useState<string | null>(null);
+  const [returnInfo, setReturnInfo] = useState<string | null>(null);
+  const [returnSubmitting, setReturnSubmitting] = useState(false);
 
   useEffect(() => {
     fetchOrderById(id)
-      .then((data) => setOrder(mapApiOrderToOrder(data)))
+      .then(async (data) => {
+        const fallbackLookup = await buildOrderItemFallbacks(data.items);
+        setApiOrder(data);
+        setOrder(mapApiOrderToOrder(data, fallbackLookup));
+      })
       .catch((err: unknown) => {
         setError(err instanceof Error ? err.message : "โหลดออเดอร์ไม่สำเร็จ");
       })
@@ -102,19 +634,27 @@ export default function OrderTrackingPage({
 
   const handleCancelConfirm = async () => {
     if (cancelling) return;
+    if (!cancelReason) {
+      setCancelError("กรุณาเลือกเหตุผลในการยกเลิกออเดอร์");
+      return;
+    }
+
     setCancelling(true);
     setCancelError(null);
 
     try {
-      await cancelOrder(id);
+      await cancelOrder(id, {
+        reason: cancelReason,
+        detail: cancelReasonDetail.trim() || undefined,
+      });
       setShowCancelDialog(false);
       // Optimistically update status then redirect
       setOrder((prev) =>
         prev
           ? {
               ...prev,
-              orderStatus: "cancelled",
-              timeline: buildTimeline("cancelled"),
+              orderStatus: "voided",
+              timeline: buildTimeline("voided"),
             }
           : prev
       );
@@ -128,8 +668,124 @@ export default function OrderTrackingPage({
   };
 
   const handleOpenCancel = () => {
+    setCancelReason("");
+    setCancelReasonDetail("");
     setCancelError(null);
     setShowCancelDialog(true);
+  };
+
+  const handleOpenReturn = () => {
+    setReturnReason("");
+    setReturnReasonDetail("");
+    setReturnImages([]);
+    setReturnError(null);
+    setReturnInfo(null);
+    setShowReturnDialog(true);
+  };
+
+  const handleReturnImagesChange = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const selectedFiles = Array.from(event.target.files ?? []);
+    event.target.value = "";
+    setReturnError(null);
+    setReturnInfo(null);
+
+    if (selectedFiles.length === 0) return;
+
+    const availableSlots = MAX_RETURN_IMAGES - returnImages.length;
+    if (availableSlots <= 0) {
+      setReturnError(`แนบรูปได้สูงสุด ${MAX_RETURN_IMAGES} รูป`);
+      return;
+    }
+
+    const unsupportedFile = selectedFiles.find(
+      (file) => !ALLOWED_RETURN_IMAGE_TYPES.includes(file.type)
+    );
+    if (unsupportedFile) {
+      setReturnError("รองรับเฉพาะไฟล์ JPEG, PNG และ WebP เท่านั้น");
+      return;
+    }
+
+    const validFiles = selectedFiles.slice(0, availableSlots);
+    const oversizedFile = validFiles.find(
+      (file) => file.size > MAX_RETURN_IMAGE_SIZE
+    );
+
+    if (oversizedFile) {
+      setReturnError("รูปแต่ละไฟล์ต้องมีขนาดไม่เกิน 10 MB");
+      return;
+    }
+
+    const images = await Promise.all(
+      validFiles.map(
+        (file) =>
+          new Promise<ReturnImage>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () =>
+              resolve({
+                id: `${file.name}-${file.lastModified}-${crypto.randomUUID()}`,
+                file,
+                previewUrl: String(reader.result),
+              });
+            reader.onerror = () => reject(reader.error);
+            reader.readAsDataURL(file);
+          })
+      )
+    ).catch(() => null);
+
+    if (!images) {
+      setReturnError("อ่านไฟล์รูปไม่สำเร็จ กรุณาลองใหม่");
+      return;
+    }
+
+    setReturnImages((current) => [...current, ...images]);
+    if (selectedFiles.length > availableSlots) {
+      setReturnInfo(`เลือกได้สูงสุด ${MAX_RETURN_IMAGES} รูป`);
+    }
+  };
+
+  const handleSubmitReturn = async () => {
+    if (returnSubmitting) return;
+    if (!returnReason) {
+      setReturnError("กรุณาเลือกเหตุผลในการขอคืนสินค้า");
+      return;
+    }
+    if (order?.orderStatus !== "success") {
+      setReturnError("ขอคืนสินค้าได้หลังออเดอร์สำเร็จแล้วเท่านั้น");
+      return;
+    }
+    if (returnImages.length === 0) {
+      setReturnError("กรุณาแนบรูปประกอบอย่างน้อย 1 รูป");
+      return;
+    }
+
+    setReturnSubmitting(true);
+    setReturnError(null);
+    setReturnInfo(null);
+
+    const reason = returnReasonDetail.trim()
+      ? `${returnReason} - ${returnReasonDetail.trim()}`
+      : returnReason;
+
+    try {
+      await createReturnRequest(id, {
+        reason,
+        photos: returnImages.map((image) => image.file),
+      });
+      setReturnInfo("ส่งคำขอคืนสินค้าเรียบร้อยแล้ว");
+      setReturnImages([]);
+      setReturnReason("");
+      setReturnReasonDetail("");
+    } catch (error) {
+      setReturnError(
+        error instanceof Error
+          ? error.message
+          : "ส่งคำขอคืนสินค้าไม่สำเร็จ กรุณาลองใหม่"
+      );
+    } finally {
+      setReturnSubmitting(false);
+    }
   };
 
   if (loading) {
@@ -146,7 +802,7 @@ export default function OrderTrackingPage({
     );
   }
 
-  if (error || !order) {
+  if (error || !order || !apiOrder) {
     return (
       <>
         <AppHeader title="ติดตามออเดอร์" showBack />
@@ -167,21 +823,123 @@ export default function OrderTrackingPage({
   }
 
   const cancellable = CANCELLABLE_STATUSES.includes(order.orderStatus);
+  const cancellationNeedsRefund =
+    cancellable &&
+    REFUNDABLE_PAYMENT_STATUSES.includes(order.paymentStatus);
+  const canRequestReturn = RETURN_REQUEST_STATUSES.includes(order.orderStatus);
+  const canPayNow =
+    order.paymentStatus === "pending" && order.paymentMethod !== "cod";
+  const paymentHref = `/payment?orderId=${encodeURIComponent(
+    order.id
+  )}&orderNo=${encodeURIComponent(order.orderNo)}&amount=${encodeURIComponent(
+    String(order.total)
+  )}`;
 
   return (
     <>
-      <AppHeader title="ติดตามออเดอร์" showBack />
-      <PageContainer className="space-y-3 pt-4">
-        <OrderStatusCard order={order} />
+      <AppHeader title="รายละเอียดคำสั่งซื้อ" showBack />
+      <PageContainer className="space-y-3 pt-4 pb-36 md:max-w-5xl md:px-8 xl:max-w-6xl">
+        <section className="overflow-hidden rounded-card bg-white app-panel-shadow ring-1 ring-black/[0.04]">
+          <div className="bg-brand px-4 py-5 text-white">
+            <p className="text-xs font-bold text-white/75">สถานะคำสั่งซื้อ</p>
+            <h1 className="mt-1 text-xl font-extrabold leading-tight">
+              {getStatusTitle(order.orderStatus)}
+            </h1>
+            <p className="mt-1 text-sm font-semibold text-white/85">
+              {getStatusDescription(order.orderStatus)}
+            </p>
+          </div>
 
-        <Card className="p-4">
-          <h2 className="mb-3 text-sm font-bold text-ink">สถานะการจัดส่ง</h2>
-          <OrderTimeline steps={order.timeline} />
+          <div className="space-y-3 px-4 py-4">
+            <div className="flex items-start gap-3">
+              <Truck className="mt-0.5 h-5 w-5 shrink-0 text-ink-soft" />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-extrabold text-ink">
+                    ข้อมูลการจัดส่ง
+                  </p>
+                  <ChevronRight className="h-4 w-4 text-ink-soft" />
+                </div>
+                <p className="mt-1 text-sm font-semibold text-ink-soft">
+                  ส่งโดย {formatShippingLine(apiOrder)}
+                </p>
+                <div className="mt-3 rounded-2xl bg-brand-soft px-3 py-2.5">
+                  <div className="flex items-center gap-2">
+                    <PackageCheck className="h-4 w-4 text-brand" />
+                    <p className="text-sm font-extrabold text-brand">
+                      {getLatestTimelineText(order)}
+                    </p>
+                  </div>
+                  <p className="mt-1 pl-6 text-xs font-semibold text-ink-soft">
+                    {apiOrder.shippingDate
+                      ? formatDateTime(apiOrder.shippingDate)
+                      : apiOrder.orderDate
+                        ? formatDateTime(apiOrder.orderDate)
+                        : "รอร้านอัปเดตเวลา"}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="border-t border-black/[0.05] pt-3">
+              <div className="flex items-start gap-3">
+                <MapPin className="mt-0.5 h-5 w-5 shrink-0 text-ink-soft" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-extrabold text-ink">
+                    ที่อยู่ในการจัดส่ง
+                  </p>
+                  <p className="mt-2 text-sm font-bold text-ink">
+                    {order.customerName || "-"}{" "}
+                    <span className="font-semibold text-ink-soft">
+                      {order.phone}
+                    </span>
+                  </p>
+                  <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-ink-soft">
+                    {order.address || "-"}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <OrderProductCard order={order} />
+
+        <Card className="overflow-hidden bg-white">
+          <h2 className="px-4 pt-4 text-sm font-extrabold text-ink">
+            บริการหลังการขาย
+          </h2>
+          <div className="mt-1 divide-y divide-black/[0.05]">
+            {canRequestReturn && (
+              <ServiceRow
+                icon={<RotateCcw className="h-5 w-5" />}
+                label="ขอคืนเงิน/คืนสินค้า"
+                onClick={handleOpenReturn}
+              />
+            )}
+            <ServiceRow
+              icon={<MessageCircle className="h-5 w-5" />}
+              label="ติดต่อผู้ขาย"
+              onClick={() => openExternalWindow(LINE_OA_URL)}
+            />
+            <ServiceRow
+              icon={<Headphones className="h-5 w-5" />}
+              label="Customer Service"
+              onClick={() => openExternalWindow(LINE_OA_URL)}
+            />
+          </div>
         </Card>
 
-        <TrackingCard order={order} />
+        <OrderMetaCard apiOrder={apiOrder} order={order} />
 
-        <ContactLineButton />
+        {canPayNow && (
+          <Link href={paymentHref} className="block">
+            <Button size="lg" fullWidth>
+              <QrCode className="h-5 w-5" />
+              ชำระเงิน
+            </Button>
+          </Link>
+        )}
 
         <Link href="/orders" className="block">
           <Button variant="ghost" fullWidth>
@@ -196,10 +954,42 @@ export default function OrderTrackingPage({
             className="flex w-full items-center justify-center gap-2 rounded-full border border-red-200 bg-red-50 py-3 text-sm font-bold text-red-600 transition active:scale-[0.98] hover:bg-red-100"
           >
             <XCircle className="h-4 w-4" />
-            ยกเลิกออเดอร์
+            {cancellationNeedsRefund
+              ? "ยกเลิกและขอคืนเงิน"
+              : "ยกเลิกออเดอร์"}
           </button>
         )}
       </PageContainer>
+
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-black/[0.06] bg-white/95 px-4 py-3 shadow-[0_-12px_35px_rgba(0,0,0,0.08)] backdrop-blur">
+        <div className="mx-auto grid w-full max-w-md grid-cols-2 gap-3 md:max-w-5xl md:px-8 xl:max-w-6xl">
+          <Link
+            href="/products"
+            className="inline-flex h-12 items-center justify-center gap-2 rounded-full border border-black/12 bg-white text-sm font-extrabold text-ink transition active:scale-[0.97]"
+          >
+            <RotateCcw className="h-4 w-4" />
+            ซื้ออีกครั้ง
+          </Link>
+          {canPayNow ? (
+            <Link
+              href={paymentHref}
+              className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-brand text-sm font-extrabold text-white shadow-[0_10px_24px_rgba(237,23,28,0.22)] transition active:scale-[0.97]"
+            >
+              <QrCode className="h-4 w-4" />
+              ชำระเงิน
+            </Link>
+          ) : (
+            <button
+              type="button"
+              onClick={() => openExternalWindow(LINE_OA_URL)}
+              className="inline-flex h-12 items-center justify-center gap-2 rounded-full border border-brand bg-white text-sm font-extrabold text-brand transition active:scale-[0.97]"
+            >
+              <MessageCircle className="h-4 w-4" />
+              ติดต่อร้าน
+            </button>
+          )}
+        </div>
+      </div>
 
       {/* Cancel confirmation bottom sheet */}
       {showCancelDialog && (
@@ -210,7 +1000,7 @@ export default function OrderTrackingPage({
           }}
         >
           <div
-            className="w-full max-w-md rounded-t-[2rem] bg-white px-5 pb-8 pt-5 shadow-[0_-20px_60px_rgba(0,0,0,0.18)]"
+            className="max-h-[92vh] w-full max-w-md overflow-y-auto rounded-t-[2rem] bg-white px-5 pb-8 pt-5 shadow-[0_-20px_60px_rgba(0,0,0,0.18)]"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Handle bar */}
@@ -221,14 +1011,66 @@ export default function OrderTrackingPage({
                 <AlertTriangle className="h-8 w-8 text-red-500" />
               </span>
               <h2 className="mt-4 text-lg font-extrabold text-ink">
-                ยืนยันยกเลิกออเดอร์?
+                {cancellationNeedsRefund
+                  ? "ยืนยันยกเลิกและขอคืนเงิน?"
+                  : "ยืนยันยกเลิกออเดอร์?"}
               </h2>
               <p className="mt-1.5 text-sm leading-relaxed text-ink-soft">
                 ออเดอร์{" "}
                 <span className="font-bold text-ink">{order.orderNo}</span>{" "}
-                จะถูกยกเลิกและไม่สามารถเปิดใหม่ได้
+                {cancellationNeedsRefund
+                  ? "จะถูกยกเลิกและส่งคำขอคืนเงินให้ร้านตรวจสอบ"
+                  : "จะถูกยกเลิกและไม่สามารถเปิดใหม่ได้"}
               </p>
             </div>
+
+            <fieldset className="mb-4">
+              <legend className="mb-2 text-sm font-extrabold text-ink">
+                เหตุผลที่ยกเลิก
+              </legend>
+              <div className="space-y-2">
+                {CANCEL_REASON_OPTIONS.map((reason) => (
+                  <label
+                    key={reason}
+                    className={`flex cursor-pointer items-center gap-3 rounded-2xl border px-3.5 py-3 transition ${
+                      cancelReason === reason
+                        ? "border-brand bg-brand-soft"
+                        : "border-black/10 bg-white"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="cancel-reason"
+                      value={reason}
+                      checked={cancelReason === reason}
+                      onChange={() => {
+                        setCancelReason(reason);
+                        setCancelError(null);
+                      }}
+                      className="h-4 w-4 accent-brand"
+                    />
+                    <span className="text-sm font-semibold text-ink">
+                      {reason}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+
+            <label className="mb-4 block">
+              <span className="mb-2 block text-sm font-extrabold text-ink">
+                รายละเอียดเพิ่มเติม{" "}
+                <span className="font-semibold text-ink-soft">(ถ้ามี)</span>
+              </span>
+              <textarea
+                value={cancelReasonDetail}
+                onChange={(event) => setCancelReasonDetail(event.target.value)}
+                maxLength={1000}
+                rows={3}
+                placeholder="บอกรายละเอียดเพิ่มเติมให้ร้านทราบ"
+                className="w-full resize-none rounded-2xl border border-black/10 bg-surface-muted/50 px-4 py-3 text-sm font-semibold text-ink outline-none transition placeholder:text-ink-soft/70 focus:border-brand focus:bg-white"
+              />
+            </label>
 
             {cancelError && (
               <p className="mb-4 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-center text-sm font-semibold text-red-600">
@@ -255,10 +1097,197 @@ export default function OrderTrackingPage({
                 {cancelling ? (
                   <>
                     <Loader2 className="h-5 w-5 animate-spin" />
-                    กำลังยกเลิก...
+                    {cancellationNeedsRefund
+                      ? "กำลังส่งคำขอ..."
+                      : "กำลังยกเลิก..."}
                   </>
                 ) : (
-                  "ยืนยันยกเลิก"
+                  cancellationNeedsRefund
+                    ? "ยกเลิกและขอคืนเงิน"
+                    : "ยืนยันยกเลิก"
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Return/refund request bottom sheet */}
+      {showReturnDialog && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 backdrop-blur-sm"
+          onClick={() => {
+            if (!returnSubmitting) setShowReturnDialog(false);
+          }}
+        >
+          <div
+            className="max-h-[92vh] w-full max-w-md overflow-y-auto rounded-t-[2rem] bg-white px-5 pb-8 pt-5 shadow-[0_-20px_60px_rgba(0,0,0,0.18)]"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="mx-auto mb-5 h-1 w-10 rounded-full bg-black/10" />
+
+            <div className="mb-5 flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-extrabold text-ink">
+                  ขอคืนเงิน/คืนสินค้า
+                </h2>
+                <p className="mt-1 text-sm font-semibold text-ink-soft">
+                  ออเดอร์ {order.orderNo}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowReturnDialog(false)}
+                disabled={returnSubmitting}
+                aria-label="ปิด"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-muted text-ink-soft transition active:scale-95"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <fieldset>
+              <legend className="mb-2 text-sm font-extrabold text-ink">
+                เหตุผลที่ขอคืนสินค้า
+              </legend>
+              <div className="space-y-2">
+                {RETURN_REASON_OPTIONS.map((reason) => (
+                  <label
+                    key={reason}
+                    className={`flex cursor-pointer items-center gap-3 rounded-2xl border px-3.5 py-3 transition ${
+                      returnReason === reason
+                        ? "border-brand bg-brand-soft"
+                        : "border-black/10 bg-white"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="return-reason"
+                      value={reason}
+                      checked={returnReason === reason}
+                      onChange={() => {
+                        setReturnReason(reason);
+                        setReturnError(null);
+                        setReturnInfo(null);
+                      }}
+                      className="h-4 w-4 accent-brand"
+                    />
+                    <span className="text-sm font-semibold text-ink">
+                      {reason}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+
+            <label className="mt-4 block">
+              <span className="mb-2 block text-sm font-extrabold text-ink">
+                รายละเอียดเพิ่มเติม{" "}
+                <span className="font-semibold text-ink-soft">(ถ้ามี)</span>
+              </span>
+              <textarea
+                value={returnReasonDetail}
+                onChange={(event) => setReturnReasonDetail(event.target.value)}
+                maxLength={1000}
+                rows={3}
+                placeholder="อธิบายปัญหาที่พบ"
+                className="w-full resize-none rounded-2xl border border-black/10 bg-surface-muted/50 px-4 py-3 text-sm font-semibold text-ink outline-none transition placeholder:text-ink-soft/70 focus:border-brand focus:bg-white"
+              />
+            </label>
+
+            <div className="mt-4">
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <p className="text-sm font-extrabold text-ink">รูปประกอบ</p>
+                <span className="text-xs font-semibold text-ink-soft">
+                  {returnImages.length}/{MAX_RETURN_IMAGES} รูป
+                </span>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2">
+                {returnImages.map((image) => (
+                  <div
+                    key={image.id}
+                    className="relative aspect-square overflow-hidden rounded-2xl bg-surface-muted ring-1 ring-black/[0.06]"
+                  >
+                    <Image
+                      src={image.previewUrl}
+                      alt={`รูปประกอบ ${image.file.name}`}
+                      fill
+                      unoptimized
+                      sizes="120px"
+                      className="object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setReturnImages((current) =>
+                          current.filter((item) => item.id !== image.id)
+                        )
+                      }
+                      aria-label={`ลบรูป ${image.file.name}`}
+                      className="absolute right-1.5 top-1.5 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                ))}
+
+                {returnImages.length < MAX_RETURN_IMAGES && (
+                  <label className="flex aspect-square cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-brand/40 bg-brand-soft/60 text-brand transition active:scale-95">
+                    <ImagePlus className="h-6 w-6" />
+                    <span className="mt-1 text-xs font-bold">เพิ่มรูป</span>
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      multiple
+                      onChange={handleReturnImagesChange}
+                      className="sr-only"
+                    />
+                  </label>
+                )}
+              </div>
+              <p className="mt-2 text-xs font-semibold text-ink-soft">
+                รองรับ JPEG, PNG, WebP สูงสุด 10 MB ต่อรูป และต้องแนบอย่างน้อย 1 รูป
+              </p>
+            </div>
+
+            {returnError && (
+              <p className="mt-4 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-semibold text-red-600">
+                {returnError}
+              </p>
+            )}
+            {returnInfo && (
+              <p className="mt-4 rounded-2xl border border-brand/15 bg-brand-soft px-4 py-3 text-sm font-semibold text-brand">
+                {returnInfo}
+              </p>
+            )}
+
+            <div className="mt-5 flex gap-3">
+              <Button
+                variant="secondary"
+                size="lg"
+                fullWidth
+                onClick={() => setShowReturnDialog(false)}
+                disabled={returnSubmitting}
+              >
+                ยกเลิก
+              </Button>
+              <button
+                type="button"
+                onClick={handleSubmitReturn}
+                disabled={returnSubmitting}
+                className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-brand px-4 text-sm font-extrabold text-white transition active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {returnSubmitting ? (
+                  <>
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    กำลังส่ง...
+                  </>
+                ) : (
+                  <>
+                    <RotateCcw className="h-4 w-4" />
+                    ส่งคำขอ
+                  </>
                 )}
               </button>
             </div>
