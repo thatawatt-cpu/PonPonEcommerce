@@ -134,6 +134,25 @@ export const useCartStore = create<CartState>()(
     }),
     {
       name: "ponpon-cart",
+      version: 2,
+      migrate: (persistedState, version) => {
+        const state = persistedState as { items?: CartItem[] };
+        const items = Array.isArray(state.items) ? state.items : [];
+
+        if (version < 2) {
+          return {
+            items: items.filter(
+              (item) =>
+                !(
+                  /^\d+$/.test(item.productId) &&
+                  item.imageUrl.startsWith("/images/products/")
+                ),
+            ),
+          };
+        }
+
+        return { items };
+      },
       // Only persist the items; derived getters are recomputed.
       partialize: (state) => ({ items: state.items }),
     }

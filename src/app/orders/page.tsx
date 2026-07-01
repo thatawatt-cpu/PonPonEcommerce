@@ -1,7 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent,
+} from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   ArrowUpRight,
   ChevronRight,
@@ -106,6 +114,7 @@ const ORDER_PAGE_CONTAINER_CLASS = "pt-4 md:max-w-5xl md:px-8 xl:max-w-6xl";
 const ORDER_PAGE_SIZE = 10;
 const EMPTY_ORDERS: ApiOrderListItem[] = [];
 const FALLBACK_ORDER_PAGE_SIZE = 100;
+const ACTIVE_ORDER_STATUS_CODES = ["0", "3", "5", "6"];
 
 const orderFilterParams = orderTabs.reduce(
   (params, filter) => {
@@ -265,6 +274,16 @@ async function fetchOrdersWithClientFallback(
   };
 }
 
+async function fetchActiveOrderCount(): Promise<number> {
+  const response = await fetchOrders({
+    status: ACTIVE_ORDER_STATUS_CODES,
+    page: 1,
+    pageSize: 1,
+  });
+
+  return Number.isFinite(response.total) ? response.total : response.items.length;
+}
+
 function formatVariantOptions(
   options?: { name: string; value: string }[]
 ): string[] {
@@ -340,17 +359,27 @@ function OrderCard({
   isPreviewLoading?: boolean;
   itemsCount: number;
 }) {
+  const router = useRouter();
   const [itemsExpanded, setItemsExpanded] = useState(false);
   const orderStatus = mapStatus(order.status);
+  const orderHref = `/orders/${order.id}`;
   const progress = progressByStatus[orderStatus];
   const isShipped = orderStatus === "shipping";
   const visiblePreviewItems = itemsExpanded ? previewItems : previewItems.slice(0, 1);
   const hiddenPreviewCount = Math.max(itemsCount - visiblePreviewItems.length, 0);
   const previewHiddenCount = Math.max(previewItems.length - visiblePreviewItems.length, 0);
   const hasMoreItems = Math.max(itemsCount, previewItems.length) > 1;
+  const handleCardClick = (event: MouseEvent<HTMLDivElement>) => {
+    const target = event.target;
+    if (target instanceof Element && target.closest("a, button")) return;
+    router.push(orderHref);
+  };
 
   return (
-      <Card className="overflow-hidden bg-white">
+      <Card
+        onClick={handleCardClick}
+        className="group relative touch-pan-y cursor-pointer overflow-hidden bg-white transition hover:-translate-y-0.5 hover:shadow-card"
+      >
         <div className="flex items-center justify-between gap-3 border-b border-black/[0.05] px-4 py-3">
           <div className="flex min-w-0 items-center gap-2.5">
             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-soft text-brand">
@@ -428,7 +457,7 @@ function OrderCard({
                     <button
                       type="button"
                       onClick={() => setItemsExpanded((value) => !value)}
-                      className="flex w-full items-center justify-center gap-1.5 border-t border-black/[0.05] pt-2 text-sm font-bold text-ink-soft transition hover:text-brand active:scale-[0.99]"
+                      className="relative z-20 flex w-full items-center justify-center gap-1.5 border-t border-black/[0.05] pt-2 text-sm font-bold text-ink-soft transition hover:text-brand active:scale-[0.99]"
                     >
                       {itemsExpanded ? "ย่อรายการ" : "ดูเพิ่มเติม"}
                       {!itemsExpanded && hiddenPreviewCount > 0 && (
@@ -496,7 +525,7 @@ function OrderCard({
             </p>
           </div>
           <Link
-            href={`/orders/${order.id}`}
+            href={orderHref}
             className="flex shrink-0 items-center gap-1 rounded-full border border-brand bg-white px-4 py-2 text-xs font-extrabold text-brand transition active:scale-95"
           >
             ติดตามออเดอร์
@@ -516,6 +545,7 @@ export default function OrdersPage() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
+  const [activeOrderCount, setActiveOrderCount] = useState<number | null>(null);
   const [activeFilter, setActiveFilter] = useState<OrderFilter>("all");
   const [query, setQuery] = useState("");
   const [loadedTabs, setLoadedTabs] = useState<Set<OrderFilter>>(
@@ -598,6 +628,22 @@ export default function OrdersPage() {
   }, [activeFilter, loadOrdersPage, loadedTabs]);
 
   useEffect(() => {
+    let cancelled = false;
+
+    void fetchActiveOrderCount()
+      .then((count) => {
+        if (!cancelled) setActiveOrderCount(count);
+      })
+      .catch((countError: unknown) => {
+        console.error("[orders] Failed to load active order count", countError);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
     const target = loadMoreRef.current;
     if (!target || shouldShowInitialLoading || !hasMore) return;
 
@@ -613,11 +659,6 @@ export default function OrdersPage() {
     observer.observe(target);
     return () => observer.disconnect();
   }, [activeFilter, hasMore, loadOrdersPage, page, shouldShowInitialLoading]);
-
-  const activeOrders = (ordersCache.all ?? []).filter((o) => {
-    const s = mapStatus(o.status);
-    return s !== "success" && s !== "voided" && s !== "returned" && s !== "failed_shipment";
-  }).length;
 
   const normalizedQuery = query.trim().toLocaleLowerCase("th");
 
@@ -682,7 +723,14 @@ export default function OrdersPage() {
                     สถานะการสั่งซื้อ
                   </p>
                   <h2 className="mt-0.5 text-xl font-extrabold">
-                    {activeOrders} ออเดอร์กำลังดำเนินการ
+                    {activeOrderCount === null ? (
+                      <span
+                        className="inline-block h-7 w-48 animate-pulse rounded-lg bg-white/20 align-middle"
+                        aria-label="กำลังโหลดยอดออเดอร์"
+                      />
+                    ) : (
+                      `${activeOrderCount} ออเดอร์กำลังดำเนินการ`
+                    )}
                   </h2>
                 </div>
                 <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/16">

@@ -4,25 +4,10 @@ import { AppHeader } from "@/components/layout/app-header";
 import { PageContainer } from "@/components/layout/page-container";
 import { ProductCard } from "@/components/product/product-card";
 import { Card } from "@/components/ui/card";
-import { products } from "@/lib/mock-data";
-
-const recentProductIds = ["1", "2", "4", "3", "7", "5", "8", "6"];
-
-const viewedAtById: Record<string, string> = {
-  "1": "เมื่อ 5 นาทีที่แล้ว",
-  "2": "เมื่อ 18 นาทีที่แล้ว",
-  "4": "วันนี้ 19:08",
-  "3": "วันนี้ 16:42",
-  "7": "เมื่อวาน 09:30",
-  "5": "เมื่อวาน 08:15",
-  "8": "6 มิ.ย. 2569",
-  "6": "5 มิ.ย. 2569",
-};
+import type { Product } from "@/types/product";
 
 export default function RecentlyViewedPage() {
-  const recentProducts = recentProductIds
-    .map((id) => products.find((product) => product.id === id))
-    .filter((product): product is NonNullable<typeof product> => Boolean(product));
+  const recentProducts: Product[] = [];
 
   return (
     <>
@@ -86,7 +71,6 @@ export default function RecentlyViewedPage() {
                     key={product.id}
                     product={product}
                     index={index}
-                    metaLabel={viewedAtById[product.id]}
                   />
                 ))}
               </div>

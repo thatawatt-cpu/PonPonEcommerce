@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Heart, ShoppingBag } from "lucide-react";
 import { AppHeader } from "@/components/layout/app-header";
@@ -7,19 +8,42 @@ import { PageContainer } from "@/components/layout/page-container";
 import { ProductImage } from "@/components/product/product-image";
 import { Price } from "@/components/ui/price";
 import { Card } from "@/components/ui/card";
-import { products } from "@/lib/mock-data";
+import { mapApiProductToProduct } from "@/features/products/product-mapper";
 import {
   useFavoriteStore,
   useFavoritesHydrated,
 } from "@/store/favorite-store";
+import type { ApiProductListItem } from "@/types/api";
+import type { Product } from "@/types/product";
 
 export default function FavoritesPage() {
   const hydrated = useFavoritesHydrated();
+  const [products, setProducts] = useState<Product[]>([]);
   const favoriteProductIds = useFavoriteStore((state) => state.productIds);
   const toggleFavorite = useFavoriteStore((state) => state.toggleFavorite);
-  const favoriteProducts = products.filter((product) =>
-    favoriteProductIds.includes(product.id),
+  const favoriteProducts = useMemo(
+    () =>
+      products.filter((product) => favoriteProductIds.includes(product.id)),
+    [favoriteProductIds, products],
   );
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    fetch("/api/products?pageSize=100", { signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) return [];
+        const data = (await response.json()) as ApiProductListItem[];
+        return Array.isArray(data) ? data.map(mapApiProductToProduct) : [];
+      })
+      .then(setProducts)
+      .catch((error: unknown) => {
+        if (error instanceof Error && error.name === "AbortError") return;
+        console.error("[favorites] Failed to load products", error);
+      });
+
+    return () => controller.abort();
+  }, []);
 
   return (
     <>

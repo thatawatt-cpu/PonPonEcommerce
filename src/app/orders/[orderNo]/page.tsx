@@ -829,6 +829,7 @@ export default function OrderTrackingPage({
   const canRequestReturn = RETURN_REQUEST_STATUSES.includes(order.orderStatus);
   const canPayNow =
     order.paymentStatus === "pending" && order.paymentMethod !== "cod";
+  const hasShippingAddress = Boolean(order.address.trim());
   const paymentHref = `/payment?orderId=${encodeURIComponent(
     order.id
   )}&orderNo=${encodeURIComponent(order.orderNo)}&amount=${encodeURIComponent(
@@ -882,23 +883,47 @@ export default function OrderTrackingPage({
             </div>
 
             <div className="border-t border-black/[0.05] pt-3">
-              <div className="flex items-start gap-3">
-                <MapPin className="mt-0.5 h-5 w-5 shrink-0 text-ink-soft" />
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-extrabold text-ink">
-                    ที่อยู่ในการจัดส่ง
-                  </p>
-                  <p className="mt-2 text-sm font-bold text-ink">
-                    {order.customerName || "-"}{" "}
-                    <span className="font-semibold text-ink-soft">
-                      {order.phone}
-                    </span>
-                  </p>
-                  <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-ink-soft">
-                    {order.address || "-"}
-                  </p>
+              {hasShippingAddress ? (
+                <div className="flex items-start gap-3">
+                  <MapPin className="mt-0.5 h-5 w-5 shrink-0 text-ink-soft" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-extrabold text-ink">
+                      ที่อยู่ในการจัดส่ง
+                    </p>
+                    <p className="mt-2 text-sm font-bold text-ink">
+                      {order.customerName || "-"}{" "}
+                      <span className="font-semibold text-ink-soft">
+                        {order.phone}
+                      </span>
+                    </p>
+                    <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-ink-soft">
+                      {order.address}
+                    </p>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <Link
+                  href="/addresses"
+                  className="group flex items-center gap-3 rounded-2xl border border-dashed border-brand/25 bg-brand-soft/55 p-3 transition active:scale-[0.99] hover:border-brand/40 hover:bg-brand-soft"
+                  aria-label="เพิ่มหรือจัดการที่อยู่จัดส่ง"
+                >
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white text-brand shadow-sm ring-1 ring-brand/10">
+                    <MapPin className="h-5 w-5" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-extrabold text-ink">
+                      ยังไม่มีที่อยู่จัดส่ง
+                    </span>
+                    <span className="mt-0.5 block text-xs font-semibold leading-relaxed text-ink-soft">
+                      เพิ่มชื่อผู้รับ เบอร์โทร และที่อยู่สำหรับจัดส่ง
+                    </span>
+                  </span>
+                  <span className="flex shrink-0 items-center gap-1 text-xs font-extrabold text-brand">
+                    จัดการ
+                    <ChevronRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
+                  </span>
+                </Link>
+              )}
             </div>
           </div>
         </section>

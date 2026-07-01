@@ -1,6 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useState,
+  type SelectHTMLAttributes,
+} from "react";
 import {
   Bell,
   Building2,
@@ -57,6 +62,66 @@ const emptyAddress: AddressFormState = {
   isDefault: false,
 };
 
+interface SubdistrictOption {
+  name: string;
+  postcode: string;
+}
+
+interface AddressSelectProps
+  extends Omit<SelectHTMLAttributes<HTMLSelectElement>, "children"> {
+  label: string;
+  placeholder: string;
+  options: string[];
+}
+
+function AddressSelect({
+  id,
+  label,
+  placeholder,
+  options,
+  className,
+  ...props
+}: AddressSelectProps) {
+  return (
+    <label htmlFor={id} className="block">
+      <span className="mb-1.5 block text-sm font-medium text-ink">{label}</span>
+      <select
+        id={id}
+        className={cn(
+          "w-full appearance-none rounded-2xl border border-black/[0.07] bg-surface-muted/70 px-4 py-3 text-sm text-ink outline-none transition focus:border-brand focus:bg-white focus:ring-3 focus:ring-brand/10 disabled:cursor-not-allowed disabled:opacity-55",
+          className
+        )}
+        {...props}
+      >
+        <option value="">{placeholder}</option>
+        {options.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+async function fetchAddressOptions<T>(
+  params: Record<string, string>,
+  signal?: AbortSignal
+): Promise<T[]> {
+  const query = new URLSearchParams(params);
+  const response = await fetch(
+    `/api/thai-addresses${query.size ? `?${query}` : ""}`,
+    { signal }
+  );
+
+  if (!response.ok) {
+    throw new Error("โหลดข้อมูลพื้นที่ไม่สำเร็จ");
+  }
+
+  const data = (await response.json()) as { items?: T[] };
+  return Array.isArray(data.items) ? data.items : [];
+}
+
 function preserveAddressOrder(
   nextAddresses: SavedAddress[],
   orderIds?: string[]
@@ -112,6 +177,14 @@ export default function AddressesPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [form, setForm] = useState<AddressFormState>(emptyAddress);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [provinceOptions, setProvinceOptions] = useState<string[]>([]);
+  const [districtOptions, setDistrictOptions] = useState<string[]>([]);
+  const [subdistrictOptions, setSubdistrictOptions] = useState<
+    SubdistrictOption[]
+  >([]);
+  const [addressOptionsLoading, setAddressOptionsLoading] = useState<
+    "provinces" | "districts" | "subdistricts" | null
+  >(null);
   const [saving, setSaving] = useState(false);
   const [editingAddress, setEditingAddress] = useState<SavedAddress | null>(
     null
@@ -216,6 +289,92 @@ export default function AddressesPage() {
       window.clearTimeout(timer);
     };
   }, [syncAddresses]);
+
+  useEffect(() => {
+    if (!formOpen || provinceOptions.length > 0) return;
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      setAddressOptionsLoading("provinces");
+      void fetchAddressOptions<string>({}, controller.signal)
+        .then(setProvinceOptions)
+        .catch((optionError: unknown) => {
+          if (optionError instanceof Error && optionError.name === "AbortError")
+            return;
+          setErrors((value) => ({
+            ...value,
+            addressOptions: "โหลดรายชื่อจังหวัดไม่สำเร็จ กรุณาลองใหม่",
+          }));
+        })
+        .finally(() => {
+          if (!controller.signal.aborted) setAddressOptionsLoading(null);
+        });
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [formOpen, provinceOptions.length]);
+
+  useEffect(() => {
+    if (!formOpen || !form.province) return;
+
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      setAddressOptionsLoading("districts");
+      void fetchAddressOptions<string>(
+        { province: form.province },
+        controller.signal
+      )
+        .then(setDistrictOptions)
+        .catch((optionError: unknown) => {
+          if (optionError instanceof Error && optionError.name === "AbortError")
+            return;
+          setErrors((value) => ({
+            ...value,
+            addressOptions: "โหลดรายชื่อเขต/อำเภอไม่สำเร็จ กรุณาลองใหม่",
+          }));
+        })
+        .finally(() => {
+          if (!controller.signal.aborted) setAddressOptionsLoading(null);
+        });
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [form.province, formOpen]);
+
+  useEffect(() => {
+    if (!formOpen || !form.province || !form.district) return;
+
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      setAddressOptionsLoading("subdistricts");
+      void fetchAddressOptions<SubdistrictOption>(
+        { province: form.province, district: form.district },
+        controller.signal
+      )
+        .then(setSubdistrictOptions)
+        .catch((optionError: unknown) => {
+          if (optionError instanceof Error && optionError.name === "AbortError")
+            return;
+          setErrors((value) => ({
+            ...value,
+            addressOptions: "โหลดรายชื่อแขวง/ตำบลไม่สำเร็จ กรุณาลองใหม่",
+          }));
+        })
+        .finally(() => {
+          if (!controller.signal.aborted) setAddressOptionsLoading(null);
+        });
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [form.district, form.province, formOpen]);
 
   const openCreate = () => {
     setEditingAddress(null);
@@ -617,6 +776,11 @@ export default function AddressesPage() {
                   {errors.form}
                 </p>
               )}
+              {errors.addressOptions && (
+                <p className="rounded-2xl bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">
+                  {errors.addressOptions}
+                </p>
+              )}
 
               <Input
                 id="address-label"
@@ -684,52 +848,102 @@ export default function AddressesPage() {
                 }
               />
 
-              <div className="grid grid-cols-2 gap-2">
-                <Input
-                  id="subdistrict"
-                  label="แขวง/ตำบล"
-                  value={form.subdistrict}
-                  onChange={(event) =>
-                    updateForm({ subdistrict: event.target.value })
-                  }
-                />
-                <Input
-                  id="district"
-                  label="เขต/อำเภอ"
-                  value={form.district}
-                  onChange={(event) =>
-                    updateForm({ district: event.target.value })
-                  }
-                />
-              </div>
-              {(errors.subdistrict || errors.district) && (
+              <AddressSelect
+                id="province"
+                label="จังหวัด"
+                placeholder={
+                  addressOptionsLoading === "provinces"
+                    ? "กำลังโหลดจังหวัด..."
+                    : "เลือกจังหวัด"
+                }
+                value={form.province}
+                options={provinceOptions}
+                disabled={addressOptionsLoading === "provinces"}
+                onChange={(event) => {
+                  updateForm({
+                    province: event.target.value,
+                    district: "",
+                    subdistrict: "",
+                    postcode: "",
+                  });
+                  setDistrictOptions([]);
+                  setSubdistrictOptions([]);
+                }}
+              />
+              {errors.province && (
                 <p className="-mt-2 text-xs text-brand">
-                  {errors.subdistrict || errors.district}
+                  {errors.province}
                 </p>
               )}
 
-              <div className="grid grid-cols-2 gap-2">
-                <Input
-                  id="province"
-                  label="จังหวัด"
-                  value={form.province}
-                  onChange={(event) =>
-                    updateForm({ province: event.target.value })
+              <AddressSelect
+                id="district"
+                label="เขต/อำเภอ"
+                placeholder={
+                  addressOptionsLoading === "districts"
+                    ? "กำลังโหลดเขต/อำเภอ..."
+                    : form.province
+                      ? "เลือกเขต/อำเภอ"
+                      : "เลือกจังหวัดก่อน"
+                }
+                value={form.district}
+                options={districtOptions}
+                disabled={
+                  !form.province || addressOptionsLoading === "districts"
+                }
+                onChange={(event) => {
+                  updateForm({
+                    district: event.target.value,
+                    subdistrict: "",
+                    postcode: "",
+                  });
+                  setSubdistrictOptions([]);
+                }}
+              />
+              {errors.district && (
+                <p className="-mt-2 text-xs text-brand">{errors.district}</p>
+              )}
+
+              <div className="grid grid-cols-[minmax(0,1fr)_7rem] gap-2">
+                <AddressSelect
+                  id="subdistrict"
+                  label="แขวง/ตำบล"
+                  placeholder={
+                    addressOptionsLoading === "subdistricts"
+                      ? "กำลังโหลด..."
+                      : form.district
+                        ? "เลือกแขวง/ตำบล"
+                        : "เลือกเขต/อำเภอก่อน"
                   }
+                  value={form.subdistrict}
+                  options={subdistrictOptions.map((option) => option.name)}
+                  disabled={
+                    !form.district ||
+                    addressOptionsLoading === "subdistricts"
+                  }
+                  onChange={(event) => {
+                    const selected = subdistrictOptions.find(
+                      (option) => option.name === event.target.value
+                    );
+                    updateForm({
+                      subdistrict: event.target.value,
+                      postcode: selected?.postcode ?? "",
+                    });
+                  }}
                 />
                 <Input
                   id="postcode"
                   label="รหัสไปรษณีย์"
                   inputMode="numeric"
                   value={form.postcode}
-                  onChange={(event) =>
-                    updateForm({ postcode: event.target.value })
-                  }
+                  readOnly
+                  placeholder="อัตโนมัติ"
+                  className="bg-black/[0.03] text-center font-bold"
                 />
               </div>
-              {(errors.province || errors.postcode) && (
+              {(errors.subdistrict || errors.postcode) && (
                 <p className="-mt-2 text-xs text-brand">
-                  {errors.province || errors.postcode}
+                  {errors.subdistrict || errors.postcode}
                 </p>
               )}
 
