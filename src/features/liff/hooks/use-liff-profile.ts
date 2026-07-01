@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { getPonPonMe } from "@/features/auth/ponpon-auth";
 import { PONPON_LIFF_ID, PONPON_SKIP_LINE_LIFF } from "@/lib/auth-config";
 import { getLiffProfile, initLiff, isLiffLoggedIn } from "@/lib/liff";
 import { mockCustomerProfile } from "@/lib/mock-data";
@@ -35,24 +36,40 @@ export function useLiffProfile(): UseLiffProfileResult {
         await initLiff(PONPON_LIFF_ID);
 
         if (!isLiffLoggedIn()) {
-          if (!cancelled) setError("กรุณาเปิดแอปผ่าน LINE");
+          if (!cancelled) {
+            setError("กรุณาเข้าสู่ระบบใหม่ผ่าน LINE");
+          }
           return;
         }
 
         const timeout = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("โหลดโปรไฟล์ช้าเกินไป")), 8000)
+          setTimeout(() => reject(new Error("โหลดข้อมูลผู้ใช้ช้าเกินไป")), 8000)
         );
-        const result = await Promise.race([getLiffProfile(), timeout]);
+        const [lineProfile, meProfile] = await Promise.race([
+          Promise.all([getLiffProfile(), getPonPonMe()]),
+          timeout,
+        ]);
+
+        const result: LiffProfile = {
+          displayName: meProfile.displayName || lineProfile.displayName,
+          lineUserId: lineProfile.lineUserId || meProfile.id,
+          pictureUrl: meProfile.pictureUrl ?? lineProfile.pictureUrl,
+        };
+
         if (!cancelled) {
           setProfile(result);
         }
       } catch (err) {
         if (!cancelled) {
-          setError(
-            err instanceof Error
-              ? err.message
-              : "ไม่สามารถโหลดข้อมูลผู้ใช้ได้"
-          );
+          const message =
+            err instanceof Error ? err.message : "ไม่สามารถโหลดข้อมูลผู้ใช้ได้";
+          const normalizedMessage = message.includes("status 401")
+            ? "เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่"
+            : message.includes("status 403")
+              ? "ไม่มีสิทธิ์เข้าถึงข้อมูล กรุณาเข้าสู่ระบบใหม่"
+              : message;
+
+          setError(normalizedMessage);
         }
       } finally {
         if (!cancelled) setLoading(false);

@@ -25,7 +25,7 @@ import { Card } from "@/components/ui/card";
 import { LiffProfileCard } from "@/features/liff/components/liff-profile-card";
 import { MembershipSummaryCard } from "@/components/membership/membership-summary-card";
 import { useLiffProfile } from "@/features/liff/hooks/use-liff-profile";
-import { openExternalWindow } from "@/lib/liff";
+import { loginWithLine, openExternalWindow } from "@/lib/liff";
 import { LINE_OA_URL } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import {
@@ -104,11 +104,21 @@ export default function ProfilePage() {
     },
   ];
 
+  const handleRetryLogin = async () => {
+    await loginWithLine();
+    window.location.reload();
+  };
+
   return (
     <>
       <AppHeader title="โปรไฟล์" showCart={false} />
       <PageContainer className="space-y-4 pt-4">
-        <LiffProfileCard profile={profile} loading={loading} error={error} />
+        <LiffProfileCard
+          profile={profile}
+          loading={loading}
+          error={error}
+          onRetryLogin={handleRetryLogin}
+        />
         <MembershipSummaryCard />
 
         <section>

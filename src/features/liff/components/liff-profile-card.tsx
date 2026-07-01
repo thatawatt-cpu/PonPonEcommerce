@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { Loader2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import type { LiffProfile } from "@/types/liff";
 
@@ -8,12 +9,14 @@ interface LiffProfileCardProps {
   profile: LiffProfile | null;
   loading: boolean;
   error?: string | null;
+  onRetryLogin?: () => void;
 }
 
 export function LiffProfileCard({
   profile,
   loading,
   error,
+  onRetryLogin,
 }: LiffProfileCardProps) {
   if (loading) {
     return (
@@ -29,8 +32,18 @@ export function LiffProfileCard({
 
   if (error || !profile) {
     return (
-      <Card className="p-4 text-sm text-ink-soft">
-        {error ?? "ไม่พบโปรไฟล์"}
+      <Card className="space-y-3 p-4">
+        <div className="text-sm text-ink-soft">{error ?? "ไม่พบโปรไฟล์"}</div>
+        {onRetryLogin && (
+          <button
+            type="button"
+            onClick={onRetryLogin}
+            className="inline-flex items-center justify-center gap-2 rounded-full bg-brand px-4 py-2 text-sm font-bold text-white transition active:scale-[0.98]"
+          >
+            <Loader2 className="h-4 w-4" />
+            เข้าสู่ระบบใหม่
+          </button>
+        )}
       </Card>
     );
   }
@@ -63,7 +76,7 @@ export function LiffProfileCard({
       </div>
       <div className="mt-3 flex items-center gap-2">
         <span className="rounded-full bg-brand-soft px-2.5 py-1 text-[10px] font-extrabold text-brand">
-          โหมดทดลอง
+          โหมดทดสอบ
         </span>
         <p className="text-[11px] font-medium text-ink-soft">
           ข้อมูล LINE จำลองสำหรับทดสอบหน้าร้าน
