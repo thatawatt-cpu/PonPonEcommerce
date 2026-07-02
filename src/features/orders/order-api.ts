@@ -89,17 +89,10 @@ export interface CancelOrderInput {
   detail?: string;
 }
 
-export interface CancelOrderResult {
-  omiseRefundStatus?: string | null;
-  order?: {
-    omiseRefundStatus?: string | null;
-  } | null;
-}
-
 export async function cancelOrder(
   id: string,
   input: CancelOrderInput
-): Promise<CancelOrderResult> {
+): Promise<void> {
   const reason = input.detail?.trim()
     ? `${input.reason.trim()} - ${input.detail.trim()}`
     : input.reason.trim();
@@ -117,10 +110,6 @@ export async function cancelOrder(
         `ยกเลิกออเดอร์ไม่สำเร็จ (${response.status})`
     );
   }
-
-  if (response.status === 204) return {};
-
-  return (await response.json().catch(() => ({}))) as CancelOrderResult;
 }
 
 export interface CreateReturnRequestInput {
