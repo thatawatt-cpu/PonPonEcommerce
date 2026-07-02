@@ -13,6 +13,8 @@ import type { LiffProfile } from "@/types/liff";
 
 const LOGIN_FLOW_KEY = "ponpon.line_login_inflight";
 const PROFILE_ME_BOOTSTRAP_DELAY_MS = 500;
+const PROFILE_ME_TIMEOUT_MS = 5000;
+const PROFILE_BOOTSTRAP_TIMEOUT_MS = 5000;
 
 interface UseLiffProfileResult {
   profile: LiffProfile | null;
@@ -22,6 +24,19 @@ interface UseLiffProfileResult {
 
 function wait(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  message: string
+): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(message)), timeoutMs)
+    ),
+  ]);
 }
 
 /**
@@ -35,33 +50,60 @@ export function useLiffProfile(): UseLiffProfileResult {
   useEffect(() => {
     let cancelled = false;
 
-    async function reloginWithLine(reason?: unknown) {
+    function startLineLogin(reason?: unknown) {
       clearStoredPonPonSession();
+
+      if (reason instanceof Error) {
+        console.warn("[ponpon-auth] /me failed, starting LINE login", reason);
+      } else {
+        console.warn("[ponpon-auth] /me failed, starting LINE login", reason);
+      }
+
+      setError("กำลังเข้าสู่ระบบใหม่ผ่าน LINE");
+      setLoading(false);
+
       if (sessionStorage.getItem(LOGIN_FLOW_KEY) === "1") {
-        setError("กำลังเข้าสู่ระบบใหม่ผ่าน LINE");
         return;
       }
 
-      if (reason instanceof Error) {
-        console.warn("[ponpon-auth] /me failed, forcing LINE login", reason);
-      } else {
-        console.warn("[ponpon-auth] /me failed, forcing LINE login", reason);
-      }
-
       sessionStorage.setItem(LOGIN_FLOW_KEY, "1");
-      await loginWithLine();
+      void loginWithLine().catch((loginError) => {
+        sessionStorage.removeItem(LOGIN_FLOW_KEY);
+        if (cancelled) return;
+
+        const message =
+          loginError instanceof Error
+            ? loginError.message
+            : "ไม่สามารถเข้าสู่ระบบ LINE ใหม่ได้";
+        setError(message);
+      });
     }
 
     async function getPonPonMeAfterBootstrap() {
       try {
-        return await getPonPonMe();
+        return await withTimeout(
+          getPonPonMe(),
+          PROFILE_ME_TIMEOUT_MS,
+          "โหลดข้อมูลผู้ใช้ช้าเกินไป"
+        );
       } catch (initialError) {
-        console.info("[ponpon-auth] /me failed; retrying after bootstrap", initialError);
-        await bootstrapLineSession({ allowLogin: false });
+        console.info(
+          "[ponpon-auth] /me failed; retrying after bootstrap",
+          initialError
+        );
+        await withTimeout(
+          bootstrapLineSession({ allowLogin: false }),
+          PROFILE_BOOTSTRAP_TIMEOUT_MS,
+          "ต่ออายุเซสชันช้าเกินไป"
+        );
         await wait(PROFILE_ME_BOOTSTRAP_DELAY_MS);
 
         try {
-          return await getPonPonMe();
+          return await withTimeout(
+            getPonPonMe(),
+            PROFILE_ME_TIMEOUT_MS,
+            "โหลดข้อมูลผู้ใช้ช้าเกินไป"
+          );
         } catch (retryError) {
           throw retryError instanceof Error
             ? retryError
@@ -84,7 +126,7 @@ export function useLiffProfile(): UseLiffProfileResult {
         await initLiff(PONPON_LIFF_ID);
 
         if (!isLiffLoggedIn()) {
-          await reloginWithLine(new Error("LINE session is not ready."));
+          startLineLogin(new Error("LINE session is not ready."));
           return;
         }
 
@@ -98,18 +140,8 @@ export function useLiffProfile(): UseLiffProfileResult {
           pictureUrl: meProfile.pictureUrl ?? "",
         });
       } catch (err) {
-        if (cancelled) return;
-
-        try {
-          await reloginWithLine(err);
-          return;
-        } catch (loginError) {
-          const message =
-            loginError instanceof Error
-              ? loginError.message
-              : "ไม่สามารถเข้าสู่ระบบ LINE ใหม่ได้";
-          setError(message);
-          return;
+        if (!cancelled) {
+          startLineLogin(err);
         }
       } finally {
         if (!cancelled) setLoading(false);
