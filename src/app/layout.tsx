@@ -6,10 +6,26 @@ import { LiffAuthBootstrap } from "@/components/layout/liff-auth-bootstrap";
 import { SHOP_NAME, SHOP_TAGLINE } from "@/lib/constants";
 import { getAppOrigin } from "@/lib/site-url";
 
+const SITE_TITLE = `${SHOP_NAME} — ${SHOP_TAGLINE}`;
+const SITE_DESCRIPTION = "ร้าน Pon Pon — ช้อปง่าย สั่งไว ผ่าน LINE";
+
 export const metadata: Metadata = {
   metadataBase: new URL(getAppOrigin()),
-  title: `${SHOP_NAME} â€” ${SHOP_TAGLINE}`,
-  description: "à¸£à¹‰à¸²à¸™ Pon Pon â€” à¸Šà¹‰à¸­à¸›à¸‡à¹ˆà¸²à¸¢ à¸ªà¸±à¹ˆà¸‡à¹„à¸§ à¸œà¹ˆà¸²à¸™ LINE",
+  title: SITE_TITLE,
+  description: SITE_DESCRIPTION,
+  openGraph: {
+    type: "website",
+    locale: "th_TH",
+    url: "/",
+    siteName: SHOP_NAME,
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+  },
+  twitter: {
+    card: "summary",
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+  },
 };
 
 export const viewport: Viewport = {
