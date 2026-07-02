@@ -9,6 +9,7 @@ import type { PonPonMeResponse } from "@/types/customer";
 const JWT_STORAGE_KEY = "ponpon.auth.jwt";
 const LINE_ACCESS_TOKEN_KEY = "ponpon.auth.line.accessToken";
 const LINE_REFRESH_TOKEN_KEY = "ponpon.auth.line.refreshToken";
+export const PONPON_AUTH_TOKEN_CHANGED_EVENT = "ponpon-auth-token-changed";
 
 export interface PonPonAuthExchangeResponse {
   accessToken?: string;
@@ -59,11 +60,13 @@ export function getStoredPonPonJwt(): string | null {
 export function setStoredPonPonJwt(jwt: string): void {
   if (!canUseStorage()) return;
   window.localStorage.setItem(JWT_STORAGE_KEY, jwt);
+  window.dispatchEvent(new Event(PONPON_AUTH_TOKEN_CHANGED_EVENT));
 }
 
 export function clearStoredPonPonJwt(): void {
   if (!canUseStorage()) return;
   window.localStorage.removeItem(JWT_STORAGE_KEY);
+  window.dispatchEvent(new Event(PONPON_AUTH_TOKEN_CHANGED_EVENT));
 }
 
 export function clearStoredPonPonSession(): void {
@@ -71,6 +74,7 @@ export function clearStoredPonPonSession(): void {
   window.localStorage.removeItem(JWT_STORAGE_KEY);
   window.localStorage.removeItem(LINE_ACCESS_TOKEN_KEY);
   window.localStorage.removeItem(LINE_REFRESH_TOKEN_KEY);
+  window.dispatchEvent(new Event(PONPON_AUTH_TOKEN_CHANGED_EVENT));
 }
 
 export function isStoredJwtValid(): boolean {

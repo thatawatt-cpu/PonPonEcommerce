@@ -3,6 +3,7 @@ import Script from "next/script";
 import "./globals.css";
 import { BottomNavigation } from "@/components/layout/bottom-navigation";
 import { LiffAuthBootstrap } from "@/components/layout/liff-auth-bootstrap";
+import { ShopNotificationListener } from "@/components/layout/shop-notification-listener";
 import { SHOP_NAME, SHOP_TAGLINE } from "@/lib/constants";
 import { getAppOrigin } from "@/lib/site-url";
 
@@ -71,6 +72,7 @@ export default function RootLayout({
         */}
         <div className="relative min-h-dvh w-full">
           <LiffAuthBootstrap />
+          <ShopNotificationListener />
           {children}
         </div>
         <BottomNavigation />
