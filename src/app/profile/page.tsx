@@ -25,7 +25,8 @@ import { Card } from "@/components/ui/card";
 import { LiffProfileCard } from "@/features/liff/components/liff-profile-card";
 import { MembershipSummaryCard } from "@/components/membership/membership-summary-card";
 import { useLiffProfile } from "@/features/liff/hooks/use-liff-profile";
-import { openExternalWindow } from "@/lib/liff";
+import { clearStoredPonPonSession } from "@/features/auth/ponpon-auth";
+import { loginWithLine, openExternalWindow } from "@/lib/liff";
 import { LINE_OA_URL } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import {
@@ -104,6 +105,16 @@ export default function ProfilePage() {
     },
   ];
 
+  const handleRetryLogin = async () => {
+    try {
+      clearStoredPonPonSession();
+      await loginWithLine();
+      window.location.reload();
+    } catch (error) {
+      console.error("[profile] login retry failed", error);
+    }
+  };
+
   return (
     <>
       <AppHeader title="โปรไฟล์" showCart={false} />
@@ -112,6 +123,7 @@ export default function ProfilePage() {
           profile={profile}
           loading={loading}
           error={error}
+          onRetryLogin={handleRetryLogin}
         />
         <MembershipSummaryCard />
 

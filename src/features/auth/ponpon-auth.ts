@@ -69,6 +69,7 @@ export function clearStoredPonPonJwt(): void {
 export function clearStoredPonPonSession(): void {
   if (!canUseStorage()) return;
   window.localStorage.removeItem(JWT_STORAGE_KEY);
+  window.localStorage.removeItem(LINE_ACCESS_TOKEN_KEY);
   window.localStorage.removeItem(LINE_REFRESH_TOKEN_KEY);
 }
 
@@ -191,47 +192,52 @@ export async function refreshPonPonSession(): Promise<PonPonSession> {
   }
 
   refreshSessionPromise = (async () => {
-    console.info("[ponpon-auth] refresh request", {
-      endpoint: PONPON_AUTH_REFRESH_URL,
-    });
+    try {
+      console.info("[ponpon-auth] refresh request", {
+        endpoint: PONPON_AUTH_REFRESH_URL,
+      });
 
-    const response = await fetch(PONPON_AUTH_REFRESH_URL, {
-      method: "POST",
-      credentials: "include",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify({ refreshToken }),
-    });
+      const response = await fetch(PONPON_AUTH_REFRESH_URL, {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({ refreshToken }),
+      });
 
-    console.info("[ponpon-auth] refresh response", {
-      status: response.status,
-      ok: response.ok,
-    });
+      console.info("[ponpon-auth] refresh response", {
+        status: response.status,
+        ok: response.ok,
+      });
 
-    if (!response.ok) {
+      if (!response.ok) {
+        clearStoredPonPonSession();
+        const errBody = (await response.json().catch(() => null)) as Record<
+          string,
+          unknown
+        > | null;
+        const detail = errBody
+          ? (errBody.error ??
+            errBody.message ??
+            errBody.title ??
+            JSON.stringify(errBody))
+          : null;
+        throw new Error(
+          `PonPon auth refresh failed with status ${response.status}${detail ? `: ${detail}` : ""}`
+        );
+      }
+
+      const payload = (await response.json().catch(() => null)) as
+        | PonPonAuthExchangeResponse
+        | null;
+
+      return buildSessionFromPayload(payload);
+    } catch (error) {
       clearStoredPonPonSession();
-      const errBody = (await response.json().catch(() => null)) as Record<
-        string,
-        unknown
-      > | null;
-      const detail = errBody
-        ? (errBody.error ??
-          errBody.message ??
-          errBody.title ??
-          JSON.stringify(errBody))
-        : null;
-      throw new Error(
-        `PonPon auth refresh failed with status ${response.status}${detail ? `: ${detail}` : ""}`
-      );
+      throw error;
     }
-
-    const payload = (await response.json().catch(() => null)) as
-      | PonPonAuthExchangeResponse
-      | null;
-
-    return buildSessionFromPayload(payload);
   })().finally(() => {
     refreshSessionPromise = null;
   });

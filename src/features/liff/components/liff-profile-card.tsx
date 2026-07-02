@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { Loader2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import type { LiffProfile } from "@/types/liff";
 
@@ -8,12 +9,14 @@ interface LiffProfileCardProps {
   profile: LiffProfile | null;
   loading: boolean;
   error?: string | null;
+  onRetryLogin?: () => void;
 }
 
 export function LiffProfileCard({
   profile,
   loading,
   error,
+  onRetryLogin,
 }: LiffProfileCardProps) {
   if (loading) {
     return (
@@ -33,6 +36,16 @@ export function LiffProfileCard({
         <div className="text-sm text-ink-soft">
           {error ?? "ไม่พบโปรไฟล์"}
         </div>
+        {onRetryLogin && (
+          <button
+            type="button"
+            onClick={onRetryLogin}
+            className="inline-flex items-center justify-center gap-2 rounded-full bg-brand px-4 py-2 text-sm font-bold text-white transition active:scale-[0.98]"
+          >
+            <Loader2 className="h-4 w-4" />
+            เข้าสู่ระบบใหม่
+          </button>
+        )}
       </Card>
     );
   }

@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import {
   exchangeLineIdToken,
   isStoredJwtValid,
+  getStoredLineRefreshToken,
   refreshPonPonSession,
 } from "@/features/auth/ponpon-auth";
 import { PONPON_LIFF_ID, PONPON_SKIP_LINE_LIFF } from "@/lib/auth-config";
@@ -52,20 +53,23 @@ async function bootstrapLineSession(): Promise<void> {
 
   await initLiff(PONPON_LIFF_ID);
 
-  if (isStoredJwtValid()) {
+  const storedRefreshToken = getStoredLineRefreshToken();
+  if (storedRefreshToken) {
+    try {
+      const session = await refreshPonPonSession();
+      sessionStorage.removeItem(LOGIN_FLOW_KEY);
+      console.info("[ponpon-auth] jwt refreshed", {
+        hasJwt: Boolean(session.jwt),
+        hasRefreshToken: Boolean(session.refreshToken),
+      });
+      return;
+    } catch {
+      console.info("[ponpon-auth] refresh token unusable; checking LIFF session");
+    }
+  } else if (isStoredJwtValid()) {
+    sessionStorage.removeItem(LOGIN_FLOW_KEY);
     console.info("[ponpon-auth] stored JWT still valid — skipping exchange");
     return;
-  }
-
-  try {
-    const session = await refreshPonPonSession();
-    console.info("[ponpon-auth] jwt refreshed", {
-      hasJwt: Boolean(session.jwt),
-      hasRefreshToken: Boolean(session.refreshToken),
-    });
-    return;
-  } catch {
-    console.info("[ponpon-auth] no usable refresh token; checking LIFF session");
   }
 
   if (!isLiffLoggedIn()) {

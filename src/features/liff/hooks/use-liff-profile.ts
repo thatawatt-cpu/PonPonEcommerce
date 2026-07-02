@@ -2,16 +2,11 @@
 
 import { useEffect, useState } from "react";
 import {
-  exchangeLineIdToken,
+  clearStoredPonPonSession,
   getPonPonMe,
 } from "@/features/auth/ponpon-auth";
 import { PONPON_LIFF_ID, PONPON_SKIP_LINE_LIFF } from "@/lib/auth-config";
-import {
-  getLiffProfile,
-  getLiffTokens,
-  initLiff,
-  isLiffLoggedIn,
-} from "@/lib/liff";
+import { initLiff, isLiffLoggedIn, loginWithLine } from "@/lib/liff";
 import { mockCustomerProfile } from "@/lib/mock-data";
 import type { LiffProfile } from "@/types/liff";
 
@@ -19,26 +14,6 @@ interface UseLiffProfileResult {
   profile: LiffProfile | null;
   loading: boolean;
   error: string | null;
-}
-
-async function getPonPonMeWithFreshTokenOn401() {
-  try {
-    return await getPonPonMe();
-  } catch (error) {
-    const shouldRetry =
-      error instanceof Error && error.message.includes("status 401");
-
-    if (!shouldRetry) {
-      throw error;
-    }
-
-    console.info(
-      "[ponpon-auth] /me rejected stored JWT; exchanging LIFF token and retrying once"
-    );
-    const tokens = await getLiffTokens();
-    await exchangeLineIdToken(tokens);
-    return getPonPonMe();
-  }
 }
 
 /**
@@ -52,6 +27,18 @@ export function useLiffProfile(): UseLiffProfileResult {
   useEffect(() => {
     let cancelled = false;
 
+    async function reloginWithLine(reason?: unknown) {
+      clearStoredPonPonSession();
+
+      if (reason instanceof Error) {
+        console.warn("[ponpon-auth] /me failed, forcing LINE login", reason);
+      } else {
+        console.warn("[ponpon-auth] /me failed, forcing LINE login", reason);
+      }
+
+      await loginWithLine();
+    }
+
     async function load() {
       try {
         if (PONPON_SKIP_LINE_LIFF) {
@@ -64,40 +51,32 @@ export function useLiffProfile(): UseLiffProfileResult {
         await initLiff(PONPON_LIFF_ID);
 
         if (!isLiffLoggedIn()) {
-          if (!cancelled) {
-            setError("กรุณาเข้าสู่ระบบใหม่ผ่าน LINE");
-          }
+          await reloginWithLine(new Error("LINE session is not ready."));
           return;
         }
 
-        const timeout = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("โหลดข้อมูลผู้ใช้ช้าเกินไป")), 8000)
-        );
-        const [lineProfile, meProfile] = await Promise.race([
-          Promise.all([getLiffProfile(), getPonPonMeWithFreshTokenOn401()]),
-          timeout,
-        ]);
+        const meProfile = await getPonPonMe();
 
-        const result: LiffProfile = {
-          displayName: meProfile.displayName || lineProfile.displayName,
-          lineUserId: lineProfile.lineUserId || meProfile.id,
-          pictureUrl: meProfile.pictureUrl ?? lineProfile.pictureUrl,
-        };
+        if (cancelled) return;
 
-        if (!cancelled) {
-          setProfile(result);
-        }
+        setProfile({
+          displayName: meProfile.displayName,
+          lineUserId: meProfile.id,
+          pictureUrl: meProfile.pictureUrl ?? "",
+        });
       } catch (err) {
-        if (!cancelled) {
-          const message =
-            err instanceof Error ? err.message : "ไม่สามารถโหลดข้อมูลผู้ใช้ได้";
-          const normalizedMessage = message.includes("status 401")
-            ? "เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่"
-            : message.includes("status 403")
-              ? "ไม่มีสิทธิ์เข้าถึงข้อมูล กรุณาเข้าสู่ระบบใหม่"
-              : message;
+        if (cancelled) return;
 
-          setError(normalizedMessage);
+        try {
+          await reloginWithLine(err);
+          return;
+        } catch (loginError) {
+          const message =
+            loginError instanceof Error
+              ? loginError.message
+              : "ไม่สามารถเข้าสู่ระบบ LINE ใหม่ได้";
+          setError(message);
+          return;
         }
       } finally {
         if (!cancelled) setLoading(false);
