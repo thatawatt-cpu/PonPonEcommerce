@@ -1,16 +1,15 @@
 import { NextResponse } from "next/server";
-import { PONPON_AUTH_BACKEND_URL } from "@/lib/server/auth-backend";
+import { PONPON_AUTH_BACKEND_REFRESH_URL } from "@/lib/server/auth-backend";
 
-type LoginBody = {
-  idToken?: string;
-  accessToken?: string;
+type RefreshBody = {
+  refreshToken?: string;
 };
 
 export async function POST(request: Request) {
-  let body: LoginBody;
+  let body: RefreshBody;
 
   try {
-    body = (await request.json()) as LoginBody;
+    body = (await request.json()) as RefreshBody;
   } catch {
     return NextResponse.json(
       { error: "Invalid request body." },
@@ -18,30 +17,29 @@ export async function POST(request: Request) {
     );
   }
 
-  if (!body.idToken) {
-    return NextResponse.json({ error: "Missing idToken." }, { status: 400 });
+  if (!body.refreshToken) {
+    return NextResponse.json(
+      { error: "Missing refreshToken." },
+      { status: 400 }
+    );
   }
-
-  console.info("[ponpon-auth] proxying line-login request", {
-    backend: PONPON_AUTH_BACKEND_URL,
-  });
 
   let backendResponse: Response;
 
   try {
-    backendResponse = await fetch(PONPON_AUTH_BACKEND_URL, {
+    backendResponse = await fetch(PONPON_AUTH_BACKEND_REFRESH_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Accept: "application/json",
       },
       body: JSON.stringify({
-        idToken: body.idToken,
+        refreshToken: body.refreshToken,
       }),
       cache: "no-store",
     });
   } catch (error) {
-    console.error("[ponpon-auth] backend fetch failed", error);
+    console.error("[ponpon-auth] refresh backend fetch failed", error);
     return NextResponse.json(
       { error: "Failed to reach auth backend." },
       { status: 502 }
@@ -50,7 +48,7 @@ export async function POST(request: Request) {
 
   const contentType = backendResponse.headers.get("content-type") ?? "";
   const responseText = await backendResponse.clone().text();
-  console.info("[ponpon-auth] backend response", {
+  console.info("[ponpon-auth] refresh backend response", {
     status: backendResponse.status,
     contentType,
     body: responseText.slice(0, 500),
@@ -61,8 +59,7 @@ export async function POST(request: Request) {
     return NextResponse.json(json, { status: backendResponse.status });
   }
 
-  const text = await backendResponse.text();
-  return new NextResponse(text, {
+  return new NextResponse(responseText, {
     status: backendResponse.status,
     headers: {
       "content-type": contentType || "text/plain; charset=utf-8",

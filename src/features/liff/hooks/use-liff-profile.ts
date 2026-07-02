@@ -1,9 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getPonPonMe } from "@/features/auth/ponpon-auth";
+import {
+  exchangeLineIdToken,
+  getPonPonMe,
+} from "@/features/auth/ponpon-auth";
 import { PONPON_LIFF_ID, PONPON_SKIP_LINE_LIFF } from "@/lib/auth-config";
-import { getLiffProfile, initLiff, isLiffLoggedIn } from "@/lib/liff";
+import {
+  getLiffProfile,
+  getLiffTokens,
+  initLiff,
+  isLiffLoggedIn,
+} from "@/lib/liff";
 import { mockCustomerProfile } from "@/lib/mock-data";
 import type { LiffProfile } from "@/types/liff";
 
@@ -11,6 +19,26 @@ interface UseLiffProfileResult {
   profile: LiffProfile | null;
   loading: boolean;
   error: string | null;
+}
+
+async function getPonPonMeWithFreshTokenOn401() {
+  try {
+    return await getPonPonMe();
+  } catch (error) {
+    const shouldRetry =
+      error instanceof Error && error.message.includes("status 401");
+
+    if (!shouldRetry) {
+      throw error;
+    }
+
+    console.info(
+      "[ponpon-auth] /me rejected stored JWT; exchanging LIFF token and retrying once"
+    );
+    const tokens = await getLiffTokens();
+    await exchangeLineIdToken(tokens);
+    return getPonPonMe();
+  }
 }
 
 /**
@@ -46,7 +74,7 @@ export function useLiffProfile(): UseLiffProfileResult {
           setTimeout(() => reject(new Error("โหลดข้อมูลผู้ใช้ช้าเกินไป")), 8000)
         );
         const [lineProfile, meProfile] = await Promise.race([
-          Promise.all([getLiffProfile(), getPonPonMe()]),
+          Promise.all([getLiffProfile(), getPonPonMeWithFreshTokenOn401()]),
           timeout,
         ]);
 

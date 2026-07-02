@@ -5,5 +5,9 @@ export const PONPON_AUTH_EXCHANGE_URL =
   process.env.NEXT_PUBLIC_PONPON_AUTH_EXCHANGE_URL?.trim() ||
   "/api/auth/line-login";
 
+export const PONPON_AUTH_REFRESH_URL =
+  process.env.NEXT_PUBLIC_PONPON_AUTH_REFRESH_URL?.trim() ||
+  "/api/auth/refresh-token";
+
 export const PONPON_SKIP_LINE_LIFF =
   process.env.NEXT_PUBLIC_SKIP_LINE_LIFF?.trim().toLowerCase() === "true";

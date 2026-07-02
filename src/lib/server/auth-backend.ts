@@ -16,3 +16,8 @@ export const PONPON_AUTH_BACKEND_ME_URL = `${PONPON_AUTH_BACKEND_BASE_URL.replac
   /\/+$/,
   ""
 )}/api/auth/me`;
+
+export const PONPON_AUTH_BACKEND_REFRESH_URL = `${PONPON_AUTH_BACKEND_BASE_URL.replace(
+  /\/+$/,
+  ""
+)}/api/auth/refresh-token`;

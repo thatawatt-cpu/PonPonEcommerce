@@ -1,6 +1,9 @@
 "use client";
 
-import { PONPON_AUTH_EXCHANGE_URL } from "@/lib/auth-config";
+import {
+  PONPON_AUTH_EXCHANGE_URL,
+  PONPON_AUTH_REFRESH_URL,
+} from "@/lib/auth-config";
 import type { PonPonMeResponse } from "@/types/customer";
 
 const JWT_STORAGE_KEY = "ponpon.auth.jwt";
@@ -22,6 +25,7 @@ export interface PonPonAuthExchangeResponse {
   jwt?: string;
   token?: string;
   expiresIn?: number;
+  expiresAt?: string | number;
   [key: string]: unknown;
 }
 
@@ -45,6 +49,8 @@ function canUseStorage(): boolean {
   return typeof window !== "undefined" && typeof window.localStorage !== "undefined";
 }
 
+let refreshSessionPromise: Promise<PonPonSession> | null = null;
+
 export function getStoredPonPonJwt(): string | null {
   if (!canUseStorage()) return null;
   return window.localStorage.getItem(JWT_STORAGE_KEY);
@@ -58,6 +64,12 @@ export function setStoredPonPonJwt(jwt: string): void {
 export function clearStoredPonPonJwt(): void {
   if (!canUseStorage()) return;
   window.localStorage.removeItem(JWT_STORAGE_KEY);
+}
+
+export function clearStoredPonPonSession(): void {
+  if (!canUseStorage()) return;
+  window.localStorage.removeItem(JWT_STORAGE_KEY);
+  window.localStorage.removeItem(LINE_REFRESH_TOKEN_KEY);
 }
 
 export function isStoredJwtValid(): boolean {
@@ -115,15 +127,154 @@ export function buildPonPonAuthHeaders(
   return nextHeaders;
 }
 
+function buildSessionFromPayload(
+  payload: PonPonAuthExchangeResponse | null
+): PonPonSession {
+  const appAccessToken =
+    payload && typeof payload.accessToken === "string"
+      ? payload.accessToken
+      : payload && typeof payload.AccessToken === "string"
+        ? payload.AccessToken
+        : "";
+
+  const refreshToken =
+    payload && typeof payload.refreshToken === "string"
+      ? payload.refreshToken
+      : payload && typeof payload.RefreshToken === "string"
+        ? payload.RefreshToken
+        : "";
+
+  const jwt =
+    appAccessToken ||
+    (payload && typeof payload.jwt === "string"
+      ? payload.jwt
+      : payload && typeof payload.token === "string"
+        ? payload.token
+        : "");
+
+  if (!jwt) {
+    throw new Error("PonPon auth backend did not return an access token.");
+  }
+
+  setStoredPonPonJwt(jwt);
+  if (refreshToken) {
+    setStoredLineRefreshToken(refreshToken);
+  }
+
+  const expiresAt =
+    payload && typeof payload.expiresIn === "number"
+      ? Date.now() + payload.expiresIn * 1000
+      : payload && typeof payload.expiresAt === "number"
+        ? payload.expiresAt
+        : payload && typeof payload.expiresAt === "string"
+          ? Date.parse(payload.expiresAt)
+          : undefined;
+
+  return {
+    jwt,
+    accessToken: jwt,
+    refreshToken: refreshToken || undefined,
+    expiresAt:
+      typeof expiresAt === "number" && Number.isFinite(expiresAt)
+        ? expiresAt
+        : undefined,
+  };
+}
+
+export async function refreshPonPonSession(): Promise<PonPonSession> {
+  if (refreshSessionPromise) return refreshSessionPromise;
+
+  const refreshToken = getStoredLineRefreshToken();
+  if (!refreshToken) {
+    clearStoredPonPonSession();
+    throw new Error("PonPon refresh token is not available.");
+  }
+
+  refreshSessionPromise = (async () => {
+    console.info("[ponpon-auth] refresh request", {
+      endpoint: PONPON_AUTH_REFRESH_URL,
+    });
+
+    const response = await fetch(PONPON_AUTH_REFRESH_URL, {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({ refreshToken }),
+    });
+
+    console.info("[ponpon-auth] refresh response", {
+      status: response.status,
+      ok: response.ok,
+    });
+
+    if (!response.ok) {
+      clearStoredPonPonSession();
+      const errBody = (await response.json().catch(() => null)) as Record<
+        string,
+        unknown
+      > | null;
+      const detail = errBody
+        ? (errBody.error ??
+          errBody.message ??
+          errBody.title ??
+          JSON.stringify(errBody))
+        : null;
+      throw new Error(
+        `PonPon auth refresh failed with status ${response.status}${detail ? `: ${detail}` : ""}`
+      );
+    }
+
+    const payload = (await response.json().catch(() => null)) as
+      | PonPonAuthExchangeResponse
+      | null;
+
+    return buildSessionFromPayload(payload);
+  })().finally(() => {
+    refreshSessionPromise = null;
+  });
+
+  return refreshSessionPromise;
+}
+
 export async function ponponFetch(
   input: RequestInfo | URL,
   init: RequestInit = {}
 ): Promise<Response> {
-  return fetch(input, {
+  const requestInit: RequestInit = {
     ...init,
     credentials: init.credentials ?? "include",
     headers: buildPonPonAuthHeaders(init.headers),
-  });
+  };
+
+  const response = await fetch(input, requestInit);
+
+  if (response.status !== 401) {
+    return response;
+  }
+
+  try {
+    await refreshPonPonSession();
+  } catch (error) {
+    console.warn("[ponpon-auth] refresh failed after 401", error);
+    return response;
+  }
+
+  const retryInit: RequestInit = {
+    ...init,
+    credentials: init.credentials ?? "include",
+    headers: buildPonPonAuthHeaders(init.headers),
+  };
+
+  const retryResponse = await fetch(input, retryInit);
+
+  if (retryResponse.status === 401) {
+    clearStoredPonPonSession();
+  }
+
+  return retryResponse;
 }
 
 export async function fetchPonPonMe(): Promise<Response> {
@@ -136,6 +287,10 @@ export async function getPonPonMe(): Promise<PonPonMeSession> {
   const response = await fetchPonPonMe();
 
   if (!response.ok) {
+    if (response.status === 401) {
+      clearStoredPonPonSession();
+    }
+
     throw new Error(`PonPon me request failed with status ${response.status}`);
   }
 
@@ -179,7 +334,6 @@ export async function exchangeLineIdToken(input: {
     },
     body: JSON.stringify({
       idToken: input.idToken,
-      ...(input.accessToken && { accessToken: input.accessToken }),
     }),
   });
 
@@ -204,44 +358,5 @@ export async function exchangeLineIdToken(input: {
       | PonPonAuthExchangeResponse
       | null;
 
-  const appAccessToken =
-    payload && typeof payload.accessToken === "string"
-      ? payload.accessToken
-      : payload && typeof payload.AccessToken === "string"
-        ? payload.AccessToken
-        : "";
-
-  const refreshToken =
-    payload && typeof payload.refreshToken === "string"
-      ? payload.refreshToken
-      : payload && typeof payload.RefreshToken === "string"
-        ? payload.RefreshToken
-        : "";
-
-  const jwt =
-    appAccessToken ||
-    (payload && typeof payload.jwt === "string"
-      ? payload.jwt
-      : payload && typeof payload.token === "string"
-        ? payload.token
-        : "");
-
-  if (!jwt) {
-    throw new Error("PonPon auth backend did not return an access token.");
-  }
-
-  setStoredPonPonJwt(jwt);
-  if (refreshToken) {
-    setStoredLineRefreshToken(refreshToken);
-  }
-
-  return {
-    jwt,
-    accessToken: jwt,
-    refreshToken: refreshToken || undefined,
-    expiresAt:
-      payload && typeof payload.expiresIn === "number"
-        ? Date.now() + payload.expiresIn * 1000
-        : undefined,
-  };
+  return buildSessionFromPayload(payload);
 }
