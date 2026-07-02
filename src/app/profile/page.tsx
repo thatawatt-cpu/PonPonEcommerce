@@ -105,8 +105,12 @@ export default function ProfilePage() {
   ];
 
   const handleRetryLogin = async () => {
-    await loginWithLine();
-    window.location.reload();
+    try {
+      await loginWithLine();
+      window.location.reload();
+    } catch (error) {
+      console.error("[profile] login retry failed", error);
+    }
   };
 
   return (
