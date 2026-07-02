@@ -29,6 +29,7 @@ import { Button } from "@/components/ui/button";
 import { OrderStatusBadge } from "@/components/ui/status-badge";
 import { ProductImage } from "@/components/product/product-image";
 import { fetchOrders } from "@/features/orders/order-api";
+import { getManualRefundLabel } from "@/features/orders/refund-status";
 import { formatBaht, formatDate } from "@/lib/format";
 import type {
   ApiOrderListItem,
@@ -362,6 +363,7 @@ function OrderCard({
   const router = useRouter();
   const [itemsExpanded, setItemsExpanded] = useState(false);
   const orderStatus = mapStatus(order.status);
+  const manualRefundLabel = getManualRefundLabel(order.omiseRefundStatus);
   const orderHref = `/orders/${order.id}`;
   const progress = progressByStatus[orderStatus];
   const isShipped = orderStatus === "shipping";
@@ -399,7 +401,15 @@ function OrderCard({
             </div>
           </div>
           <div className="shrink-0 text-right">
-            <OrderStatusBadge status={orderStatus} />
+            {manualRefundLabel ? (
+              <span className="inline-flex items-center justify-center whitespace-nowrap rounded-full bg-warning-soft px-3 py-1.5 text-[11px] font-bold leading-none text-warning shadow-sm ring-1 ring-current/10">
+                <span className="block translate-y-px">
+                  {manualRefundLabel}
+                </span>
+              </span>
+            ) : (
+              <OrderStatusBadge status={orderStatus} />
+            )}
           </div>
         </div>
 
@@ -498,7 +508,7 @@ function OrderCard({
           <div className="mt-4">
             <div className="mb-1.5 flex items-center justify-between gap-3">
               <p className="truncate text-[11px] font-semibold text-ink-soft">
-                {helperByStatus[orderStatus]}
+                {manualRefundLabel ?? helperByStatus[orderStatus]}
               </p>
               <span className="shrink-0 text-[10px] font-bold text-brand">
                 {progress}%

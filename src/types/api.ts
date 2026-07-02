@@ -135,6 +135,7 @@ export interface ApiOrderListItem {
   number: string;
   status: string;
   paymentStatus: string;
+  omiseRefundStatus?: string | null;
   amount: number;
   paymentAmount: number;
   shippingChannel: string | null;
@@ -234,6 +235,7 @@ export interface ApiOrderDetail {
   number: string;
   status: string;
   paymentStatus: string;
+  omiseRefundStatus?: string | null;
   amount: number;
   vatAmount: number;
   shippingAmount: number;

@@ -76,6 +76,16 @@ export async function POST(
       return new NextResponse(null, { status: 204 });
     }
 
+    if (response.ok) {
+      return new NextResponse(response.body, {
+        status: response.status,
+        headers: {
+          "Content-Type":
+            response.headers.get("Content-Type") ?? "application/json",
+        },
+      });
+    }
+
     return NextResponse.json(await readBackendError(response), {
       status: response.status,
     });
