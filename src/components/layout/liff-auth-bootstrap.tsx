@@ -36,7 +36,9 @@ function isIdTokenExpired(token: string): boolean {
 
 let bootstrapPromise: Promise<void> | null = null;
 
-async function bootstrapLineSession(): Promise<void> {
+export async function bootstrapLineSession({
+  allowLogin = true,
+}: { allowLogin?: boolean } = {}): Promise<void> {
   const lastReauthAt = Number(localStorage.getItem(REAUTH_KEY) ?? 0);
   const recentlyAttempted = Date.now() - lastReauthAt < REAUTH_DEBOUNCE_MS;
   const loginInFlight = sessionStorage.getItem(LOGIN_FLOW_KEY) === "1";
@@ -73,6 +75,11 @@ async function bootstrapLineSession(): Promise<void> {
   }
 
   if (!isLiffLoggedIn()) {
+    if (!allowLogin) {
+      console.info("[ponpon-auth] LINE session missing; login deferred");
+      return;
+    }
+
     if (loginInFlight || recentlyAttempted) {
       console.info("[ponpon-auth] LINE login already in progress; waiting");
       return;
@@ -100,6 +107,11 @@ async function bootstrapLineSession(): Promise<void> {
   });
 
   if (expired && !recentlyAttempted) {
+    if (!allowLogin) {
+      console.info("[ponpon-auth] idToken expired; login deferred");
+      return;
+    }
+
     console.info("[ponpon-auth] idToken expired — starting re-login flow");
     localStorage.setItem(REAUTH_KEY, String(Date.now()));
     sessionStorage.setItem(LOGIN_FLOW_KEY, "1");
@@ -127,6 +139,11 @@ async function bootstrapLineSession(): Promise<void> {
       error instanceof Error && error.message.includes("status 401");
 
     if (is401 && !recentlyAttempted) {
+      if (!allowLogin) {
+        console.info("[ponpon-auth] token rejected by backend; login deferred");
+        return;
+      }
+
       console.info(
         "[ponpon-auth] token rejected by backend — starting re-login flow"
       );

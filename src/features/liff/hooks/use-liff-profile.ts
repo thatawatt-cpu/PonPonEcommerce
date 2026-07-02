@@ -5,15 +5,23 @@ import {
   clearStoredPonPonSession,
   getPonPonMe,
 } from "@/features/auth/ponpon-auth";
+import { bootstrapLineSession } from "@/components/layout/liff-auth-bootstrap";
 import { PONPON_LIFF_ID, PONPON_SKIP_LINE_LIFF } from "@/lib/auth-config";
 import { initLiff, isLiffLoggedIn, loginWithLine } from "@/lib/liff";
 import { mockCustomerProfile } from "@/lib/mock-data";
 import type { LiffProfile } from "@/types/liff";
 
+const LOGIN_FLOW_KEY = "ponpon.line_login_inflight";
+const PROFILE_ME_BOOTSTRAP_DELAY_MS = 500;
+
 interface UseLiffProfileResult {
   profile: LiffProfile | null;
   loading: boolean;
   error: string | null;
+}
+
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /**
@@ -29,6 +37,10 @@ export function useLiffProfile(): UseLiffProfileResult {
 
     async function reloginWithLine(reason?: unknown) {
       clearStoredPonPonSession();
+      if (sessionStorage.getItem(LOGIN_FLOW_KEY) === "1") {
+        setError("กำลังเข้าสู่ระบบใหม่ผ่าน LINE");
+        return;
+      }
 
       if (reason instanceof Error) {
         console.warn("[ponpon-auth] /me failed, forcing LINE login", reason);
@@ -36,7 +48,28 @@ export function useLiffProfile(): UseLiffProfileResult {
         console.warn("[ponpon-auth] /me failed, forcing LINE login", reason);
       }
 
+      sessionStorage.setItem(LOGIN_FLOW_KEY, "1");
       await loginWithLine();
+    }
+
+    async function getPonPonMeAfterBootstrap() {
+      try {
+        return await getPonPonMe();
+      } catch (initialError) {
+        console.info("[ponpon-auth] /me failed; retrying after bootstrap", initialError);
+        await bootstrapLineSession({ allowLogin: false });
+        await wait(PROFILE_ME_BOOTSTRAP_DELAY_MS);
+
+        try {
+          return await getPonPonMe();
+        } catch (retryError) {
+          throw retryError instanceof Error
+            ? retryError
+            : initialError instanceof Error
+              ? initialError
+              : new Error("ไม่สามารถโหลดข้อมูลผู้ใช้ได้");
+        }
+      }
     }
 
     async function load() {
@@ -55,7 +88,7 @@ export function useLiffProfile(): UseLiffProfileResult {
           return;
         }
 
-        const meProfile = await getPonPonMe();
+        const meProfile = await getPonPonMeAfterBootstrap();
 
         if (cancelled) return;
 
