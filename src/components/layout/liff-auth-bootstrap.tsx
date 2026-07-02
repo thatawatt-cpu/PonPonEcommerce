@@ -18,6 +18,20 @@ import {
 const REAUTH_KEY = "ponpon.reauth_at";
 const REAUTH_DEBOUNCE_MS = 60_000;
 const LOGIN_FLOW_KEY = "ponpon.line_login_inflight";
+const LIFF_INIT_TIMEOUT_MS = 5000;
+
+function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  message: string
+): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(message)), timeoutMs)
+    ),
+  ]);
+}
 
 function getIdTokenExpiry(token: string): number | null {
   try {
@@ -53,7 +67,11 @@ export async function bootstrapLineSession({
     return;
   }
 
-  await initLiff(PONPON_LIFF_ID);
+  await withTimeout(
+    initLiff(PONPON_LIFF_ID),
+    LIFF_INIT_TIMEOUT_MS,
+    "LIFF init timed out"
+  );
 
   const storedRefreshToken = getStoredLineRefreshToken();
   if (storedRefreshToken) {

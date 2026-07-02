@@ -12,6 +12,7 @@ import { mockCustomerProfile } from "@/lib/mock-data";
 import type { LiffProfile } from "@/types/liff";
 
 const LOGIN_FLOW_KEY = "ponpon.line_login_inflight";
+const PROFILE_LIFF_INIT_TIMEOUT_MS = 5000;
 const PROFILE_ME_BOOTSTRAP_DELAY_MS = 500;
 const PROFILE_ME_TIMEOUT_MS = 5000;
 const PROFILE_BOOTSTRAP_TIMEOUT_MS = 5000;
@@ -123,7 +124,11 @@ export function useLiffProfile(): UseLiffProfileResult {
           return;
         }
 
-        await initLiff(PONPON_LIFF_ID);
+        await withTimeout(
+          initLiff(PONPON_LIFF_ID),
+          PROFILE_LIFF_INIT_TIMEOUT_MS,
+          "LIFF init timed out"
+        );
 
         if (!isLiffLoggedIn()) {
           startLineLogin(new Error("LINE session is not ready."));

@@ -9,6 +9,7 @@ import { PONPON_LIFF_ID, PONPON_SKIP_LINE_LIFF } from "@/lib/auth-config";
 import type { LiffProfile } from "@/types/liff";
 
 const MOCK_DELAY = 350;
+const LIFF_SDK_INIT_TIMEOUT_MS = 5000;
 let initPromise: Promise<{ ready: true }> | null = null;
 
 type RuntimeLiff = {
@@ -59,6 +60,19 @@ function wait<T>(value: T, ms = MOCK_DELAY): Promise<T> {
   return new Promise((resolve) => setTimeout(() => resolve(value), ms));
 }
 
+function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  message: string
+): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(message)), timeoutMs)
+    ),
+  ]);
+}
+
 /** Pretend to initialise the LIFF app with a liffId. Always succeeds. */
 export async function initLiff(
   liffId: string = PONPON_LIFF_ID
@@ -75,7 +89,11 @@ export async function initLiff(
         throw new Error("NEXT_PUBLIC_LIFF_ID is not configured.");
       }
 
-      await runtime.init({ liffId });
+      await withTimeout(
+        Promise.resolve(runtime.init({ liffId })),
+        LIFF_SDK_INIT_TIMEOUT_MS,
+        "LIFF SDK init did not complete within timeout"
+      );
       return { ready: true as const };
     }
 
