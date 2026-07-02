@@ -38,6 +38,10 @@ import {
   getCarrierName,
 } from "@/features/shipping/shipping-utils";
 import { buildTimeline } from "@/features/orders/order-utils";
+import {
+  getManualRefundLabel,
+  normalizeOmiseRefundStatus,
+} from "@/features/orders/refund-status";
 import { openExternalWindow } from "@/lib/liff";
 import { LINE_OA_URL } from "@/lib/constants";
 import { formatBaht, formatDateTime } from "@/lib/format";
@@ -611,6 +615,7 @@ export default function OrderTrackingPage({
   const [cancelReason, setCancelReason] = useState("");
   const [cancelReasonDetail, setCancelReasonDetail] = useState("");
   const [cancelError, setCancelError] = useState<string | null>(null);
+  const [cancelSuccess, setCancelSuccess] = useState<string | null>(null);
   const [showReturnDialog, setShowReturnDialog] = useState(false);
   const [returnReason, setReturnReason] = useState("");
   const [returnReasonDetail, setReturnReasonDetail] = useState("");
@@ -643,12 +648,50 @@ export default function OrderTrackingPage({
     setCancelError(null);
 
     try {
-      await cancelOrder(id, {
+      const cancelResult = await cancelOrder(id, {
         reason: cancelReason,
         detail: cancelReasonDetail.trim() || undefined,
       });
       setShowCancelDialog(false);
-      // Optimistically update status then redirect
+
+      const refreshedOrder = await fetchOrderById(id).catch(() => null);
+      const refundStatus = normalizeOmiseRefundStatus(
+        refreshedOrder?.omiseRefundStatus ??
+          cancelResult.omiseRefundStatus ??
+          cancelResult.order?.omiseRefundStatus
+      );
+
+      if (refundStatus) {
+        if (refreshedOrder) {
+          const fallbackLookup = await buildOrderItemFallbacks(
+            refreshedOrder.items
+          );
+          setApiOrder({
+            ...refreshedOrder,
+            omiseRefundStatus: refundStatus,
+          });
+          setOrder(mapApiOrderToOrder(refreshedOrder, fallbackLookup));
+        } else {
+          setApiOrder((prev) =>
+            prev ? { ...prev, omiseRefundStatus: refundStatus } : prev
+          );
+          setOrder((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  orderStatus: "voided",
+                  timeline: buildTimeline("voided"),
+                }
+              : prev
+          );
+        }
+        setCancelSuccess(
+          "ได้รับคำขอคืนเงินแล้ว ร้านค้าจะตรวจสอบและดำเนินการคืนเงินให้ภายหลัง"
+        );
+        setCancelling(false);
+        return;
+      }
+
       setOrder((prev) =>
         prev
           ? {
@@ -671,6 +714,7 @@ export default function OrderTrackingPage({
     setCancelReason("");
     setCancelReasonDetail("");
     setCancelError(null);
+    setCancelSuccess(null);
     setShowCancelDialog(true);
   };
 
@@ -822,7 +866,11 @@ export default function OrderTrackingPage({
     );
   }
 
-  const cancellable = CANCELLABLE_STATUSES.includes(order.orderStatus);
+  const manualRefundLabel = getManualRefundLabel(
+    apiOrder.omiseRefundStatus
+  );
+  const cancellable =
+    !manualRefundLabel && CANCELLABLE_STATUSES.includes(order.orderStatus);
   const cancellationNeedsRefund =
     cancellable &&
     REFUNDABLE_PAYMENT_STATUSES.includes(order.paymentStatus);
@@ -840,14 +888,24 @@ export default function OrderTrackingPage({
     <>
       <AppHeader title="รายละเอียดคำสั่งซื้อ" showBack />
       <PageContainer className="space-y-3 pt-4 pb-36 md:max-w-5xl md:px-8 xl:max-w-6xl">
+        {cancelSuccess && (
+          <div
+            role="status"
+            className="rounded-2xl border border-warning/20 bg-warning-soft px-4 py-3 text-sm font-bold leading-relaxed text-warning"
+          >
+            {cancelSuccess}
+          </div>
+        )}
         <section className="overflow-hidden rounded-card bg-white app-panel-shadow ring-1 ring-black/[0.04]">
           <div className="bg-brand px-4 py-5 text-white">
             <p className="text-xs font-bold text-white/75">สถานะคำสั่งซื้อ</p>
             <h1 className="mt-1 text-xl font-extrabold leading-tight">
-              {getStatusTitle(order.orderStatus)}
+              {manualRefundLabel ?? getStatusTitle(order.orderStatus)}
             </h1>
             <p className="mt-1 text-sm font-semibold text-white/85">
-              {getStatusDescription(order.orderStatus)}
+              {manualRefundLabel
+                ? manualRefundLabel
+                : getStatusDescription(order.orderStatus)}
             </p>
           </div>
 
