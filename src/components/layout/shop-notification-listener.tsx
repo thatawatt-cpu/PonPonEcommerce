@@ -14,24 +14,11 @@ import {
   PONPON_AUTH_TOKEN_CHANGED_EVENT,
 } from "@/features/auth/ponpon-auth";
 import { cn } from "@/lib/utils";
-
-type ShopNotificationType =
-  | "refund_completed"
-  | "refund_requested"
-  | "return_request_updated"
-  | "return_refund_completed";
-
-interface ShopNotificationPayload {
-  type?: ShopNotificationType;
-  orderId?: string;
-  orderNumber?: string;
-  title?: string;
-  message?: string;
-  amount?: number;
-  status?: string;
-  actionUrl?: string | null;
-  createdAtUtc?: string;
-}
+import {
+  type ShopNotificationPayload,
+  type ShopNotificationType,
+  useNotificationStore,
+} from "@/store/notification-store";
 
 interface ToastNotification {
   id: string;
@@ -70,6 +57,9 @@ function buildToast(payload: ShopNotificationPayload): ToastNotification {
 export function ShopNotificationListener() {
   const [toasts, setToasts] = useState<ToastNotification[]>([]);
   const [authVersion, setAuthVersion] = useState(0);
+  const addFromShopNotification = useNotificationStore(
+    (state) => state.addFromShopNotification
+  );
   const timersRef = useRef(new Map<string, ReturnType<typeof setTimeout>>());
 
   const dismissToast = useCallback((id: string) => {
@@ -135,6 +125,7 @@ export function ShopNotificationListener() {
       connection.on(
         "shopNotification",
         (payload: ShopNotificationPayload) => {
+          addFromShopNotification(payload);
           if (isRefundCompletedNotification(payload)) {
             showToast(payload);
           }
@@ -161,7 +152,7 @@ export function ShopNotificationListener() {
         void connection.stop();
       }
     };
-  }, [authVersion, dismissToast]);
+  }, [authVersion, addFromShopNotification, dismissToast]);
 
   useEffect(() => {
     const timers = timersRef.current;

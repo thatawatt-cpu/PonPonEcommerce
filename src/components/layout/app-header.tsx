@@ -18,6 +18,11 @@ import {
   X,
 } from "lucide-react";
 import { useCartHydrated, useCartStore } from "@/store/cart-store";
+import {
+  formatNotificationTime,
+  useNotificationStore,
+  useNotificationsHydrated,
+} from "@/store/notification-store";
 import { SHOP_NAME } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 
@@ -40,12 +45,20 @@ export function AppHeader({
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
-  const [notificationsRead, setNotificationsRead] = useState(false);
   const hydrated = useCartHydrated();
+  const notificationsHydrated = useNotificationsHydrated();
   const rawCount = useCartStore((s) =>
     s.items.reduce((n, i) => n + i.quantity, 0)
   );
   const count = hydrated ? rawCount : 0;
+  const notifications = useNotificationStore((state) => state.items);
+  const markAllRead = useNotificationStore((state) => state.markAllRead);
+  const markRead = useNotificationStore((state) => state.markRead);
+  const rawUnreadCount = useNotificationStore((state) => state.unreadCount());
+  const unreadCount = notificationsHydrated ? rawUnreadCount : 0;
+  const recentNotifications = notificationsHydrated
+    ? notifications.slice(0, 5)
+    : [];
 
   const menuItems = [
     { href: "/", label: "หน้าหลัก", icon: Home },
@@ -55,24 +68,6 @@ export function AppHeader({
     { href: "/orders", label: "ออเดอร์ของฉัน", icon: ReceiptText },
     { href: "/profile", label: "โปรไฟล์", icon: UserRound },
   ];
-  const notifications = [
-    {
-      title: "กำลังตรวจสอบการชำระเงิน ORD001",
-      time: "5 นาทีที่แล้ว",
-      href: "/orders/ORD001",
-    },
-    {
-      title: "คูปองใหม่พร้อมใช้",
-      time: "1 ชม. ที่แล้ว",
-      href: "/coupons",
-    },
-    {
-      title: "Flash Sale เริ่มแล้ว",
-      time: "วันนี้ 09:00",
-      href: "/products",
-    },
-  ];
-
   return (
     <>
       <header
@@ -122,9 +117,9 @@ export function AppHeader({
                 className="relative flex h-9 w-9 items-center justify-center rounded-full text-ink transition active:scale-90 hover:bg-brand-soft motion-reduce:active:scale-100"
               >
                 <Bell className="h-5.5 w-5.5" />
-                {!notificationsRead && (
+                {unreadCount > 0 && (
                   <span className="absolute right-0 top-0 flex h-4 min-w-4 animate-pop items-center justify-center rounded-full bg-brand px-1 text-[9px] font-bold text-white ring-2 ring-white">
-                    2
+                    {unreadCount > 9 ? "9+" : unreadCount}
                   </span>
                 )}
               </button>
@@ -166,13 +161,15 @@ export function AppHeader({
                   การแจ้งเตือน
                 </h2>
                 <p className="text-[10px] font-semibold text-ink-soft">
-                  {!notificationsRead ? "มี 2 รายการที่ยังไม่ได้อ่าน" : "อ่านครบแล้ว"}
+                  {unreadCount > 0
+                    ? `มี ${unreadCount} รายการที่ยังไม่ได้อ่าน`
+                    : "อ่านครบแล้ว"}
                 </p>
               </div>
-              {!notificationsRead && (
+              {unreadCount > 0 && (
                 <button
                   type="button"
-                  onClick={() => setNotificationsRead(true)}
+                  onClick={markAllRead}
                   className="flex items-center gap-1 text-[11px] font-extrabold text-brand"
                 >
                   <CheckCheck className="h-3.5 w-3.5" />
@@ -181,39 +178,54 @@ export function AppHeader({
               )}
             </div>
 
-            <ul className="divide-y divide-black/[0.05]">
-              {notifications.map((notification, index) => {
-                const unread = !notificationsRead && index < 2;
-                return (
-                  <li key={notification.title}>
-                    <Link
-                      href={notification.href}
-                      onClick={() => setNotificationsOpen(false)}
-                      className={cn(
-                        "flex items-start gap-3 px-4 py-3 transition active:bg-brand-soft",
-                        unread && "bg-brand-soft/40"
-                      )}
-                    >
-                      <span className="relative mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-white text-brand shadow-sm">
-                        <Bell className="h-4.5 w-4.5" />
-                        {unread && (
-                          <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-brand ring-2 ring-white" />
+            {recentNotifications.length > 0 ? (
+              <ul className="divide-y divide-black/[0.05]">
+                {recentNotifications.map((notification) => {
+                  const unread = notification.unread;
+                  return (
+                    <li key={notification.id}>
+                      <Link
+                        href={notification.href}
+                        onClick={() => {
+                          markRead(notification.id);
+                          setNotificationsOpen(false);
+                        }}
+                        className={cn(
+                          "flex items-start gap-3 px-4 py-3 transition active:bg-brand-soft",
+                          unread && "bg-brand-soft/40"
                         )}
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block text-xs font-extrabold text-ink">
-                          {notification.title}
+                      >
+                        <span className="relative mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-white text-brand shadow-sm">
+                          <Bell className="h-4.5 w-4.5" />
+                          {unread && (
+                            <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-brand ring-2 ring-white" />
+                          )}
                         </span>
-                        <span className="mt-1 block text-[10px] font-semibold text-ink-soft">
-                          {notification.time}
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-xs font-extrabold text-ink">
+                            {notification.title}
+                          </span>
+                          <span className="mt-1 block text-[10px] font-semibold text-ink-soft">
+                            {formatNotificationTime(notification.createdAtUtc)}
+                          </span>
                         </span>
-                      </span>
-                      <ChevronRight className="mt-2 h-4 w-4 shrink-0 text-ink-soft" />
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
+                        <ChevronRight className="mt-2 h-4 w-4 shrink-0 text-ink-soft" />
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <div className="px-4 py-7 text-center">
+                <Bell className="mx-auto h-6 w-6 text-ink-soft/40" />
+                <p className="mt-2 text-xs font-bold text-ink">
+                  ยังไม่มีการแจ้งเตือน
+                </p>
+                <p className="mt-1 text-[10px] text-ink-soft">
+                  รายการใหม่จะแสดงที่นี่เมื่อร้านค้าอัปเดตคำสั่งซื้อ
+                </p>
+              </div>
+            )}
 
             <Link
               href="/notifications"
