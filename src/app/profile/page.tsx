@@ -34,6 +34,9 @@ import {
   useFavoritesHydrated,
 } from "@/store/favorite-store";
 
+const LOGIN_FLOW_KEY = "ponpon.line_login_inflight";
+const REAUTH_KEY = "ponpon.reauth_at";
+
 interface Shortcut {
   label: string;
   icon: LucideIcon;
@@ -108,8 +111,9 @@ export default function ProfilePage() {
   const handleRetryLogin = async () => {
     try {
       clearStoredPonPonSession();
-      await loginWithLine();
-      window.location.reload();
+      sessionStorage.removeItem(LOGIN_FLOW_KEY);
+      localStorage.removeItem(REAUTH_KEY);
+      await loginWithLine({ force: true });
     } catch (error) {
       console.error("[profile] login retry failed", error);
     }

@@ -133,7 +133,7 @@ export async function bootstrapLineSession({
     console.info("[ponpon-auth] idToken expired — starting re-login flow");
     localStorage.setItem(REAUTH_KEY, String(Date.now()));
     sessionStorage.setItem(LOGIN_FLOW_KEY, "1");
-    await loginWithLine();
+    await loginWithLine({ force: true });
     return;
   }
 
@@ -167,7 +167,7 @@ export async function bootstrapLineSession({
       );
       localStorage.setItem(REAUTH_KEY, String(Date.now()));
       sessionStorage.setItem(LOGIN_FLOW_KEY, "1");
-      await loginWithLine();
+      await loginWithLine({ force: true });
       return;
     }
 

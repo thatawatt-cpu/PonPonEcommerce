@@ -15,7 +15,8 @@ let initPromise: Promise<{ ready: true }> | null = null;
 type RuntimeLiff = {
   init?: (config: { liffId: string }) => Promise<unknown> | unknown;
   isLoggedIn?: () => boolean;
-  login?: () => void | Promise<void>;
+  login?: (options?: { redirectUri?: string }) => void | Promise<void>;
+  logout?: () => void;
   getIDToken?: () => string | null | undefined;
   getAccessToken?: () => string | null | undefined;
   getProfile?: () => Promise<{
@@ -124,9 +125,15 @@ export function isLiffLoggedIn(): boolean {
 }
 
 /** Pretend to start the LINE login flow. No-op in the mock. */
-export async function loginWithLine(): Promise<void> {
+export async function loginWithLine({
+  force = false,
+  redirectUri,
+}: {
+  force?: boolean;
+  redirectUri?: string;
+} = {}): Promise<void> {
   if (shouldUseMockLiff()) {
-    console.info("[mock-liff] loginWithLine()");
+    console.info("[mock-liff] loginWithLine()", { force, redirectUri });
     await wait(undefined, 150);
     return;
   }
@@ -134,7 +141,13 @@ export async function loginWithLine(): Promise<void> {
   const runtime = typeof window !== "undefined" ? window.liff ?? null : null;
 
   if (runtime?.login) {
-    await runtime.login();
+    if (force && runtime.isLoggedIn?.()) {
+      runtime.logout?.();
+    }
+
+    await runtime.login({
+      redirectUri: redirectUri ?? window.location.href,
+    });
     return;
   }
 

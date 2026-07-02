@@ -68,7 +68,7 @@ export function useLiffProfile(): UseLiffProfileResult {
       }
 
       sessionStorage.setItem(LOGIN_FLOW_KEY, "1");
-      void loginWithLine().catch((loginError) => {
+      void loginWithLine({ force: true }).catch((loginError) => {
         sessionStorage.removeItem(LOGIN_FLOW_KEY);
         if (cancelled) return;
 
