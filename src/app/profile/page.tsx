@@ -34,6 +34,7 @@ import {
   useFavoritesHydrated,
 } from "@/store/favorite-store";
 import {
+  formatNotificationContext,
   formatNotificationTime,
   useNotificationStore,
   useNotificationsHydrated,
@@ -173,6 +174,7 @@ export default function ProfilePage() {
                   <ul className="divide-y divide-black/[0.05]">
                     {latestNotifications.map((notification) => {
                       const unread = notification.unread;
+                      const context = formatNotificationContext(notification);
                       return (
                         <li key={notification.id}>
                           <Link
@@ -195,6 +197,11 @@ export default function ProfilePage() {
                               <span className="block text-sm font-extrabold text-ink">
                                 {notification.title}
                               </span>
+                              {context && (
+                                <span className="mt-0.5 block truncate text-xs font-extrabold text-brand">
+                                  {context}
+                                </span>
+                              )}
                               <span className="mt-0.5 block text-xs leading-relaxed text-ink-soft">
                                 {notification.description}
                               </span>

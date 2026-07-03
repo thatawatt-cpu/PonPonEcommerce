@@ -40,8 +40,13 @@ export interface ShopNotificationPayload {
 export interface NotificationItem {
   id: string;
   type?: string;
+  orderId?: string;
+  orderNumber?: string;
   title: string;
   description: string;
+  amount?: number;
+  status?: string;
+  trackingNumber?: string;
   createdAtUtc: string;
   href: string;
   category: NotificationCategory;
@@ -173,14 +178,38 @@ function toNotificationItem(
   return {
     id: getNotificationId(payload),
     type: payload.type,
+    orderId: payload.orderId,
+    orderNumber: payload.orderNumber,
     title: getShopNotificationTitle(payload),
     description: getShopNotificationDescription(payload),
+    amount: payload.amount,
+    status: payload.status,
+    trackingNumber: payload.trackingNumber,
     createdAtUtc: payload.createdAtUtc ?? new Date().toISOString(),
     href: getNotificationHref(payload),
     category: "order",
     unread: payload.isRead === true ? false : true,
     readAtUtc: payload.readAtUtc ?? null,
   };
+}
+
+export function formatNotificationContext(
+  notification: Pick<
+    NotificationItem,
+    "orderNumber" | "trackingNumber" | "status"
+  >
+): string {
+  const details = [
+    notification.orderNumber
+      ? `คำสั่งซื้อ ${notification.orderNumber}`
+      : null,
+    notification.trackingNumber
+      ? `เลขพัสดุ ${notification.trackingNumber}`
+      : null,
+    notification.status ? `สถานะ ${notification.status}` : null,
+  ].filter(Boolean);
+
+  return details.join(" · ");
 }
 
 function getPayloadList(data: unknown): ShopNotificationPayload[] {

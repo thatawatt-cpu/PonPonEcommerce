@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { useCartHydrated, useCartStore } from "@/store/cart-store";
 import {
+  formatNotificationContext,
   formatNotificationTime,
   useNotificationStore,
   useNotificationsHydrated,
@@ -182,6 +183,7 @@ export function AppHeader({
               <ul className="divide-y divide-black/[0.05]">
                 {recentNotifications.map((notification) => {
                   const unread = notification.unread;
+                  const context = formatNotificationContext(notification);
                   return (
                     <li key={notification.id}>
                       <Link
@@ -205,7 +207,15 @@ export function AppHeader({
                           <span className="block text-xs font-extrabold text-ink">
                             {notification.title}
                           </span>
-                          <span className="mt-1 block text-[10px] font-semibold text-ink-soft">
+                          {context && (
+                            <span className="mt-0.5 block truncate text-[11px] font-extrabold text-brand">
+                              {context}
+                            </span>
+                          )}
+                          <span className="mt-0.5 line-clamp-2 block text-[10px] font-semibold leading-relaxed text-ink-soft">
+                            {notification.description}
+                          </span>
+                          <span className="mt-1 block text-[10px] font-semibold text-ink-soft/75">
                             {formatNotificationTime(notification.createdAtUtc)}
                           </span>
                         </span>

@@ -13,6 +13,7 @@ import { PageContainer } from "@/components/layout/page-container";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import {
+  formatNotificationContext,
   formatNotificationTime,
   type NotificationCategory,
   useNotificationStore,
@@ -108,6 +109,7 @@ export default function NotificationsPage() {
           <Card className="overflow-hidden">
             <ul className="divide-y divide-black/[0.05]">
               {filteredNotifications.map((notification) => {
+                const context = formatNotificationContext(notification);
                 return (
                   <li key={notification.id}>
                     <Link
@@ -128,6 +130,11 @@ export default function NotificationsPage() {
                         <span className="block text-sm font-extrabold text-ink">
                           {notification.title}
                         </span>
+                        {context && (
+                          <span className="mt-1 block text-xs font-extrabold text-brand">
+                            {context}
+                          </span>
+                        )}
                         <span className="mt-1 block text-xs leading-relaxed text-ink-soft">
                           {notification.description}
                         </span>
