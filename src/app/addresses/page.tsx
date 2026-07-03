@@ -3,6 +3,7 @@
 import {
   useCallback,
   useEffect,
+  useRef,
   useState,
   type SelectHTMLAttributes,
 } from "react";
@@ -66,6 +67,18 @@ interface SubdistrictOption {
   name: string;
   postcode: string;
 }
+
+type AddressOptionsLoading = {
+  provinces: boolean;
+  districts: boolean;
+  subdistricts: boolean;
+};
+
+type AddressOptionRequestIds = {
+  provinces: number;
+  districts: number;
+  subdistricts: number;
+};
 
 interface AddressSelectProps
   extends Omit<SelectHTMLAttributes<HTMLSelectElement>, "children"> {
@@ -182,9 +195,17 @@ export default function AddressesPage() {
   const [subdistrictOptions, setSubdistrictOptions] = useState<
     SubdistrictOption[]
   >([]);
-  const [addressOptionsLoading, setAddressOptionsLoading] = useState<
-    "provinces" | "districts" | "subdistricts" | null
-  >(null);
+  const [addressOptionsLoading, setAddressOptionsLoading] =
+    useState<AddressOptionsLoading>({
+      provinces: false,
+      districts: false,
+      subdistricts: false,
+    });
+  const addressOptionRequestIds = useRef<AddressOptionRequestIds>({
+    provinces: 0,
+    districts: 0,
+    subdistricts: 0,
+  });
   const [saving, setSaving] = useState(false);
   const [editingAddress, setEditingAddress] = useState<SavedAddress | null>(
     null
@@ -293,20 +314,32 @@ export default function AddressesPage() {
   useEffect(() => {
     if (!formOpen || provinceOptions.length > 0) return;
     const controller = new AbortController();
+    const requestId = addressOptionRequestIds.current.provinces + 1;
+    addressOptionRequestIds.current.provinces = requestId;
+    const isLatestRequest = () =>
+      addressOptionRequestIds.current.provinces === requestId;
     const timer = window.setTimeout(() => {
-      setAddressOptionsLoading("provinces");
+      setAddressOptionsLoading((value) => ({ ...value, provinces: true }));
       void fetchAddressOptions<string>({}, controller.signal)
-        .then(setProvinceOptions)
+        .then((options) => {
+          if (isLatestRequest()) setProvinceOptions(options);
+        })
         .catch((optionError: unknown) => {
           if (optionError instanceof Error && optionError.name === "AbortError")
             return;
+          if (!isLatestRequest()) return;
           setErrors((value) => ({
             ...value,
             addressOptions: "โหลดรายชื่อจังหวัดไม่สำเร็จ กรุณาลองใหม่",
           }));
         })
         .finally(() => {
-          if (!controller.signal.aborted) setAddressOptionsLoading(null);
+          if (isLatestRequest()) {
+            setAddressOptionsLoading((value) => ({
+              ...value,
+              provinces: false,
+            }));
+          }
         });
     }, 0);
 
@@ -317,26 +350,38 @@ export default function AddressesPage() {
   }, [formOpen, provinceOptions.length]);
 
   useEffect(() => {
-    if (!formOpen || !form.province) return;
+    if (!formOpen || !form.province) {
+      return;
+    }
 
     const controller = new AbortController();
+    const province = form.province;
+    const requestId = addressOptionRequestIds.current.districts + 1;
+    addressOptionRequestIds.current.districts = requestId;
+    const isLatestRequest = () =>
+      addressOptionRequestIds.current.districts === requestId;
     const timer = window.setTimeout(() => {
-      setAddressOptionsLoading("districts");
-      void fetchAddressOptions<string>(
-        { province: form.province },
-        controller.signal
-      )
-        .then(setDistrictOptions)
+      setAddressOptionsLoading((value) => ({ ...value, districts: true }));
+      void fetchAddressOptions<string>({ province }, controller.signal)
+        .then((options) => {
+          if (isLatestRequest()) setDistrictOptions(options);
+        })
         .catch((optionError: unknown) => {
           if (optionError instanceof Error && optionError.name === "AbortError")
             return;
+          if (!isLatestRequest()) return;
           setErrors((value) => ({
             ...value,
             addressOptions: "โหลดรายชื่อเขต/อำเภอไม่สำเร็จ กรุณาลองใหม่",
           }));
         })
         .finally(() => {
-          if (!controller.signal.aborted) setAddressOptionsLoading(null);
+          if (isLatestRequest()) {
+            setAddressOptionsLoading((value) => ({
+              ...value,
+              districts: false,
+            }));
+          }
         });
     }, 0);
 
@@ -347,26 +392,42 @@ export default function AddressesPage() {
   }, [form.province, formOpen]);
 
   useEffect(() => {
-    if (!formOpen || !form.province || !form.district) return;
+    if (!formOpen || !form.province || !form.district) {
+      return;
+    }
 
     const controller = new AbortController();
+    const province = form.province;
+    const district = form.district;
+    const requestId = addressOptionRequestIds.current.subdistricts + 1;
+    addressOptionRequestIds.current.subdistricts = requestId;
+    const isLatestRequest = () =>
+      addressOptionRequestIds.current.subdistricts === requestId;
     const timer = window.setTimeout(() => {
-      setAddressOptionsLoading("subdistricts");
+      setAddressOptionsLoading((value) => ({ ...value, subdistricts: true }));
       void fetchAddressOptions<SubdistrictOption>(
-        { province: form.province, district: form.district },
+        { province, district },
         controller.signal
       )
-        .then(setSubdistrictOptions)
+        .then((options) => {
+          if (isLatestRequest()) setSubdistrictOptions(options);
+        })
         .catch((optionError: unknown) => {
           if (optionError instanceof Error && optionError.name === "AbortError")
             return;
+          if (!isLatestRequest()) return;
           setErrors((value) => ({
             ...value,
             addressOptions: "โหลดรายชื่อแขวง/ตำบลไม่สำเร็จ กรุณาลองใหม่",
           }));
         })
         .finally(() => {
-          if (!controller.signal.aborted) setAddressOptionsLoading(null);
+          if (isLatestRequest()) {
+            setAddressOptionsLoading((value) => ({
+              ...value,
+              subdistricts: false,
+            }));
+          }
         });
     }, 0);
 
@@ -852,13 +913,13 @@ export default function AddressesPage() {
                 id="province"
                 label="จังหวัด"
                 placeholder={
-                  addressOptionsLoading === "provinces"
+                  addressOptionsLoading.provinces
                     ? "กำลังโหลดจังหวัด..."
                     : "เลือกจังหวัด"
                 }
                 value={form.province}
                 options={provinceOptions}
-                disabled={addressOptionsLoading === "provinces"}
+                disabled={addressOptionsLoading.provinces}
                 onChange={(event) => {
                   updateForm({
                     province: event.target.value,
@@ -868,6 +929,11 @@ export default function AddressesPage() {
                   });
                   setDistrictOptions([]);
                   setSubdistrictOptions([]);
+                  setAddressOptionsLoading((value) => ({
+                    ...value,
+                    districts: false,
+                    subdistricts: false,
+                  }));
                 }}
               />
               {errors.province && (
@@ -880,7 +946,7 @@ export default function AddressesPage() {
                 id="district"
                 label="เขต/อำเภอ"
                 placeholder={
-                  addressOptionsLoading === "districts"
+                  addressOptionsLoading.districts
                     ? "กำลังโหลดเขต/อำเภอ..."
                     : form.province
                       ? "เลือกเขต/อำเภอ"
@@ -888,9 +954,7 @@ export default function AddressesPage() {
                 }
                 value={form.district}
                 options={districtOptions}
-                disabled={
-                  !form.province || addressOptionsLoading === "districts"
-                }
+                disabled={!form.province || addressOptionsLoading.districts}
                 onChange={(event) => {
                   updateForm({
                     district: event.target.value,
@@ -898,6 +962,10 @@ export default function AddressesPage() {
                     postcode: "",
                   });
                   setSubdistrictOptions([]);
+                  setAddressOptionsLoading((value) => ({
+                    ...value,
+                    subdistricts: false,
+                  }));
                 }}
               />
               {errors.district && (
@@ -909,7 +977,7 @@ export default function AddressesPage() {
                   id="subdistrict"
                   label="แขวง/ตำบล"
                   placeholder={
-                    addressOptionsLoading === "subdistricts"
+                    addressOptionsLoading.subdistricts
                       ? "กำลังโหลด..."
                       : form.district
                         ? "เลือกแขวง/ตำบล"
@@ -917,10 +985,7 @@ export default function AddressesPage() {
                   }
                   value={form.subdistrict}
                   options={subdistrictOptions.map((option) => option.name)}
-                  disabled={
-                    !form.district ||
-                    addressOptionsLoading === "subdistricts"
-                  }
+                  disabled={!form.district || addressOptionsLoading.subdistricts}
                   onChange={(event) => {
                     const selected = subdistrictOptions.find(
                       (option) => option.name === event.target.value
