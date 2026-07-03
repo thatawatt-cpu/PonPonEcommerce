@@ -5,6 +5,7 @@ import { BottomNavigation } from "@/components/layout/bottom-navigation";
 import { LiffAuthBootstrap } from "@/components/layout/liff-auth-bootstrap";
 import { ShopNotificationListener } from "@/components/layout/shop-notification-listener";
 import { SHOP_NAME, SHOP_TAGLINE } from "@/lib/constants";
+import { PONPON_BACKEND_BASE_URL } from "@/lib/server/api-backend";
 import { getAppOrigin } from "@/lib/site-url";
 
 const SITE_TITLE = `${SHOP_NAME} — ${SHOP_TAGLINE}`;
@@ -72,7 +73,9 @@ export default function RootLayout({
         */}
         <div className="relative min-h-dvh w-full">
           <LiffAuthBootstrap />
-          <ShopNotificationListener />
+          <ShopNotificationListener
+            hubUrl={`${PONPON_BACKEND_BASE_URL}/hubs/shop-notifications`}
+          />
           {children}
         </div>
         <BottomNavigation />

@@ -29,7 +29,6 @@ interface ToastNotification {
   orderNumber?: string;
 }
 
-const HUB_URL = "/hubs/shop-notifications";
 const TOAST_DURATION_MS = 6000;
 const IMPORTANT_TOAST_TYPES = new Set<ShopNotificationType>([
   "payment_succeeded",
@@ -57,7 +56,7 @@ function buildToast(payload: ShopNotificationPayload): ToastNotification {
   };
 }
 
-export function ShopNotificationListener() {
+export function ShopNotificationListener({ hubUrl }: { hubUrl: string }) {
   const [toasts, setToasts] = useState<ToastNotification[]>([]);
   const [authVersion, setAuthVersion] = useState(0);
   const addFromShopNotification = useNotificationStore(
@@ -119,10 +118,8 @@ export function ShopNotificationListener() {
     };
 
     const startConnection = async () => {
-      await Promise.allSettled([fetchNotifications(), fetchUnreadCount()]);
-
       connection = new HubConnectionBuilder()
-        .withUrl(HUB_URL, {
+        .withUrl(hubUrl, {
           accessTokenFactory: () => getStoredPonPonJwt() ?? "",
         })
         .withAutomaticReconnect()
@@ -149,6 +146,13 @@ export function ShopNotificationListener() {
         if (!cancelled) {
           console.warn("[shop-notifications] SignalR connection failed", error);
         }
+      } finally {
+        if (!cancelled) {
+          await Promise.allSettled([
+            fetchNotifications(),
+            fetchUnreadCount(),
+          ]);
+        }
       }
     };
 
@@ -169,6 +173,7 @@ export function ShopNotificationListener() {
     dismissToast,
     fetchNotifications,
     fetchUnreadCount,
+    hubUrl,
   ]);
 
   useEffect(() => {
