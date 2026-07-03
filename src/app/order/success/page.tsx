@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { openExternalWindow } from "@/lib/liff";
 import { LINE_OA_URL } from "@/lib/constants";
+import { dispatchShopNotificationToast } from "@/lib/shop-notification-toast";
 import { useMembershipStore } from "@/store/membership-store";
 import { markOrderPaid } from "@/features/payments/payment-api";
 
@@ -51,6 +52,23 @@ export default function OrderSuccessPage({
   useEffect(() => {
     if (!trackingOrderId) return;
     markOrderPaid({ orderId: trackingOrderId, orderNo });
+  }, [orderNo, trackingOrderId]);
+
+  useEffect(() => {
+    if (!trackingOrderId) return;
+
+    const timer = window.setTimeout(() => {
+      dispatchShopNotificationToast({
+        type: "payment_succeeded",
+        orderId: trackingOrderId,
+        orderNumber: orderNo,
+        title: "ชำระเงินสำเร็จ",
+        message: "ร้านค้าจะเริ่มดำเนินการคำสั่งซื้อของคุณ",
+        createdAtUtc: new Date().toISOString(),
+      });
+    }, 0);
+
+    return () => window.clearTimeout(timer);
   }, [orderNo, trackingOrderId]);
 
   return (

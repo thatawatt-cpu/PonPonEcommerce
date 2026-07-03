@@ -21,6 +21,7 @@ import {
   type ShopNotificationType,
   useNotificationStore,
 } from "@/store/notification-store";
+import { SHOP_NOTIFICATION_TOAST_EVENT } from "@/lib/shop-notification-toast";
 
 interface ToastNotification {
   id: string;
@@ -79,6 +80,42 @@ export function ShopNotificationListener({ hubUrl }: { hubUrl: string }) {
     setToasts((items) => items.filter((item) => item.id !== id));
   }, []);
 
+  const showToast = useCallback(
+    (payload: ShopNotificationPayload) => {
+      const toast = buildToast(payload);
+      const existingTimer = timersRef.current.get(toast.id);
+      if (existingTimer) {
+        clearTimeout(existingTimer);
+      }
+
+      setToasts((items) =>
+        [toast, ...items.filter((item) => item.id !== toast.id)].slice(0, 3)
+      );
+
+      const timer = setTimeout(() => {
+        dismissToast(toast.id);
+      }, TOAST_DURATION_MS);
+      timersRef.current.set(toast.id, timer);
+    },
+    [dismissToast]
+  );
+
+  useEffect(() => {
+    const handleToastEvent = (event: Event) => {
+      const payload = (event as CustomEvent<ShopNotificationPayload>).detail;
+      if (payload && shouldShowToast(payload)) {
+        showToast(payload);
+      }
+    };
+
+    window.addEventListener(SHOP_NOTIFICATION_TOAST_EVENT, handleToastEvent);
+    return () =>
+      window.removeEventListener(
+        SHOP_NOTIFICATION_TOAST_EVENT,
+        handleToastEvent
+      );
+  }, [showToast]);
+
   useEffect(() => {
     const notifyAuthChanged = () => setAuthVersion((value) => value + 1);
     const handleStorage = (event: StorageEvent) => {
@@ -106,23 +143,6 @@ export function ShopNotificationListener({ hubUrl }: { hubUrl: string }) {
 
     let connection: HubConnection | null = null;
     let cancelled = false;
-
-    const showToast = (payload: ShopNotificationPayload) => {
-      const toast = buildToast(payload);
-      const existingTimer = timersRef.current.get(toast.id);
-      if (existingTimer) {
-        clearTimeout(existingTimer);
-      }
-
-      setToasts((items) =>
-        [toast, ...items.filter((item) => item.id !== toast.id)].slice(0, 3)
-      );
-
-      const timer = setTimeout(() => {
-        dismissToast(toast.id);
-      }, TOAST_DURATION_MS);
-      timersRef.current.set(toast.id, timer);
-    };
 
     const startConnection = async () => {
       connection = new HubConnectionBuilder()
@@ -181,6 +201,7 @@ export function ShopNotificationListener({ hubUrl }: { hubUrl: string }) {
     fetchNotifications,
     fetchUnreadCount,
     hubUrl,
+    showToast,
   ]);
 
   useEffect(() => {
