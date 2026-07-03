@@ -15,8 +15,9 @@ import {
 } from "@/features/auth/ponpon-auth";
 import { cn } from "@/lib/utils";
 import {
+  getShopNotificationDescription,
+  getShopNotificationTitle,
   type ShopNotificationPayload,
-  type ShopNotificationType,
   useNotificationStore,
 } from "@/store/notification-store";
 
@@ -28,17 +29,7 @@ interface ToastNotification {
 }
 
 const HUB_URL = "/hubs/shop-notifications";
-const REFUND_COMPLETED_TYPES = new Set<ShopNotificationType>([
-  "refund_completed",
-  "return_refund_completed",
-]);
 const TOAST_DURATION_MS = 6000;
-
-function isRefundCompletedNotification(
-  payload: ShopNotificationPayload
-): boolean {
-  return Boolean(payload.type && REFUND_COMPLETED_TYPES.has(payload.type));
-}
 
 function buildToast(payload: ShopNotificationPayload): ToastNotification {
   return {
@@ -46,10 +37,8 @@ function buildToast(payload: ShopNotificationPayload): ToastNotification {
       typeof crypto !== "undefined" && "randomUUID" in crypto
         ? crypto.randomUUID()
         : `${Date.now()}-${Math.random()}`,
-    title: "คืนเงินเรียบร้อยแล้ว",
-    message:
-      payload.message ||
-      "ร้านค้าดำเนินการคืนเงินและยกเลิกคำสั่งซื้อเรียบร้อยแล้ว",
+    title: getShopNotificationTitle(payload),
+    message: getShopNotificationDescription(payload),
     orderNumber: payload.orderNumber,
   };
 }
@@ -126,9 +115,7 @@ export function ShopNotificationListener() {
         "shopNotification",
         (payload: ShopNotificationPayload) => {
           addFromShopNotification(payload);
-          if (isRefundCompletedNotification(payload)) {
-            showToast(payload);
-          }
+          showToast(payload);
         }
       );
 
