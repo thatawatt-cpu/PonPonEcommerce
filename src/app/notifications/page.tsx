@@ -56,7 +56,6 @@ export default function NotificationsPage() {
         title="การแจ้งเตือน"
         showBack
         showCart={false}
-        showNotifications={false}
       />
       <PageContainer className="space-y-4 pt-4">
         <Card className="overflow-hidden p-4">

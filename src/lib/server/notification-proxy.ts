@@ -29,6 +29,10 @@ export function getNotificationsBackendUrl(path: string): string {
 export async function proxyNotificationJsonResponse(
   response: Response
 ): Promise<NextResponse> {
+  if ([204, 205, 304].includes(response.status)) {
+    return new NextResponse(null, { status: response.status });
+  }
+
   const data = await response.json().catch(() => null);
   return NextResponse.json(data, { status: response.status });
 }

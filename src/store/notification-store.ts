@@ -150,12 +150,12 @@ export function getShopNotificationDescription(
 }
 
 function getNotificationHref(payload: ShopNotificationPayload): string {
+  if (payload.orderId) {
+    return `/orders/${encodeURIComponent(payload.orderId)}`;
+  }
   if (payload.actionUrl) return payload.actionUrl;
   if (payload.orderNumber) {
     return `/orders/${encodeURIComponent(payload.orderNumber)}`;
-  }
-  if (payload.orderId) {
-    return `/orders/${encodeURIComponent(payload.orderId)}`;
   }
   return "/notifications";
 }
