@@ -481,7 +481,7 @@ export default function PaymentPage({
   return (
     <>
       <AppHeader
-        title="รหัสการชำระเงิน"
+        title="ชำระเงินด้วย PromptPay"
         showBack
         showCart={false}
         showNotifications={false}
@@ -507,9 +507,14 @@ export default function PaymentPage({
               </div>
 
               <div>
-                <p className="mt-2 text-[2.35rem] font-extrabold leading-none tracking-normal text-black md:text-[3rem] [@media(max-width:430px)_and_(max-height:860px)]:text-[2.15rem] [@media(max-height:700px)]:text-[2.1rem] [@media(min-width:768px)_and_(max-width:900px)]:text-[2.5rem]">
-                  {formattedPayAmount}
-                </p>
+                <div className="mt-2 flex items-end justify-between gap-3">
+                  <p className="text-[2.35rem] font-extrabold leading-none tracking-normal text-black md:text-[3rem] [@media(max-width:430px)_and_(max-height:860px)]:text-[2.15rem] [@media(max-height:700px)]:text-[2.1rem] [@media(min-width:768px)_and_(max-width:900px)]:text-[2.5rem]">
+                    {formattedPayAmount}
+                  </p>
+                  <p className="max-w-[55%] truncate pb-0.5 text-right text-xs font-bold text-ink-soft md:text-sm">
+                    คำสั่งซื้อ {orderNo}
+                  </p>
+                </div>
                 {paymentDeadlineLabel && (
                   <p className="mt-2 truncate text-xs font-semibold text-ink-soft md:mt-4 md:whitespace-normal md:text-base [@media(max-width:430px)_and_(max-height:860px)]:mt-1 [@media(max-width:430px)_and_(max-height:860px)]:text-[11px] [@media(min-width:768px)_and_(max-width:900px)]:mt-2 [@media(min-width:768px)_and_(max-width:900px)]:text-sm">
                     รหัสนี้ใช้ได้ถึง {paymentDeadlineLabel}
@@ -518,18 +523,17 @@ export default function PaymentPage({
               </div>
             </section>
 
-            <section className="mt-2 flex min-h-0 flex-none flex-col overflow-hidden rounded-[1.1rem] bg-white shadow-[0_14px_34px_rgba(65,25,25,0.12)] md:mt-3 md:rounded-[1.35rem] [@media(max-width:430px)_and_(max-height:860px)]:mt-1.5 [@media(max-height:700px)]:mt-1 [@media(min-width:768px)_and_(max-width:900px)]:mt-2">
-              <div className="relative overflow-hidden bg-[linear-gradient(135deg,#ff2846_0%,#ed171c_58%,#ff4863_100%)] px-4 py-3 text-white md:px-6 md:py-5 [@media(max-width:430px)_and_(max-height:860px)]:px-3.5 [@media(max-width:430px)_and_(max-height:860px)]:py-2 [@media(max-height:700px)]:py-2 [@media(min-width:768px)_and_(max-width:900px)]:px-5 [@media(min-width:768px)_and_(max-width:900px)]:py-3">
-                <div className="absolute -right-8 -top-8 h-32 w-32 rounded-[2rem] border-[18px] border-white/10" />
-                <div className="relative flex items-center gap-3 md:gap-4">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/45 bg-white/10 md:h-14 md:w-14 md:rounded-2xl [@media(max-width:430px)_and_(max-height:860px)]:h-9 [@media(max-width:430px)_and_(max-height:860px)]:w-9 [@media(max-height:700px)]:h-9 [@media(max-height:700px)]:w-9 [@media(min-width:768px)_and_(max-width:900px)]:h-11 [@media(min-width:768px)_and_(max-width:900px)]:w-11">
+            <section className="mt-2 flex min-h-0 flex-none flex-col overflow-hidden rounded-[1.1rem] border border-black/[0.06] bg-white md:mt-3 md:rounded-[1.35rem] [@media(max-width:430px)_and_(max-height:860px)]:mt-1.5 [@media(max-height:700px)]:mt-1 [@media(min-width:768px)_and_(max-width:900px)]:mt-2">
+              <div className="border-b border-black/[0.06] bg-white px-4 py-3 text-ink md:px-6 md:py-4 [@media(max-width:430px)_and_(max-height:860px)]:px-3.5 [@media(max-width:430px)_and_(max-height:860px)]:py-2 [@media(max-height:700px)]:py-2 [@media(min-width:768px)_and_(max-width:900px)]:px-5 [@media(min-width:768px)_and_(max-width:900px)]:py-3">
+                <div className="flex items-center gap-3 md:gap-4">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-soft text-brand md:h-12 md:w-12 md:rounded-2xl [@media(max-width:430px)_and_(max-height:860px)]:h-9 [@media(max-width:430px)_and_(max-height:860px)]:w-9 [@media(max-height:700px)]:h-9 [@media(max-height:700px)]:w-9 [@media(min-width:768px)_and_(max-width:900px)]:h-11 [@media(min-width:768px)_and_(max-width:900px)]:w-11">
                     <QrCode className="h-6 w-6 md:h-9 md:w-9 [@media(max-width:430px)_and_(max-height:860px)]:h-5 [@media(max-width:430px)_and_(max-height:860px)]:w-5 [@media(max-height:700px)]:h-5 [@media(max-height:700px)]:w-5 [@media(min-width:768px)_and_(max-width:900px)]:h-7 [@media(min-width:768px)_and_(max-width:900px)]:w-7" />
                   </span>
                   <div className="min-w-0">
-                    <h1 className="truncate text-xl font-extrabold leading-tight md:text-3xl [@media(max-width:430px)_and_(max-height:860px)]:text-lg [@media(max-height:700px)]:text-lg [@media(min-width:768px)_and_(max-width:900px)]:text-2xl">
+                    <h1 className="truncate text-lg font-extrabold leading-tight text-ink md:text-2xl [@media(max-width:430px)_and_(max-height:860px)]:text-base [@media(max-height:700px)]:text-base [@media(min-width:768px)_and_(max-width:900px)]:text-xl">
                       QR PromptPay
                     </h1>
-                    <p className="text-sm font-semibold text-white/90 md:text-base [@media(max-width:430px)_and_(max-height:860px)]:text-xs [@media(max-height:700px)]:text-xs">
+                    <p className="text-sm font-semibold text-ink-soft md:text-base [@media(max-width:430px)_and_(max-height:860px)]:text-xs [@media(max-height:700px)]:text-xs">
                       สแกนจ่ายด้วยพร้อมเพย์
                     </p>
                   </div>
@@ -537,7 +541,7 @@ export default function PaymentPage({
               </div>
 
               <div className="flex min-h-0 shrink flex-col items-center rounded-t-[1.1rem] bg-white px-2 pb-3 pt-3 md:px-5 md:pb-5 md:pt-5 [@media(max-width:430px)_and_(max-height:860px)]:pb-2.5 [@media(max-width:430px)_and_(max-height:860px)]:pt-2.5 [@media(max-height:700px)]:pb-2 [@media(max-height:700px)]:pt-2 [@media(min-width:768px)_and_(max-width:900px)]:pb-4 [@media(min-width:768px)_and_(max-width:900px)]:pt-4">
-                <div className="relative mx-auto aspect-square w-[min(58vw,26dvh,13rem)] max-w-full [@media(max-width:430px)_and_(max-height:860px)]:w-[min(56vw,25dvh,12.25rem)] [@media(max-height:700px)]:w-[min(46vw,21dvh,9.5rem)] md:w-[min(52vw,34dvh,22rem)] [@media(min-width:768px)_and_(max-width:900px)]:w-[min(52vw,28dvh,18.5rem)]">
+                <div className="relative mx-auto aspect-square w-[min(48vw,22dvh,11rem)] max-w-full [@media(max-width:430px)_and_(max-height:860px)]:w-[min(46vw,21dvh,10.5rem)] [@media(max-height:700px)]:w-[min(40vw,18dvh,8.5rem)] md:w-[min(44vw,29dvh,18rem)] [@media(min-width:768px)_and_(max-width:900px)]:w-[min(44vw,24dvh,15rem)]">
                   <div
                     className={
                       isExpired
@@ -591,22 +595,11 @@ export default function PaymentPage({
                 )}
               </div>
 
-              {!isExpired && (
-                <div className="mt-2 text-center [@media(max-height:700px)]:hidden">
-                  <p className="text-base font-semibold text-ink">
-                    รหัสนี้ใช้ได้ถึง{" "}
-                    <span className="font-extrabold text-brand">
-                      {expiresLabel}
-                    </span>
-                  </p>
-                </div>
-              )}
-
               {canDownloadQrCode ? (
                 <a
                   href={qrDownloadHref}
                   download={getDownloadFileName(paymentOrderId)}
-                  className="brand-button mt-3 inline-flex h-12 w-full max-w-sm items-center justify-center gap-2 rounded-full px-5 text-base font-extrabold text-white transition active:scale-[0.98] [@media(max-height:700px)]:mt-2 [@media(max-width:430px)_and_(max-height:860px)]:mt-2 [@media(min-width:768px)_and_(max-width:900px)]:h-11 [@media(min-width:768px)_and_(max-width:900px)]:max-w-xs"
+                  className="mt-3 inline-flex h-11 w-full max-w-sm items-center justify-center gap-2 rounded-full border border-brand bg-white px-5 text-sm font-extrabold text-brand transition active:scale-[0.98] hover:bg-brand-soft [@media(max-height:700px)]:mt-2 [@media(max-width:430px)_and_(max-height:860px)]:mt-2 [@media(min-width:768px)_and_(max-width:900px)]:max-w-xs"
                 >
                   <Download className="h-5 w-5" />
                   บันทึกรหัส QR
@@ -615,7 +608,7 @@ export default function PaymentPage({
                 <button
                   type="button"
                   disabled
-                  className="mt-3 inline-flex h-12 w-full max-w-sm cursor-not-allowed items-center justify-center gap-2 rounded-full bg-brand px-5 text-base font-extrabold text-white opacity-45 [@media(max-height:700px)]:mt-2 [@media(max-width:430px)_and_(max-height:860px)]:mt-2 [@media(min-width:768px)_and_(max-width:900px)]:h-11 [@media(min-width:768px)_and_(max-width:900px)]:max-w-xs"
+                  className="mt-3 inline-flex h-11 w-full max-w-sm cursor-not-allowed items-center justify-center gap-2 rounded-full border border-brand/30 bg-white px-5 text-sm font-extrabold text-brand opacity-45 [@media(max-height:700px)]:mt-2 [@media(max-width:430px)_and_(max-height:860px)]:mt-2 [@media(min-width:768px)_and_(max-width:900px)]:max-w-xs"
                 >
                   {preparingQrDownload ? (
                     <Loader2 className="h-5 w-5 animate-spin" />
@@ -641,7 +634,7 @@ export default function PaymentPage({
                 <AlertCircle className="h-4 w-4 md:h-5 md:w-5" />
               </span>
               <p className="line-clamp-2 min-w-0 w-full text-[10px] font-semibold leading-snug text-ink md:block md:overflow-visible md:text-xs md:leading-relaxed md:[-webkit-box-orient:initial] md:[-webkit-line-clamp:unset]">
-                แนะนำ: บันทึกรหัส QR นี้ไว้ หรือกลับมาดูรหัสได้ที่หน้าคำสั่งซื้อที่ยังไม่ได้ชำระเงิน
+                หลังชำระเงิน ระบบจะตรวจสอบให้อัตโนมัติ คุณสามารถกลับมาดู QR เดิมได้จากหน้าคำสั่งซื้อจนกว่ารหัสจะหมดอายุ
               </p>
               <Image
                 src="/images/payments/ponpon-payment-bag.png"

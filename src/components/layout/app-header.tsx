@@ -8,12 +8,17 @@ import {
   CheckCheck,
   ChevronLeft,
   ChevronRight,
+  CircleDollarSign,
+  Clock3,
   Home,
   LayoutGrid,
   Menu,
+  PackageCheck,
   ReceiptText,
+  RotateCcw,
   ShoppingCart,
   TicketPercent,
+  Truck,
   UserRound,
   X,
 } from "lucide-react";
@@ -34,6 +39,30 @@ interface AppHeaderProps {
   showCart?: boolean;
   showNotifications?: boolean;
   className?: string;
+}
+
+function NotificationTypeIcon({ type }: { type?: string }) {
+  if (type === "payment_expired") {
+    return <Clock3 className="h-4.5 w-4.5" />;
+  }
+
+  if (type?.startsWith("payment_")) {
+    return <CircleDollarSign className="h-4.5 w-4.5" />;
+  }
+
+  if (type === "packed" || type === "order_created") {
+    return <PackageCheck className="h-4.5 w-4.5" />;
+  }
+
+  if (type?.startsWith("shipping_")) {
+    return <Truck className="h-4.5 w-4.5" />;
+  }
+
+  if (type?.startsWith("refund_") || type?.startsWith("return_")) {
+    return <RotateCcw className="h-4.5 w-4.5" />;
+  }
+
+  return <Bell className="h-4.5 w-4.5" />;
 }
 
 export function AppHeader({
@@ -155,8 +184,8 @@ export function AppHeader({
             onClick={() => setNotificationsOpen(false)}
             className="absolute inset-0 bg-black/20"
           />
-          <section className="absolute right-3.5 top-16 w-[calc(100%-28px)] max-w-sm overflow-hidden rounded-3xl bg-white shadow-[0_18px_55px_rgba(0,0,0,0.2)] ring-1 ring-black/[0.05] md:right-[max(1.5rem,calc((100vw-48rem)/2+1.5rem))]">
-            <div className="flex items-center justify-between border-b border-black/[0.05] px-4 py-3">
+          <section className="absolute right-3.5 top-16 flex max-h-[65dvh] w-[calc(100%-28px)] max-w-sm flex-col overflow-hidden rounded-2xl bg-white shadow-[0_18px_55px_rgba(0,0,0,0.2)] ring-1 ring-black/[0.05] md:right-[max(1.5rem,calc((100vw-48rem)/2+1.5rem))]">
+            <div className="flex shrink-0 items-center justify-between border-b border-black/[0.05] px-4 py-3">
               <div>
                 <h2 className="text-sm font-extrabold text-ink">
                   การแจ้งเตือน
@@ -180,7 +209,7 @@ export function AppHeader({
             </div>
 
             {recentNotifications.length > 0 ? (
-              <ul className="divide-y divide-black/[0.05]">
+              <ul className="min-h-0 flex-1 divide-y divide-black/[0.05] overflow-y-auto overscroll-contain">
                 {recentNotifications.map((notification) => {
                   const unread = notification.unread;
                   const context = formatNotificationContext(notification);
@@ -194,17 +223,34 @@ export function AppHeader({
                         }}
                         className={cn(
                           "flex items-start gap-3 px-4 py-3 transition active:bg-brand-soft",
-                          unread && "bg-brand-soft/40"
+                          unread ? "bg-brand-soft/40" : "bg-white"
                         )}
                       >
-                        <span className="relative mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-white text-brand shadow-sm">
-                          <Bell className="h-4.5 w-4.5" />
+                        <span
+                          className={cn(
+                            "relative mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-brand",
+                            unread
+                              ? "bg-white shadow-sm ring-1 ring-brand/10"
+                              : "bg-surface-muted text-ink-soft"
+                          )}
+                        >
+                          <NotificationTypeIcon type={notification.type} />
                           {unread && (
                             <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-brand ring-2 ring-white" />
                           )}
                         </span>
-                        <span className="min-w-0 flex-1">
-                          <span className="block text-xs font-extrabold text-ink">
+                        <span
+                          className={cn(
+                            "min-w-0 flex-1",
+                            !unread && "opacity-70"
+                          )}
+                        >
+                          <span
+                            className={cn(
+                              "block text-xs text-ink",
+                              unread ? "font-extrabold" : "font-bold"
+                            )}
+                          >
                             {notification.title}
                           </span>
                           {context && (
@@ -240,7 +286,7 @@ export function AppHeader({
             <Link
               href="/notifications"
               onClick={() => setNotificationsOpen(false)}
-              className="block bg-[#fff8f6] px-4 py-3 text-center text-xs font-extrabold text-brand"
+              className="block shrink-0 border-t border-brand/10 bg-[#fff8f6] px-4 py-3 text-center text-xs font-extrabold text-brand"
             >
               ดูการแจ้งเตือนทั้งหมด
             </Link>
