@@ -34,6 +34,7 @@ export default function NotificationsPage() {
   const notifications = useNotificationStore((state) => state.items);
   const markAllRead = useNotificationStore((state) => state.markAllRead);
   const markRead = useNotificationStore((state) => state.markRead);
+  const storeUnreadCount = useNotificationStore((state) => state.unreadCount);
 
   const filteredNotifications = useMemo(() => {
     if (!hydrated) return [];
@@ -46,9 +47,7 @@ export default function NotificationsPage() {
     );
   }, [activeFilter, hydrated, notifications]);
 
-  const unreadCount = hydrated
-    ? notifications.filter((notification) => notification.unread).length
-    : 0;
+  const unreadCount = hydrated ? storeUnreadCount : 0;
 
   return (
     <>
@@ -74,7 +73,7 @@ export default function NotificationsPage() {
             {unreadCount > 0 && (
               <button
                 type="button"
-                onClick={markAllRead}
+                onClick={() => void markAllRead()}
                 className="flex shrink-0 items-center gap-1 rounded-full bg-brand-soft px-3 py-2 text-xs font-extrabold text-brand"
               >
                 <CheckCheck className="h-4 w-4" />
@@ -113,7 +112,7 @@ export default function NotificationsPage() {
                   <li key={notification.id}>
                     <Link
                       href={notification.href}
-                      onClick={() => markRead(notification.id)}
+                      onClick={() => void markRead(notification.id)}
                       className={cn(
                         "flex items-start gap-3 px-4 py-4 transition active:bg-brand-soft",
                         notification.unread && "bg-brand-soft/35"

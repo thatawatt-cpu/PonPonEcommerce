@@ -54,7 +54,7 @@ export function AppHeader({
   const notifications = useNotificationStore((state) => state.items);
   const markAllRead = useNotificationStore((state) => state.markAllRead);
   const markRead = useNotificationStore((state) => state.markRead);
-  const rawUnreadCount = useNotificationStore((state) => state.unreadCount());
+  const rawUnreadCount = useNotificationStore((state) => state.unreadCount);
   const unreadCount = notificationsHydrated ? rawUnreadCount : 0;
   const recentNotifications = notificationsHydrated
     ? notifications.slice(0, 5)
@@ -169,7 +169,7 @@ export function AppHeader({
               {unreadCount > 0 && (
                 <button
                   type="button"
-                  onClick={markAllRead}
+                  onClick={() => void markAllRead()}
                   className="flex items-center gap-1 text-[11px] font-extrabold text-brand"
                 >
                   <CheckCheck className="h-3.5 w-3.5" />
@@ -187,7 +187,7 @@ export function AppHeader({
                       <Link
                         href={notification.href}
                         onClick={() => {
-                          markRead(notification.id);
+                          void markRead(notification.id);
                           setNotificationsOpen(false);
                         }}
                         className={cn(

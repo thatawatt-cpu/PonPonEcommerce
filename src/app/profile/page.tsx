@@ -177,7 +177,9 @@ export default function ProfilePage() {
                         <li key={notification.id}>
                           <Link
                             href={notification.href}
-                            onClick={() => markNotificationRead(notification.id)}
+                            onClick={() =>
+                              void markNotificationRead(notification.id)
+                            }
                             className={cn(
                               "flex items-start gap-3 px-4 py-3.5 transition active:bg-brand-soft",
                               unread && "bg-brand-soft/35"

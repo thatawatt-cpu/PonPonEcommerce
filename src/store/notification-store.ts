@@ -3,6 +3,7 @@
 import { useSyncExternalStore } from "react";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { ponponFetch } from "@/features/auth/ponpon-auth";
 
 export type ShopNotificationType =
   | "order_created"
@@ -21,6 +22,7 @@ export type ShopNotificationType =
 export type NotificationCategory = "order" | "promotion";
 
 export interface ShopNotificationPayload {
+  id?: string;
   type?: string;
   orderId?: string;
   orderNumber?: string;
@@ -30,6 +32,8 @@ export interface ShopNotificationPayload {
   status?: string;
   trackingNumber?: string;
   actionUrl?: string | null;
+  isRead?: boolean;
+  readAtUtc?: string | null;
   createdAtUtc?: string;
 }
 
@@ -42,14 +46,18 @@ export interface NotificationItem {
   href: string;
   category: NotificationCategory;
   unread: boolean;
+  readAtUtc?: string | null;
 }
 
 interface NotificationState {
   items: NotificationItem[];
+  unreadCount: number;
+  loading: boolean;
+  fetchNotifications: () => Promise<void>;
+  fetchUnreadCount: () => Promise<void>;
   addFromShopNotification: (payload: ShopNotificationPayload) => void;
-  markRead: (id: string) => void;
-  markAllRead: () => void;
-  unreadCount: () => number;
+  markRead: (id: string) => Promise<void>;
+  markAllRead: () => Promise<void>;
 }
 
 const MAX_NOTIFICATIONS = 50;
@@ -148,6 +156,8 @@ function getNotificationHref(payload: ShopNotificationPayload): string {
 }
 
 function getNotificationId(payload: ShopNotificationPayload): string {
+  if (payload.id) return payload.id;
+
   return [
     payload.type ?? "shop",
     payload.orderId ?? payload.orderNumber ?? "order",
@@ -168,8 +178,37 @@ function toNotificationItem(
     createdAtUtc: payload.createdAtUtc ?? new Date().toISOString(),
     href: getNotificationHref(payload),
     category: "order",
-    unread: true,
+    unread: payload.isRead === true ? false : true,
+    readAtUtc: payload.readAtUtc ?? null,
   };
+}
+
+function getPayloadList(data: unknown): ShopNotificationPayload[] {
+  if (Array.isArray(data)) return data as ShopNotificationPayload[];
+
+  if (data && typeof data === "object") {
+    const record = data as Record<string, unknown>;
+    for (const key of ["items", "notifications", "data"]) {
+      const value = record[key];
+      if (Array.isArray(value)) return value as ShopNotificationPayload[];
+    }
+  }
+
+  return [];
+}
+
+function getUnreadCount(data: unknown): number {
+  if (typeof data === "number" && Number.isFinite(data)) return data;
+
+  if (data && typeof data === "object") {
+    const record = data as Record<string, unknown>;
+    for (const key of ["unreadCount", "count", "total"]) {
+      const value = record[key];
+      if (typeof value === "number" && Number.isFinite(value)) return value;
+    }
+  }
+
+  return 0;
 }
 
 export function formatNotificationTime(createdAtUtc: string): string {
@@ -198,37 +237,128 @@ export const useNotificationStore = create<NotificationState>()(
   persist(
     (set, get) => ({
       items: [],
+      unreadCount: 0,
+      loading: false,
+      fetchNotifications: async () => {
+        set({ loading: true });
+        try {
+          const response = await ponponFetch("/api/notifications", {
+            method: "GET",
+          });
+
+          if (!response.ok) return;
+
+          const data = await response.json().catch(() => null);
+          const items = getPayloadList(data).map(toNotificationItem);
+          set({ items });
+        } catch (error) {
+          console.warn("[notifications] failed to fetch notifications", error);
+        } finally {
+          set({ loading: false });
+        }
+      },
+      fetchUnreadCount: async () => {
+        try {
+          const response = await ponponFetch("/api/notifications/unread-count", {
+            method: "GET",
+          });
+
+          if (!response.ok) return;
+
+          const data = await response.json().catch(() => null);
+          set({ unreadCount: getUnreadCount(data) });
+        } catch (error) {
+          console.warn("[notifications] failed to fetch unread count", error);
+        }
+      },
       addFromShopNotification: (payload) =>
         set((state) => {
           const item = toNotificationItem(payload);
+          const previousItem = state.items.find(
+            (notification) => notification.id === item.id
+          );
           const existing = state.items.filter(
             (notification) => notification.id !== item.id
           );
           return {
             items: [item, ...existing].slice(0, MAX_NOTIFICATIONS),
+            unreadCount: item.unread && !previousItem?.unread
+              ? state.unreadCount + 1
+              : state.unreadCount,
           };
         }),
-      markRead: (id) =>
+      markRead: async (id) => {
+        const previous = get();
+        const target = previous.items.find(
+          (notification) => notification.id === id
+        );
+        const wasUnread = Boolean(target?.unread);
+        const readAtUtc = new Date().toISOString();
+
         set((state) => ({
           items: state.items.map((notification) =>
             notification.id === id
-              ? { ...notification, unread: false }
+              ? { ...notification, unread: false, readAtUtc }
               : notification
           ),
-        })),
-      markAllRead: () =>
+          unreadCount: wasUnread
+            ? Math.max(0, state.unreadCount - 1)
+            : state.unreadCount,
+        }));
+
+        try {
+          const response = await ponponFetch(
+            `/api/notifications/${encodeURIComponent(id)}/read`,
+            {
+              method: "PATCH",
+            }
+          );
+
+          if (response.ok) return;
+        } catch (error) {
+          console.warn("[notifications] failed to mark notification read", error);
+        }
+
+        set({
+          items: previous.items,
+          unreadCount: previous.unreadCount,
+        });
+      },
+      markAllRead: async () => {
+        const previous = get();
+        const readAtUtc = new Date().toISOString();
+
         set((state) => ({
           items: state.items.map((notification) => ({
             ...notification,
             unread: false,
+            readAtUtc: notification.readAtUtc ?? readAtUtc,
           })),
-        })),
-      unreadCount: () =>
-        get().items.filter((notification) => notification.unread).length,
+          unreadCount: 0,
+        }));
+
+        try {
+          const response = await ponponFetch("/api/notifications/read-all", {
+            method: "PATCH",
+          });
+
+          if (response.ok) return;
+        } catch (error) {
+          console.warn("[notifications] failed to mark all notifications read", error);
+        }
+
+        set({
+          items: previous.items,
+          unreadCount: previous.unreadCount,
+        });
+      },
     }),
     {
       name: "ponpon-notifications",
-      partialize: (state) => ({ items: state.items }),
+      partialize: (state) => ({
+        items: state.items,
+        unreadCount: state.unreadCount,
+      }),
     }
   )
 );

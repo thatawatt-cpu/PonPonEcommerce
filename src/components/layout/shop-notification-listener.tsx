@@ -18,6 +18,7 @@ import {
   getShopNotificationDescription,
   getShopNotificationTitle,
   type ShopNotificationPayload,
+  type ShopNotificationType,
   useNotificationStore,
 } from "@/store/notification-store";
 
@@ -30,6 +31,19 @@ interface ToastNotification {
 
 const HUB_URL = "/hubs/shop-notifications";
 const TOAST_DURATION_MS = 6000;
+const IMPORTANT_TOAST_TYPES = new Set<ShopNotificationType>([
+  "payment_succeeded",
+  "shipping_booked",
+  "shipping_status",
+  "refund_completed",
+  "return_refund_completed",
+]);
+
+function shouldShowToast(payload: ShopNotificationPayload): boolean {
+  return Boolean(
+    payload.type && IMPORTANT_TOAST_TYPES.has(payload.type as ShopNotificationType)
+  );
+}
 
 function buildToast(payload: ShopNotificationPayload): ToastNotification {
   return {
@@ -48,6 +62,12 @@ export function ShopNotificationListener() {
   const [authVersion, setAuthVersion] = useState(0);
   const addFromShopNotification = useNotificationStore(
     (state) => state.addFromShopNotification
+  );
+  const fetchNotifications = useNotificationStore(
+    (state) => state.fetchNotifications
+  );
+  const fetchUnreadCount = useNotificationStore(
+    (state) => state.fetchUnreadCount
   );
   const timersRef = useRef(new Map<string, ReturnType<typeof setTimeout>>());
 
@@ -99,6 +119,8 @@ export function ShopNotificationListener() {
     };
 
     const startConnection = async () => {
+      await Promise.allSettled([fetchNotifications(), fetchUnreadCount()]);
+
       connection = new HubConnectionBuilder()
         .withUrl(HUB_URL, {
           accessTokenFactory: () => getStoredPonPonJwt() ?? "",
@@ -115,7 +137,9 @@ export function ShopNotificationListener() {
         "shopNotification",
         (payload: ShopNotificationPayload) => {
           addFromShopNotification(payload);
-          showToast(payload);
+          if (shouldShowToast(payload)) {
+            showToast(payload);
+          }
         }
       );
 
@@ -139,7 +163,13 @@ export function ShopNotificationListener() {
         void connection.stop();
       }
     };
-  }, [authVersion, addFromShopNotification, dismissToast]);
+  }, [
+    authVersion,
+    addFromShopNotification,
+    dismissToast,
+    fetchNotifications,
+    fetchUnreadCount,
+  ]);
 
   useEffect(() => {
     const timers = timersRef.current;
