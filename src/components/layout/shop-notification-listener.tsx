@@ -46,10 +46,10 @@ function shouldShowToast(payload: ShopNotificationPayload): boolean {
 
 function buildToast(payload: ShopNotificationPayload): ToastNotification {
   return {
-    id:
-      typeof crypto !== "undefined" && "randomUUID" in crypto
-        ? crypto.randomUUID()
-        : `${Date.now()}-${Math.random()}`,
+    id: [
+      payload.type ?? "shop",
+      payload.orderId ?? payload.orderNumber ?? payload.id ?? "notification",
+    ].join(":"),
     title: getShopNotificationTitle(payload),
     message: getShopNotificationDescription(payload),
     orderNumber: payload.orderNumber,
@@ -109,7 +109,14 @@ export function ShopNotificationListener({ hubUrl }: { hubUrl: string }) {
 
     const showToast = (payload: ShopNotificationPayload) => {
       const toast = buildToast(payload);
-      setToasts((items) => [toast, ...items].slice(0, 3));
+      const existingTimer = timersRef.current.get(toast.id);
+      if (existingTimer) {
+        clearTimeout(existingTimer);
+      }
+
+      setToasts((items) =>
+        [toast, ...items.filter((item) => item.id !== toast.id)].slice(0, 3)
+      );
 
       const timer = setTimeout(() => {
         dismissToast(toast.id);
@@ -190,7 +197,7 @@ export function ShopNotificationListener({ hubUrl }: { hubUrl: string }) {
   }
 
   return (
-    <div className="pointer-events-none fixed left-0 right-0 top-16 z-[70] flex flex-col items-center gap-2 px-3">
+    <div className="pointer-events-none fixed left-0 right-0 top-3 z-[70] flex flex-col items-center gap-2 px-3">
       {toasts.map((toast) => (
         <div
           key={toast.id}
