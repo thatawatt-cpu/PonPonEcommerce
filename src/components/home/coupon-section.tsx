@@ -14,6 +14,7 @@ interface HomeCoupon {
   value: string;
   title: string;
   detail: string;
+  minimumLabel: string;
   code: string;
   isClaimed: boolean;
   canClaim: boolean;
@@ -24,8 +25,9 @@ const fallbackCoupons: HomeCoupon[] = [
   {
     id: "welcome50",
     value: "฿50",
-    title: "ลดทันที",
-    detail: "เมื่อช้อปครบ ฿499",
+    title: "ส่วนลด 50 ฿",
+    detail: "เฉพาะร้านที่ไม่เคยลอง",
+    minimumLabel: "ขั้นต่ำ 499 ฿",
     code: "PONPON50",
     isClaimed: false,
     canClaim: true,
@@ -36,6 +38,7 @@ const fallbackCoupons: HomeCoupon[] = [
     value: "FREE",
     title: "ส่งฟรี",
     detail: "เมื่อช้อปครบ ฿399",
+    minimumLabel: "ขั้นต่ำ 399 ฿",
     code: "FREESHIP",
     isClaimed: false,
     canClaim: true,
@@ -70,16 +73,27 @@ function getCouponValue(coupon: ApiCouponListItem): string {
   return `฿${amount.toLocaleString("th-TH")}`;
 }
 
-function getMinimumSpendText(coupon: ApiCouponListItem): string {
-  const amount =
+function getMinimumAmount(coupon: ApiCouponListItem): number | null {
+  return (
     asNumber(coupon.minimumSpend) ??
     asNumber(coupon.minimumSubtotal) ??
     asNumber(coupon.minimumOrderAmount) ??
-    asNumber(coupon.minOrderAmount);
+    asNumber(coupon.minOrderAmount)
+  );
+}
 
+function getMinimumSpendText(coupon: ApiCouponListItem): string {
+  const amount = getMinimumAmount(coupon);
   return amount && amount > 0
     ? `เมื่อช้อปครบ ฿${amount.toLocaleString("th-TH")}`
     : "ใช้ได้ตอนชำระเงิน";
+}
+
+function getMinimumLabel(coupon: ApiCouponListItem): string {
+  const amount = getMinimumAmount(coupon);
+  return amount && amount > 0
+    ? `ขั้นต่ำ ${amount.toLocaleString("th-TH")} ฿`
+    : "ไม่มีขั้นต่ำ";
 }
 
 function mapApiCoupon(coupon: ApiCouponListItem): HomeCoupon | null {
@@ -96,6 +110,7 @@ function mapApiCoupon(coupon: ApiCouponListItem): HomeCoupon | null {
     value: getCouponValue(coupon),
     title,
     detail: coupon.description || getMinimumSpendText(coupon),
+    minimumLabel: getMinimumLabel(coupon),
     code: coupon.code,
     isClaimed: coupon.isClaimed === true,
     canClaim: coupon.canClaim !== false,
@@ -169,43 +184,48 @@ export function CouponSection({ coupons: apiCoupons = [] }: CouponSectionProps) 
           return (
             <article
               key={coupon.id}
-              className="home-panel-shadow relative flex min-w-[18rem] flex-1 overflow-hidden rounded-card bg-white ring-1 ring-brand/10 md:min-w-0"
+              className="home-panel-shadow relative flex min-h-[10.25rem] min-w-[20.5rem] flex-1 overflow-hidden rounded-[1.4rem] bg-[#ffe6ec] p-2 md:min-w-0"
             >
-              <div className="flex w-24 shrink-0 flex-col items-center justify-center bg-brand px-2 py-4 text-center text-white">
-                <span className="text-xl font-extrabold leading-none">
-                  {coupon.value}
-                </span>
-                <span className="mt-1 text-[10px] font-bold text-white/80">
-                  {coupon.title}
-                </span>
-              </div>
-              <div className="flex min-w-0 flex-1 items-center justify-between gap-2 px-3 py-3">
-                <div className="min-w-0">
-                  <p className="text-sm font-extrabold text-ink">
-                    {coupon.detail}
-                  </p>
-                  <p className="mt-0.5 text-[10px] font-semibold tracking-wide text-ink-soft">
-                    CODE: {coupon.code}
-                  </p>
+              <span className="absolute -left-3 top-1/2 z-20 h-8 w-8 -translate-y-1/2 rounded-full bg-surface-muted" />
+              <div className="relative flex w-full overflow-hidden rounded-[1.15rem] bg-white">
+                <div className="flex w-[8.5rem] shrink-0 flex-col items-center justify-center bg-brand px-3 py-4 text-center text-white">
+                  <span className="text-[2.15rem] font-black leading-none">
+                    {coupon.value}
+                  </span>
+                  <span className="mt-3 text-sm font-extrabold leading-tight text-white">
+                    {coupon.minimumLabel}
+                  </span>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => claim(coupon.id)}
-                  disabled={!canClaim}
-                  className={cn(
-                    "flex shrink-0 items-center justify-center rounded-full text-xs font-bold transition",
-                    isClaimed
-                      ? "h-9 w-9 bg-[#d9fbe7] text-[#12a85a]"
-                      : canClaim
-                        ? "brand-button h-9 px-3 text-white"
-                        : "h-9 px-3 bg-surface-muted text-ink-soft"
-                  )}
-                  aria-label={isClaimed ? "เก็บคูปองแล้ว" : "เก็บคูปอง"}
-                >
-                  {isClaimed ? <Check className="h-4 w-4" /> : "เก็บ"}
-                </button>
+                <div className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_4.25rem] items-center gap-3 px-4 py-4">
+                  <div className="min-w-0">
+                    <p className="truncate text-lg font-black text-ink">
+                      {coupon.title}
+                    </p>
+                    <p className="mt-2 line-clamp-2 text-sm font-extrabold leading-snug text-ink-soft">
+                      {coupon.detail}
+                    </p>
+                    <p className="mt-3 truncate text-sm font-black uppercase text-ink-soft">
+                      CODE {coupon.code}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => claim(coupon.id)}
+                    disabled={!canClaim}
+                    className={cn(
+                      "flex h-14 w-14 shrink-0 items-center justify-center rounded-full text-sm font-extrabold transition active:scale-95 disabled:shadow-none",
+                      isClaimed
+                        ? "bg-emerald-100 text-emerald-600 shadow-[0_0_0_6px_rgba(16,185,129,0.12)]"
+                        : canClaim
+                          ? "bg-brand text-white shadow-[0_0_0_6px_rgba(247,18,35,0.12),0_12px_24px_rgba(247,18,35,0.24)]"
+                          : "bg-surface-muted text-ink-soft"
+                    )}
+                    aria-label={isClaimed ? "เก็บคูปองแล้ว" : "เก็บคูปอง"}
+                  >
+                    {isClaimed ? <Check className="h-5 w-5" /> : "เก็บ"}
+                  </button>
+                </div>
               </div>
-              <span className="absolute -left-2 top-1/2 h-4 w-4 -translate-y-1/2 rounded-full bg-surface-muted" />
             </article>
           );
         })}

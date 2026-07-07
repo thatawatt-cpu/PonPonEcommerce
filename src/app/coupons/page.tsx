@@ -31,6 +31,7 @@ interface CouponItem {
   code: string;
   value: string;
   minimumSpend: string;
+  minimumLabel: string;
   expireAt: string;
   status: CouponStatus;
   kind: CouponKind;
@@ -45,6 +46,7 @@ const fallbackCoupons: CouponItem[] = [
     code: "PONPON50",
     value: "฿50",
     minimumSpend: "ซื้อครบ ฿499",
+    minimumLabel: "ขั้นต่ำ 499 ฿",
     expireAt: "หมดอายุ 15 มิ.ย. 2569",
     status: "available",
     kind: "discount",
@@ -57,6 +59,7 @@ const fallbackCoupons: CouponItem[] = [
     code: "FREESHIP",
     value: "FREE",
     minimumSpend: "ซื้อครบ ฿399",
+    minimumLabel: "ขั้นต่ำ 399 ฿",
     expireAt: "หมดอายุ 18 มิ.ย. 2569",
     status: "available",
     kind: "shipping",
@@ -69,6 +72,7 @@ const fallbackCoupons: CouponItem[] = [
     code: "PONFRIEND50",
     value: "฿50",
     minimumSpend: "ซื้อครบ ฿299",
+    minimumLabel: "ขั้นต่ำ 299 ฿",
     expireAt: "หมดอายุ 30 วันหลังรับคูปอง",
     status: "available",
     kind: "discount",
@@ -81,6 +85,7 @@ const fallbackCoupons: CouponItem[] = [
     code: "PONTHANK50",
     value: "฿50",
     minimumSpend: "ซื้อครบ ฿299",
+    minimumLabel: "ขั้นต่ำ 299 ฿",
     expireAt: "หมดอายุ 30 วันหลังได้รับรางวัล",
     status: "available",
     kind: "gift",
@@ -93,6 +98,7 @@ const fallbackCoupons: CouponItem[] = [
     code: "COOKIE20",
     value: "฿20",
     minimumSpend: "เฉพาะคุกกี้",
+    minimumLabel: "เฉพาะคุกกี้",
     expireAt: "หมดอายุ 20 มิ.ย. 2569",
     status: "available",
     kind: "discount",
@@ -105,6 +111,7 @@ const fallbackCoupons: CouponItem[] = [
     code: "MILKTEA10",
     value: "฿10",
     minimumSpend: "เฉพาะชานม",
+    minimumLabel: "เฉพาะชานม",
     expireAt: "หมดอายุ 20 มิ.ย. 2569",
     status: "available",
     kind: "discount",
@@ -117,6 +124,7 @@ const fallbackCoupons: CouponItem[] = [
     code: "LIP15",
     value: "฿15",
     minimumSpend: "เฉพาะลิปทินต์",
+    minimumLabel: "เฉพาะลิปทินต์",
     expireAt: "หมดอายุ 22 มิ.ย. 2569",
     status: "available",
     kind: "discount",
@@ -129,6 +137,7 @@ const fallbackCoupons: CouponItem[] = [
     code: "BUNDLE20",
     value: "฿20",
     minimumSpend: "คุกกี้ + ชานม",
+    minimumLabel: "คุกกี้ + ชานม",
     expireAt: "หมดอายุ 20 มิ.ย. 2569",
     status: "available",
     kind: "gift",
@@ -141,6 +150,7 @@ const fallbackCoupons: CouponItem[] = [
     code: "LOYAL10",
     value: "10%",
     minimumSpend: "ใช้แล้ว",
+    minimumLabel: "ใช้แล้ว",
     expireAt: "ใช้เมื่อ 8 มิ.ย. 2569",
     status: "used",
     kind: "discount",
@@ -153,6 +163,7 @@ const fallbackCoupons: CouponItem[] = [
     code: "GIFT30",
     value: "฿30",
     minimumSpend: "ซื้อครบ ฿299",
+    minimumLabel: "ขั้นต่ำ 299 ฿",
     expireAt: "หมดอายุ 1 มิ.ย. 2569",
     status: "expired",
     kind: "gift",
@@ -214,16 +225,27 @@ function getCouponValue(coupon: ApiCouponListItem): string {
   return `฿${amount.toLocaleString("th-TH")}`;
 }
 
-function getMinimumSpendText(coupon: ApiCouponListItem): string {
-  const amount =
+function getMinimumAmount(coupon: ApiCouponListItem): number | null {
+  return (
     asNumber(coupon.minimumSpend) ??
     asNumber(coupon.minimumSubtotal) ??
     asNumber(coupon.minimumOrderAmount) ??
-    asNumber(coupon.minOrderAmount);
+    asNumber(coupon.minOrderAmount)
+  );
+}
 
+function getMinimumSpendText(coupon: ApiCouponListItem): string {
+  const amount = getMinimumAmount(coupon);
   return amount && amount > 0
     ? `ซื้อครบ ฿${amount.toLocaleString("th-TH")}`
     : "ใช้ได้ตอนชำระเงิน";
+}
+
+function getMinimumLabel(coupon: ApiCouponListItem): string {
+  const amount = getMinimumAmount(coupon);
+  return amount && amount > 0
+    ? `ขั้นต่ำ ${amount.toLocaleString("th-TH")} ฿`
+    : "ไม่มีขั้นต่ำ";
 }
 
 function getExpireText(coupon: ApiCouponListItem): string {
@@ -268,6 +290,7 @@ function mapApiCoupon(coupon: ApiCouponListItem): CouponItem | null {
     code: coupon.code,
     value: getCouponValue(coupon),
     minimumSpend: getMinimumSpendText(coupon),
+    minimumLabel: getMinimumLabel(coupon),
     expireAt: getExpireText(coupon),
     status,
     kind,
@@ -377,7 +400,6 @@ export default function CouponsPage({
 
         <div className="space-y-3">
           {filteredCoupons.map((coupon) => {
-            const Icon = coupon.icon;
             const isAvailable = coupon.status === "available";
             const isCopied = copiedCode === coupon.code;
 
@@ -385,92 +407,84 @@ export default function CouponsPage({
               <Card
                 key={coupon.id}
                 className={cn(
-                  "relative overflow-hidden",
+                  "relative overflow-hidden bg-[#ffe6ec] p-2",
                   !isAvailable && "opacity-75",
                 )}
               >
-                <div className="flex">
+                <span className="absolute -left-3 top-1/2 z-20 h-8 w-8 -translate-y-1/2 rounded-full bg-surface-muted" />
+                <div className="relative flex min-h-[10.25rem] overflow-hidden rounded-[1.15rem] bg-white">
                   <div
                     className={cn(
-                      "flex w-24 shrink-0 flex-col items-center justify-center px-3 py-5 text-center text-white",
+                      "flex w-[8.5rem] shrink-0 flex-col items-center justify-center px-3 py-4 text-center text-white",
                       isAvailable ? "bg-brand" : "bg-ink-soft",
                     )}
                   >
-                    <Icon className="mb-2 h-5 w-5" />
-                    <span className="text-xl font-extrabold leading-none">
+                    <span className="text-[2.15rem] font-black leading-none">
                       {coupon.value}
                     </span>
-                    <span className="mt-1 text-[10px] font-bold text-white/80">
-                      {coupon.minimumSpend}
+                    <span className="mt-3 text-sm font-extrabold leading-tight text-white">
+                      {coupon.minimumLabel}
                     </span>
                   </div>
 
-                  <div className="min-w-0 flex-1 px-3 py-3.5">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <h2 className="truncate text-sm font-extrabold text-ink">
-                          {coupon.title}
-                        </h2>
-                        <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-ink-soft">
-                          {coupon.description}
-                        </p>
-                      </div>
-                      <span
-                        className={cn(
-                          "shrink-0 rounded-full px-2.5 py-1 text-[10px] font-extrabold",
-                          statusClass[coupon.status],
-                        )}
-                      >
-                        {statusLabel[coupon.status]}
-                      </span>
-                    </div>
-
-                    <div className="mt-3 flex items-center justify-between gap-2 rounded-2xl bg-[#fff8f6] px-3 py-2">
-                      <div className="min-w-0">
-                        <p className="text-[10px] font-bold text-ink-soft">
-                          CODE
-                        </p>
-                        <p className="truncate text-xs font-extrabold tracking-wide text-ink">
-                          {coupon.code}
-                        </p>
-                      </div>
-                      {isAvailable ? (
-                        <div className="flex shrink-0 items-center gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => copyCode(coupon.code)}
-                            aria-label={`คัดลอกโค้ด ${coupon.code}`}
-                            className={cn(
-                              "flex h-8 w-8 items-center justify-center rounded-full transition",
-                              isCopied
-                                ? "bg-success-soft text-success"
-                                : "bg-white text-brand shadow-sm ring-1 ring-brand/10",
-                            )}
-                          >
-                            {isCopied ? (
-                              <Check className="h-3.5 w-3.5" />
-                            ) : (
-                              <Copy className="h-3.5 w-3.5" />
-                            )}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => applyCouponNow(coupon.code)}
-                            className="brand-button flex h-8 items-center rounded-full px-3 text-xs font-extrabold text-white"
-                          >
-                            ใช้เลย
-                          </button>
+                  <div className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-4 py-4">
+                    <div className="min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <h2 className="truncate text-lg font-black text-ink">
+                            {coupon.title}
+                          </h2>
+                          <p className="mt-2 line-clamp-2 text-sm font-extrabold leading-snug text-ink-soft">
+                            {coupon.description}
+                          </p>
                         </div>
-                      ) : null}
+                        <span
+                          className={cn(
+                            "shrink-0 rounded-full px-2.5 py-1 text-[10px] font-extrabold",
+                            statusClass[coupon.status],
+                          )}
+                        >
+                          {statusLabel[coupon.status]}
+                        </span>
+                      </div>
+                      <p className="mt-3 truncate text-sm font-black uppercase text-ink-soft">
+                        CODE {coupon.code}
+                      </p>
+                      <p className="mt-2 flex items-center gap-1 text-[10px] font-semibold text-ink-soft">
+                        <Clock3 className="h-3.5 w-3.5" />
+                        {coupon.expireAt}
+                      </p>
                     </div>
-
-                    <p className="mt-2 flex items-center gap-1 text-[10px] font-semibold text-ink-soft">
-                      <Clock3 className="h-3.5 w-3.5" />
-                      {coupon.expireAt}
-                    </p>
+                    {isAvailable ? (
+                      <div className="flex shrink-0 flex-col items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => copyCode(coupon.code)}
+                          aria-label={`คัดลอกโค้ด ${coupon.code}`}
+                          className={cn(
+                            "flex h-9 w-9 items-center justify-center rounded-full transition",
+                            isCopied
+                              ? "bg-success-soft text-success"
+                              : "bg-white text-brand shadow-sm ring-1 ring-brand/10",
+                          )}
+                        >
+                          {isCopied ? (
+                            <Check className="h-4 w-4" />
+                          ) : (
+                            <Copy className="h-4 w-4" />
+                          )}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => applyCouponNow(coupon.code)}
+                          className="flex h-14 w-14 items-center justify-center rounded-full bg-brand text-sm font-extrabold text-white shadow-[0_0_0_6px_rgba(247,18,35,0.12),0_12px_24px_rgba(247,18,35,0.24)] transition active:scale-95"
+                        >
+                          ใช้เลย
+                        </button>
+                      </div>
+                    ) : null}
                   </div>
                 </div>
-                <span className="absolute -left-2 top-1/2 h-4 w-4 -translate-y-1/2 rounded-full bg-surface-muted" />
               </Card>
             );
           })}
