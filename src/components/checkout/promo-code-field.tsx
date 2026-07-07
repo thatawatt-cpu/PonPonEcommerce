@@ -56,8 +56,10 @@ export function PromoCodeField({
             return (
               <div
                 key={coupon.code}
-                className={`flex min-h-11 items-center gap-2 rounded-2xl px-3 py-2 text-white shadow-sm ${
-                  isFreeShipping ? "bg-emerald-600" : "bg-brand"
+                className={`flex min-h-11 items-center gap-2 rounded-2xl border px-3 py-2 shadow-sm ${
+                  isFreeShipping
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                    : "border-brand/15 bg-brand-soft text-brand"
                 }`}
               >
                 <div className="min-w-0 flex-1">
@@ -66,18 +68,13 @@ export function PromoCodeField({
                   </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-1.5">
-                  <span
-                    className={`rounded-full bg-white px-3 py-1 text-xs font-extrabold ${
-                      isFreeShipping ? "text-emerald-700" : "text-brand"
-                    }`}
-                  >
-                    ใช้
-                  </span>
                   <button
                     type="button"
                     onClick={() => onRemove(coupon.code)}
                     aria-label={`ลบคูปอง ${coupon.name || coupon.code}`}
-                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/18 text-white transition active:scale-95"
+                    className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white transition active:scale-95 ${
+                      isFreeShipping ? "text-emerald-700" : "text-brand"
+                    }`}
                   >
                     <X className="h-3.5 w-3.5" />
                   </button>

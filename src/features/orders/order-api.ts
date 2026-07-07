@@ -11,6 +11,48 @@ import type {
   ApiOrderDetail,
 } from "@/types/api";
 
+interface ApiErrorPayload {
+  code?: string;
+  message?: string;
+  error?: string;
+  details?: unknown;
+}
+
+export class ApiRequestError extends Error {
+  code?: string;
+  details?: unknown;
+  status: number;
+
+  constructor(input: {
+    message: string;
+    status: number;
+    code?: string;
+    details?: unknown;
+  }) {
+    super(input.message);
+    this.name = "ApiRequestError";
+    this.status = input.status;
+    this.code = input.code;
+    this.details = input.details;
+  }
+}
+
+async function readApiRequestError(
+  response: Response,
+  fallbackMessage: string
+): Promise<ApiRequestError> {
+  const err = (await response.json().catch(() => null)) as
+    | ApiErrorPayload
+    | null;
+
+  return new ApiRequestError({
+    status: response.status,
+    code: err?.code,
+    details: err?.details,
+    message: err?.message ?? err?.error ?? fallbackMessage,
+  });
+}
+
 export async function createOrder(
   body: ApiCreateOrderRequest
 ): Promise<ApiCreateOrderResponse> {
@@ -21,10 +63,9 @@ export async function createOrder(
   });
 
   if (!response.ok) {
-    const err = await response.json().catch(() => null);
-    throw new Error(
-      (err as { message?: string } | null)?.message ??
-        `สร้างออเดอร์ไม่สำเร็จ (${response.status})`
+    throw await readApiRequestError(
+      response,
+      `สร้างออเดอร์ไม่สำเร็จ (${response.status})`
     );
   }
 
@@ -41,11 +82,9 @@ export async function fetchPricingPreview(
   });
 
   if (!response.ok) {
-    const err = await response.json().catch(() => null);
-    throw new Error(
-      (err as { message?: string; error?: string } | null)?.message ??
-        (err as { error?: string } | null)?.error ??
-        `คำนวณราคาไม่สำเร็จ (${response.status})`
+    throw await readApiRequestError(
+      response,
+      `คำนวณราคาไม่สำเร็จ (${response.status})`
     );
   }
 

@@ -37,7 +37,11 @@ import {
   type CartSelectionCheckoutItem,
 } from "@/features/checkout/cart-selection-checkout";
 import { fetchCustomerAddresses } from "@/features/customer-addresses/customer-address-api";
-import { createOrder, fetchPricingPreview } from "@/features/orders/order-api";
+import {
+  ApiRequestError,
+  createOrder,
+  fetchPricingPreview,
+} from "@/features/orders/order-api";
 import { fetchShippingRates } from "@/features/shipping/shipping-api";
 import {
   bahtToSatang,
@@ -262,6 +266,73 @@ function storePendingRedirectPayment(input: {
     PENDING_PAYMENT_STORAGE_KEY,
     JSON.stringify(input)
   );
+}
+
+const COUPON_ERROR_MESSAGES: Record<string, string> = {
+  coupon_invalid: "คูปองนี้ไม่ถูกต้อง",
+  coupon_duplicate: "คูปองนี้ถูกใช้แล้ว",
+  coupon_inactive_or_quota_exhausted: "คูปองนี้หมดสิทธิ์หรือไม่พร้อมใช้งาน",
+  coupon_customer_usage_limit_reached: "คุณใช้คูปองนี้ครบสิทธิ์แล้ว",
+  coupon_cannot_combine_with_flash_sale:
+    "คูปองนี้ใช้ร่วมกับสินค้า Flash Sale ไม่ได้",
+  coupon_cannot_combine_with_promotion:
+    "คูปองนี้ใช้ร่วมกับโปรโมชันนี้ไม่ได้",
+  coupon_cannot_stack_with_coupon: "คูปองนี้ใช้ร่วมกับคูปองอื่นไม่ได้",
+  coupon_stack_limit_exceeded:
+    "ใช้คูปองได้สูงสุด 2 ใบ: คูปองส่วนลด 1 ใบ และคูปองส่งฟรี 1 ใบ",
+  coupon_customer_not_eligible: "บัญชีนี้ยังไม่เข้าเงื่อนไขคูปองนี้",
+  coupon_product_not_eligible: "คูปองนี้ใช้กับสินค้าที่เลือกไม่ได้",
+  coupon_payment_method_not_eligible:
+    "คูปองนี้ใช้กับช่องทางชำระเงินที่เลือกไม่ได้",
+  coupon_shipping_channel_not_eligible:
+    "คูปองนี้ใช้กับขนส่งที่เลือกไม่ได้",
+  coupon_sales_channel_not_eligible: "คูปองนี้ใช้กับช่องทางขายนี้ไม่ได้",
+  coupon_condition_not_eligible: "ออเดอร์นี้ยังไม่เข้าเงื่อนไขคูปอง",
+  coupon_invalid_discount_type: "ประเภทส่วนลดของคูปองนี้ไม่ถูกต้อง",
+  coupon_quota_no_longer_available: "คูปองนี้เพิ่งหมดสิทธิ์แล้ว",
+};
+
+function getErrorDetails(err: ApiRequestError): Record<string, unknown> | null {
+  return err.details && typeof err.details === "object"
+    ? (err.details as Record<string, unknown>)
+    : null;
+}
+
+function getNumberDetail(
+  details: Record<string, unknown> | null,
+  key: string
+): number | null {
+  const value = details?.[key];
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
+function getCouponErrorMessage(
+  err: unknown,
+  fallbackMessage =
+    "ใช้คูปองได้สูงสุด 2 ใบ: คูปองส่วนลด 1 ใบ และคูปองส่งฟรี 1 ใบ"
+): string {
+  if (err instanceof ApiRequestError && err.code) {
+    const details = getErrorDetails(err);
+
+    if (err.code === "coupon_minimum_subtotal_not_met") {
+      const remainingSubtotal = getNumberDetail(details, "remainingSubtotal");
+      if (remainingSubtotal != null && remainingSubtotal > 0) {
+        return `ซื้อเพิ่มอีก ${remainingSubtotal.toLocaleString("th-TH")} บาทเพื่อใช้คูปองนี้`;
+      }
+      return "ยอดสินค้ายังไม่ถึงขั้นต่ำของคูปองนี้";
+    }
+
+    return COUPON_ERROR_MESSAGES[err.code] ?? err.message;
+  }
+
+  return err instanceof Error
+    ? err.message
+    : fallbackMessage;
 }
 
 export default function CheckoutPage({
@@ -688,11 +759,7 @@ export default function CheckoutPage({
           if (cancelled) return;
           setPricingPreview(null);
           setPromoError(true);
-          setPromoMessage(
-            err instanceof Error
-              ? err.message
-              : "ใช้คูปองได้สูงสุด 2 ใบ: คูปองส่วนลด 1 ใบ และคูปองส่งฟรี 1 ใบ"
-          );
+          setPromoMessage(getCouponErrorMessage(err));
         })
         .finally(() => {
           if (!cancelled) {
@@ -979,7 +1046,7 @@ export default function CheckoutPage({
       throw new Error("Unsupported payment method.");
     } catch (err) {
       setPlaceError(
-        err instanceof Error ? err.message : "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง",
+        getCouponErrorMessage(err, "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง")
       );
       setRedirecting(false);
       setPlacing(false);

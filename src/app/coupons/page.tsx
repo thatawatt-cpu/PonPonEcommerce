@@ -7,7 +7,6 @@ import {
   Check,
   Clock3,
   Copy,
-  ShoppingBag,
   Sparkles,
   TicketPercent,
   Truck,
@@ -40,139 +39,6 @@ interface CouponItem {
   kind: CouponKind;
   icon: LucideIcon;
 }
-
-const fallbackCoupons: CouponItem[] = [
-  {
-    id: "welcome50",
-    title: "คูปองส่วนลด ฿50",
-    description: "ใช้ได้กับสินค้าทุกหมวด เมื่อยอดครบตามเงื่อนไข",
-    code: "PONPON50",
-    value: "฿50",
-    minimumSpend: "ซื้อครบ ฿499",
-    minimumLabel: "ขั้นต่ำ 499 ฿",
-    expireAt: "หมดอายุ 15 มิ.ย. 2569",
-    status: "available",
-    kind: "discount",
-    icon: TicketPercent,
-  },
-  {
-    id: "freeship",
-    title: "ส่งฟรีเมื่อซื้อครบ",
-    description: "ลดค่าจัดส่งสำหรับออเดอร์ที่เข้าเงื่อนไข",
-    code: "FREESHIP",
-    value: "FREE",
-    minimumSpend: "ซื้อครบ ฿399",
-    minimumLabel: "ขั้นต่ำ 399 ฿",
-    expireAt: "หมดอายุ 18 มิ.ย. 2569",
-    status: "available",
-    kind: "shipping",
-    icon: Truck,
-  },
-  {
-    id: "ref-friend",
-    title: "คูปองเพื่อนใหม่ ลด ฿50",
-    description: "รับจากการใช้รหัสแนะนำเพื่อน ใช้ได้เมื่อยอดสินค้าครบ ฿299",
-    code: "PONFRIEND50",
-    value: "฿50",
-    minimumSpend: "ซื้อครบ ฿299",
-    minimumLabel: "ขั้นต่ำ 299 ฿",
-    expireAt: "หมดอายุ 30 วันหลังรับคูปอง",
-    status: "available",
-    kind: "discount",
-    icon: TicketPercent,
-  },
-  {
-    id: "ref-inviter",
-    title: "รางวัลแนะนำเพื่อน ลด ฿50",
-    description: "รับเมื่อเพื่อนที่แนะนำสั่งซื้อสำเร็จ",
-    code: "PONTHANK50",
-    value: "฿50",
-    minimumSpend: "ซื้อครบ ฿299",
-    minimumLabel: "ขั้นต่ำ 299 ฿",
-    expireAt: "หมดอายุ 30 วันหลังได้รับรางวัล",
-    status: "available",
-    kind: "gift",
-    icon: Sparkles,
-  },
-  {
-    id: "cookie20",
-    title: "คุกกี้ลดทันที ฿20",
-    description: "ใช้ได้เฉพาะคุกกี้เนยสดป๋องป๋อง",
-    code: "COOKIE20",
-    value: "฿20",
-    minimumSpend: "เฉพาะคุกกี้",
-    minimumLabel: "เฉพาะคุกกี้",
-    expireAt: "หมดอายุ 20 มิ.ย. 2569",
-    status: "available",
-    kind: "discount",
-    icon: TicketPercent,
-  },
-  {
-    id: "milktea10",
-    title: "ชานมลดทันที ฿10",
-    description: "ใช้ได้เฉพาะชานมไข่มุกป๋องป๋อง",
-    code: "MILKTEA10",
-    value: "฿10",
-    minimumSpend: "เฉพาะชานม",
-    minimumLabel: "เฉพาะชานม",
-    expireAt: "หมดอายุ 20 มิ.ย. 2569",
-    status: "available",
-    kind: "discount",
-    icon: TicketPercent,
-  },
-  {
-    id: "lip15",
-    title: "ลิปทินต์ลดทันที ฿15",
-    description: "ใช้ได้เฉพาะลิปทินต์ป๋องป๋อง",
-    code: "LIP15",
-    value: "฿15",
-    minimumSpend: "เฉพาะลิปทินต์",
-    minimumLabel: "เฉพาะลิปทินต์",
-    expireAt: "หมดอายุ 22 มิ.ย. 2569",
-    status: "available",
-    kind: "discount",
-    icon: TicketPercent,
-  },
-  {
-    id: "bundle20",
-    title: "ซื้อคู่แล้วคุ้ม",
-    description: "ลด ฿20 เมื่อมีคุกกี้และชานมในออเดอร์เดียวกัน",
-    code: "BUNDLE20",
-    value: "฿20",
-    minimumSpend: "คุกกี้ + ชานม",
-    minimumLabel: "คุกกี้ + ชานม",
-    expireAt: "หมดอายุ 20 มิ.ย. 2569",
-    status: "available",
-    kind: "gift",
-    icon: Sparkles,
-  },
-  {
-    id: "old10",
-    title: "ลูกค้าประจำลด 10%",
-    description: "ใช้กับออเดอร์ล่าสุดเรียบร้อยแล้ว",
-    code: "LOYAL10",
-    value: "10%",
-    minimumSpend: "ใช้แล้ว",
-    minimumLabel: "ใช้แล้ว",
-    expireAt: "ใช้เมื่อ 8 มิ.ย. 2569",
-    status: "used",
-    kind: "discount",
-    icon: TicketPercent,
-  },
-  {
-    id: "expiredgift",
-    title: "ของฝากสุดคุ้ม",
-    description: "คูปองนี้หมดอายุแล้ว รอรับดีลใหม่เร็ว ๆ นี้",
-    code: "GIFT30",
-    value: "฿30",
-    minimumSpend: "ซื้อครบ ฿299",
-    minimumLabel: "ขั้นต่ำ 299 ฿",
-    expireAt: "หมดอายุ 1 มิ.ย. 2569",
-    status: "expired",
-    kind: "gift",
-    icon: ShoppingBag,
-  },
-];
 
 const filters: { value: CouponFilter; label: string }[] = [
   { value: "all", label: "ทั้งหมด" },
@@ -312,20 +178,23 @@ export default function CouponsPage({
   const [activeFilter, setActiveFilter] = useState<CouponFilter>("available");
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [remoteCoupons, setRemoteCoupons] = useState<ApiCouponListItem[]>([]);
+  const [couponsLoaded, setCouponsLoaded] = useState(false);
   const coupons = useMemo(() => {
-    const apiCoupons = remoteCoupons
+    return remoteCoupons
       .map(mapApiCoupon)
       .filter((coupon): coupon is CouponItem => Boolean(coupon));
-    return apiCoupons.length > 0 ? apiCoupons : fallbackCoupons;
   }, [remoteCoupons]);
 
   useEffect(() => {
     let cancelled = false;
-    fetchMyCoupons().then((items) => {
-      if (!cancelled && items.length > 0) {
+    fetchMyCoupons()
+      .then((items) => {
+        if (cancelled) return;
         setRemoteCoupons(items);
-      }
-    });
+      })
+      .finally(() => {
+        if (!cancelled) setCouponsLoaded(true);
+      });
 
     return () => {
       cancelled = true;
@@ -414,7 +283,20 @@ export default function CouponsPage({
           </div>
         </Card>
 
-        <div className="space-y-3">
+        {!couponsLoaded ? (
+          <Card className="px-4 py-8 text-center">
+            <TicketPercent className="mx-auto h-8 w-8 text-ink-soft/40" />
+            <p className="mt-3 text-sm font-extrabold text-ink">
+              กำลังโหลดคูปอง
+            </p>
+            <p className="mt-1 text-xs text-ink-soft">
+              ระบบกำลังดึงคูปองของคุณจากร้าน
+            </p>
+          </Card>
+        ) : null}
+
+        {couponsLoaded ? (
+          <div className="space-y-3">
           {filteredCoupons.map((coupon) => {
             const Icon = coupon.icon;
             const isAvailable = coupon.status === "available";
@@ -513,9 +395,10 @@ export default function CouponsPage({
               </Card>
             );
           })}
-        </div>
+          </div>
+        ) : null}
 
-        {filteredCoupons.length === 0 ? (
+        {couponsLoaded && filteredCoupons.length === 0 ? (
           <Card className="px-4 py-10 text-center">
             <TicketPercent className="mx-auto h-8 w-8 text-ink-soft/40" />
             <p className="mt-3 text-sm font-extrabold text-ink">
