@@ -391,6 +391,7 @@ export default function CheckoutPage({
     (canLoadShippingRates && !shippingQuoteResolved) ||
     (previewCanLoad && !pricingPreviewResolved) ||
     pricingPreviewLoading;
+  const apiPaymentMethod = method === "mobile_banking" ? bankType : method;
 
   useEffect(() => {
     let cancelled = false;
@@ -555,7 +556,7 @@ export default function CheckoutPage({
         shippingPhone: shipping.phone.trim(),
         shippingAddress: shipping.address.trim(),
         shippingChannel: selectedShippingRate?.courierCode ?? null,
-        paymentMethod: method,
+        paymentMethod: apiPaymentMethod,
         couponCodes,
         items: items.map((item) => ({
           productId: item.productId,
@@ -607,10 +608,10 @@ export default function CheckoutPage({
     };
   }, [
     checkoutSourceLoaded,
+    apiPaymentMethod,
     couponCodes,
     hydrated,
     items,
-    method,
     previewCanLoad,
     selectedAddress?.email,
     selectedShippingRate?.courierCode,
@@ -731,7 +732,7 @@ export default function CheckoutPage({
         shippingAddress: shipping.address,
         shippingChannel: selectedShippingRate?.courierCode ?? null,
         shippingAmount: shippingFee,
-        paymentMethod: method,
+        paymentMethod: apiPaymentMethod,
         couponCodes,
         description: shipping.note || null,
         items: items.map((item) => ({
