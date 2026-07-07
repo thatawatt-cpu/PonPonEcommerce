@@ -40,6 +40,7 @@ export function createBuyNowCartItem(input: {
 }): CartItem {
   return {
     productId: input.product.id,
+    productSlug: input.product.slug,
     variantId: input.variantId ?? null,
     name: input.product.name,
     price: input.product.price,

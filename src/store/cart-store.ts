@@ -74,6 +74,7 @@ export const useCartStore = create<CartState>()(
                   ? {
                       ...item,
                       quantity: item.quantity + quantity,
+                      productSlug: product.slug || item.productSlug,
                       imageUrl: imageUrl ?? item.imageUrl,
                     }
                   : item
@@ -82,6 +83,7 @@ export const useCartStore = create<CartState>()(
           }
           const newItem: CartItem = {
             productId: product.id,
+            productSlug: product.slug,
             variantId: variantId ?? null,
             name: product.name,
             price: product.price,

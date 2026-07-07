@@ -1,5 +1,6 @@
 export interface CartItem {
   productId: string;
+  productSlug?: string | null;
   variantId?: string | null;
   name: string;
   price: number;

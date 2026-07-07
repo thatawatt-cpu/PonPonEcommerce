@@ -33,7 +33,8 @@ export function CartItem({ item, checked = false, onCheckedChange }: CartItemPro
   if (item.selectedOptions) {
     editParams.set("options", JSON.stringify(item.selectedOptions));
   }
-  const productHref = `/products/${encodeURIComponent(item.productId)}?${editParams.toString()}`;
+  const productPath = item.productSlug || item.productId;
+  const productHref = `/products/${encodeURIComponent(productPath)}?${editParams.toString()}`;
 
   const openProduct = () => {
     router.push(productHref);

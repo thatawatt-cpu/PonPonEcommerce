@@ -7,6 +7,7 @@ import {
   Check,
   Clock3,
   Copy,
+  Loader2,
   Sparkles,
   TicketPercent,
   Truck,
@@ -178,6 +179,7 @@ export default function CouponsPage({
   const router = useRouter();
   const [activeFilter, setActiveFilter] = useState<CouponFilter>("available");
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  const [applyingCode, setApplyingCode] = useState<string | null>(null);
   const [remoteCoupons, setRemoteCoupons] = useState<ApiCouponListItem[]>([]);
   const [couponsLoaded, setCouponsLoaded] = useState(false);
   const coupons = useMemo(() => {
@@ -223,6 +225,8 @@ export default function CouponsPage({
   };
 
   const applyCouponNow = (code: string) => {
+    setApplyingCode(code);
+
     if (returnTo !== "checkout") {
       storePendingCouponCode(code);
       router.push(`/products?coupon=${encodeURIComponent(code)}`);
@@ -290,7 +294,7 @@ export default function CouponsPage({
 
         {!couponsLoaded ? (
           <Card className="px-4 py-8 text-center">
-            <TicketPercent className="mx-auto h-8 w-8 text-ink-soft/40" />
+            <Loader2 className="mx-auto h-8 w-8 animate-spin text-brand" />
             <p className="mt-3 text-sm font-extrabold text-ink">
               กำลังโหลดคูปอง
             </p>
@@ -306,6 +310,7 @@ export default function CouponsPage({
             const Icon = coupon.icon;
             const isAvailable = coupon.status === "available";
             const isCopied = copiedCode === coupon.code;
+            const isApplying = applyingCode === coupon.code;
 
             return (
               <Card
@@ -382,9 +387,14 @@ export default function CouponsPage({
                           <button
                             type="button"
                             onClick={() => applyCouponNow(coupon.code)}
-                            className="brand-button flex h-8 items-center rounded-full px-3 text-xs font-extrabold text-white"
+                            disabled={Boolean(applyingCode)}
+                            className="brand-button flex h-8 items-center rounded-full px-3 text-xs font-extrabold text-white disabled:opacity-70"
                           >
-                            ใช้เลย
+                            {isApplying ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              "ใช้เลย"
+                            )}
                           </button>
                         </div>
                       ) : null}

@@ -279,14 +279,14 @@ export function CouponSection({ coupons: apiCoupons = [] }: CouponSectionProps) 
                   className={cn(
                     "flex h-9 shrink-0 items-center justify-center rounded-full px-3 text-xs font-bold transition",
                     isClaimed
-                      ? "bg-[#d9fbe7] text-[#12a85a]"
+                      ? "brand-button text-white"
                       : canClaim
                         ? "brand-button text-white"
                         : "bg-surface-muted text-ink-soft"
                   )}
                   aria-label={isClaimed ? "ใช้คูปอง" : "เก็บคูปอง"}
                 >
-                  {isClaimed ? "ใช้" : "เก็บ"}
+                  {isClaimed ? "ใช้เลย" : "เก็บ"}
                 </button>
               </div>
               <span className="absolute -left-2 top-1/2 h-4 w-4 -translate-y-1/2 rounded-full bg-surface-muted" />
