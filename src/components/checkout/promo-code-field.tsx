@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { CheckCircle2, ChevronRight, X } from "lucide-react";
+import { ChevronRight, TicketPercent, Truck, X } from "lucide-react";
 
 interface AppliedCouponDisplay {
   code: string;
@@ -20,18 +20,6 @@ interface PromoCodeFieldProps {
   message?: string;
   error?: boolean;
   applying?: boolean;
-}
-
-function formatDiscountAmount(amount: number): string {
-  return `${amount.toLocaleString("th-TH")} บาท`;
-}
-
-function getCouponDiscountText(coupon: AppliedCouponDisplay): string {
-  if (coupon.type === "free_shipping") {
-    return `ลดค่าส่ง ${formatDiscountAmount(coupon.discountAmount)}`;
-  }
-
-  return `ลด ${formatDiscountAmount(coupon.discountAmount)}`;
 }
 
 export function PromoCodeField({
@@ -64,44 +52,48 @@ export function PromoCodeField({
         <div className="mb-3 space-y-1.5">
           {appliedCoupons.map((coupon) => {
             const isFreeShipping = coupon.type === "free_shipping";
+            const Icon = isFreeShipping ? Truck : TicketPercent;
 
             return (
               <div
                 key={coupon.code}
-                className="flex min-h-12 items-center gap-2 rounded-2xl border border-black/[0.06] bg-white px-3 py-2 shadow-sm"
+                className={`grid min-h-[3.625rem] grid-cols-[2.5rem_minmax(0,1fr)_auto] items-center gap-2 rounded-2xl border px-2.5 py-2 shadow-sm ${
+                  isFreeShipping
+                    ? "border-emerald-200 bg-emerald-50/80"
+                    : "border-brand/20 bg-brand-soft/80"
+                }`}
               >
                 <span
-                  className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
+                  className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white ${
                     isFreeShipping
-                      ? "bg-emerald-50 text-emerald-600"
-                      : "bg-brand-soft text-brand"
+                      ? "bg-emerald-600"
+                      : "bg-brand"
                   }`}
                 >
-                  <CheckCircle2 className="h-4 w-4" />
+                  <Icon className="h-5 w-5" />
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-extrabold text-ink">
+                  <p className="truncate text-base font-extrabold leading-tight text-ink">
                     {coupon.name || coupon.code}
                   </p>
-                  <p className="mt-0.5 truncate text-[10px] font-bold uppercase text-ink-soft">
-                    CODE {coupon.code}
-                  </p>
                 </div>
-                <p
-                  className={`shrink-0 text-right text-xs font-extrabold ${
-                    isFreeShipping ? "text-emerald-600" : "text-brand"
-                  }`}
-                >
-                  {getCouponDiscountText(coupon)}
-                </p>
-                <button
-                  type="button"
-                  onClick={() => onRemove(coupon.code)}
-                  aria-label={`ลบโค้ด ${coupon.code}`}
-                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface-muted text-ink-soft transition active:scale-95"
-                >
-                  <X className="h-4 w-4" />
-                </button>
+                <div className="flex h-10 shrink-0 items-center gap-2 border-l border-dashed border-black/10 pl-3">
+                  <span
+                    className={`rounded-full bg-white/80 px-3 py-1 text-sm font-extrabold ${
+                      isFreeShipping ? "text-emerald-700" : "text-brand"
+                    }`}
+                  >
+                    ใช้
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => onRemove(coupon.code)}
+                    aria-label={`ลบคูปอง ${coupon.name || coupon.code}`}
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/75 text-ink-soft transition active:scale-95"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
             );
           })}
