@@ -30,7 +30,10 @@ import {
   useFavoriteStore,
   useFavoritesHydrated,
 } from "@/store/favorite-store";
-import { fetchCoupons } from "@/features/coupons/coupon-api";
+import {
+  claimCoupon,
+  fetchAvailableCoupons,
+} from "@/features/coupons/coupon-api";
 import { cn } from "@/lib/utils";
 import type { ApiCouponListItem } from "@/types/api";
 import type { Product } from "@/types/product";
@@ -49,6 +52,9 @@ const productCoupons = [
     title: "ลดทันที",
     detail: "เมื่อช้อปครบ ฿499",
     code: "PONPON50",
+    isClaimed: false,
+    canClaim: true,
+    isFallback: true,
   },
   {
     id: "freeship",
@@ -56,6 +62,9 @@ const productCoupons = [
     title: "ส่งฟรี",
     detail: "เมื่อช้อปครบ ฿399",
     code: "FREESHIP",
+    isClaimed: false,
+    canClaim: true,
+    isFallback: true,
   },
   {
     id: "friend50",
@@ -63,6 +72,9 @@ const productCoupons = [
     title: "เพื่อนใหม่",
     detail: "เมื่อช้อปครบ ฿299",
     code: "PONFRIEND50",
+    isClaimed: false,
+    canClaim: true,
+    isFallback: true,
   },
 ];
 
@@ -72,6 +84,9 @@ interface ProductCoupon {
   title: string;
   detail: string;
   code: string;
+  isClaimed: boolean;
+  canClaim: boolean;
+  isFallback?: boolean;
 }
 
 function asNumber(value: unknown): number | null {
@@ -106,6 +121,7 @@ function getCouponValue(coupon: ApiCouponListItem): string {
 function getMinimumSpendText(coupon: ApiCouponListItem): string {
   const amount =
     asNumber(coupon.minimumSpend) ??
+    asNumber(coupon.minimumSubtotal) ??
     asNumber(coupon.minimumOrderAmount) ??
     asNumber(coupon.minOrderAmount);
 
@@ -134,6 +150,8 @@ function mapApiCoupon(coupon: ApiCouponListItem): ProductCoupon | null {
       (type === "free_shipping" ? "ส่งฟรี" : "ลดทันที"),
     detail: coupon.description || getMinimumSpendText(coupon),
     code: coupon.code,
+    isClaimed: coupon.isClaimed === true,
+    canClaim: coupon.canClaim !== false,
   };
 }
 
@@ -212,7 +230,9 @@ export function ProductDetailClient({ product }: { product: Product }) {
   useEffect(() => {
     let cancelled = false;
 
-    fetchCoupons().then((items) => {
+    fetchAvailableCoupons({
+      salesChannel: "line_liff",
+    }).then((items) => {
       if (!cancelled && items.length > 0) {
         setRemoteProductCoupons(items);
       }
@@ -222,6 +242,26 @@ export function ProductDetailClient({ product }: { product: Product }) {
       cancelled = true;
     };
   }, []);
+
+  const claimProductCoupon = (coupon: ProductCoupon) => {
+    if (coupon.isClaimed || !coupon.canClaim) return;
+
+    if (!coupon.isFallback) {
+      claimCoupon(coupon.id).then((claimedCoupon) => {
+        if (!claimedCoupon) return;
+        setRemoteProductCoupons((current) =>
+          current.map((item) =>
+            item.id === coupon.id ? claimedCoupon : item
+          )
+        );
+      });
+      return;
+    }
+
+    setClaimedProductCoupons((current) =>
+      current.includes(coupon.id) ? current : [...current, coupon.id]
+    );
+  };
 
   const detailContent =
     product.detailContent ??
@@ -771,7 +811,9 @@ export function ProductDetailClient({ product }: { product: Product }) {
             </div>
             <div className="no-scrollbar -mx-2 flex gap-2.5 overflow-x-auto px-2 pb-1.5 pt-0.5">
               {displayProductCoupons.map((coupon) => {
-                const isClaimed = claimedProductCoupons.includes(coupon.id);
+                const isClaimed =
+                  coupon.isClaimed || claimedProductCoupons.includes(coupon.id);
+                const canClaim = coupon.canClaim && !isClaimed;
                 return (
                   <article
                     key={coupon.id}
@@ -790,17 +832,15 @@ export function ProductDetailClient({ product }: { product: Product }) {
                       </div>
                       <button
                         type="button"
-                        disabled={isClaimed}
-                        onClick={() =>
-                          setClaimedProductCoupons((c) =>
-                            c.includes(coupon.id) ? c : [...c, coupon.id]
-                          )
-                        }
+                        disabled={!canClaim}
+                        onClick={() => claimProductCoupon(coupon)}
                         className={cn(
                           "flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white transition active:scale-95 disabled:shadow-none",
                           isClaimed
                             ? "bg-emerald-100 text-emerald-600"
-                            : "bg-brand shadow-md shadow-brand/25"
+                            : canClaim
+                              ? "bg-brand shadow-md shadow-brand/25"
+                              : "bg-surface-muted text-ink-soft"
                         )}
                         aria-label={isClaimed ? "เก็บคูปองแล้ว" : "เก็บคูปอง"}
                       >

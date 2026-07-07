@@ -3,7 +3,10 @@
 import { useEffect, useState } from "react";
 import { Check, TicketPercent } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { fetchCoupons } from "@/features/coupons/coupon-api";
+import {
+  claimCoupon,
+  fetchAvailableCoupons,
+} from "@/features/coupons/coupon-api";
 import type { ApiCouponListItem } from "@/types/api";
 
 interface HomeCoupon {
@@ -12,6 +15,9 @@ interface HomeCoupon {
   title: string;
   detail: string;
   code: string;
+  isClaimed: boolean;
+  canClaim: boolean;
+  isFallback?: boolean;
 }
 
 const fallbackCoupons: HomeCoupon[] = [
@@ -21,6 +27,9 @@ const fallbackCoupons: HomeCoupon[] = [
     title: "ลดทันที",
     detail: "เมื่อช้อปครบ ฿499",
     code: "PONPON50",
+    isClaimed: false,
+    canClaim: true,
+    isFallback: true,
   },
   {
     id: "shipping",
@@ -28,6 +37,9 @@ const fallbackCoupons: HomeCoupon[] = [
     title: "ส่งฟรี",
     detail: "เมื่อช้อปครบ ฿399",
     code: "FREESHIP",
+    isClaimed: false,
+    canClaim: true,
+    isFallback: true,
   },
 ];
 
@@ -61,6 +73,7 @@ function getCouponValue(coupon: ApiCouponListItem): string {
 function getMinimumSpendText(coupon: ApiCouponListItem): string {
   const amount =
     asNumber(coupon.minimumSpend) ??
+    asNumber(coupon.minimumSubtotal) ??
     asNumber(coupon.minimumOrderAmount) ??
     asNumber(coupon.minOrderAmount);
 
@@ -84,6 +97,8 @@ function mapApiCoupon(coupon: ApiCouponListItem): HomeCoupon | null {
     title,
     detail: coupon.description || getMinimumSpendText(coupon),
     code: coupon.code,
+    isClaimed: coupon.isClaimed === true,
+    canClaim: coupon.canClaim !== false,
   };
 }
 
@@ -103,7 +118,9 @@ export function CouponSection({ coupons: apiCoupons = [] }: CouponSectionProps) 
   useEffect(() => {
     let cancelled = false;
 
-    fetchCoupons().then((items) => {
+    fetchAvailableCoupons({
+      salesChannel: "line_liff",
+    }).then((items) => {
       if (!cancelled && items.length > 0) {
         setRemoteCoupons(items);
       }
@@ -115,6 +132,19 @@ export function CouponSection({ coupons: apiCoupons = [] }: CouponSectionProps) 
   }, []);
 
   const claim = (id: string) => {
+    const coupon = displayCoupons.find((item) => item.id === id);
+    if (!coupon || coupon.isClaimed || !coupon.canClaim) return;
+
+    if (!coupon.isFallback) {
+      claimCoupon(id).then((claimedCoupon) => {
+        if (!claimedCoupon) return;
+        setRemoteCoupons((current) =>
+          current.map((item) => (item.id === id ? claimedCoupon : item))
+        );
+      });
+      return;
+    }
+
     setClaimed((current) =>
       current.includes(id) ? current : [...current, id]
     );
@@ -134,7 +164,8 @@ export function CouponSection({ coupons: apiCoupons = [] }: CouponSectionProps) 
 
       <div className="no-scrollbar -mx-3.5 flex gap-2.5 overflow-x-auto px-3.5 pb-1 md:mx-0 md:grid md:grid-cols-2 md:gap-3 md:overflow-visible md:px-0">
         {displayCoupons.map((coupon) => {
-          const isClaimed = claimed.includes(coupon.id);
+          const isClaimed = coupon.isClaimed || claimed.includes(coupon.id);
+          const canClaim = coupon.canClaim && !isClaimed;
           return (
             <article
               key={coupon.id}
@@ -160,12 +191,14 @@ export function CouponSection({ coupons: apiCoupons = [] }: CouponSectionProps) 
                 <button
                   type="button"
                   onClick={() => claim(coupon.id)}
-                  disabled={isClaimed}
+                  disabled={!canClaim}
                   className={cn(
                     "flex shrink-0 items-center justify-center rounded-full text-xs font-bold transition",
                     isClaimed
                       ? "h-9 w-9 bg-[#d9fbe7] text-[#12a85a]"
-                      : "brand-button h-9 px-3 text-white"
+                      : canClaim
+                        ? "brand-button h-9 px-3 text-white"
+                        : "h-9 px-3 bg-surface-muted text-ink-soft"
                   )}
                   aria-label={isClaimed ? "เก็บคูปองแล้ว" : "เก็บคูปอง"}
                 >

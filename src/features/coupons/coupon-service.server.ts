@@ -33,8 +33,8 @@ function isCouponVisible(coupon: ApiCouponListItem): boolean {
 }
 
 export async function getCouponsServer(): Promise<ApiCouponListItem[]> {
-  const url = new URL(`${PONPON_BACKEND_BASE_URL}/api/coupons`);
-  url.searchParams.set("pageSize", "8");
+  const url = new URL(`${PONPON_BACKEND_BASE_URL}/api/shop/coupons/available`);
+  url.searchParams.set("salesChannel", "line_liff");
 
   try {
     const res = await fetch(url.toString(), {

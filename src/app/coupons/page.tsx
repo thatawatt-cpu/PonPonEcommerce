@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useMemo, useState } from "react";
+import { use, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -16,7 +16,9 @@ import {
 import { AppHeader } from "@/components/layout/app-header";
 import { PageContainer } from "@/components/layout/page-container";
 import { Card } from "@/components/ui/card";
+import { fetchMyCoupons } from "@/features/coupons/coupon-api";
 import { cn } from "@/lib/utils";
+import type { ApiCouponListItem } from "@/types/api";
 
 type CouponStatus = "available" | "used" | "expired";
 type CouponKind = "discount" | "shipping" | "gift";
@@ -35,7 +37,7 @@ interface CouponItem {
   icon: LucideIcon;
 }
 
-const coupons: CouponItem[] = [
+const fallbackCoupons: CouponItem[] = [
   {
     id: "welcome50",
     title: "คูปองส่วนลด ฿50",
@@ -177,6 +179,102 @@ const statusClass: Record<CouponStatus, string> = {
   expired: "bg-black/[0.06] text-ink-soft",
 };
 
+function asNumber(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const parsed = Number(value.replace(/[^\d.-]/g, ""));
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
+function getCouponType(coupon: ApiCouponListItem): string {
+  return (coupon.type || coupon.discountType || "").trim().toLowerCase();
+}
+
+function getCouponIcon(kind: CouponKind): LucideIcon {
+  if (kind === "shipping") return Truck;
+  if (kind === "gift") return Sparkles;
+  return TicketPercent;
+}
+
+function getCouponValue(coupon: ApiCouponListItem): string {
+  const type = getCouponType(coupon);
+  if (type === "free_shipping") return "FREE";
+
+  const amount =
+    asNumber(coupon.discountAmount) ??
+    asNumber(coupon.discountValue) ??
+    asNumber(coupon.value);
+
+  if (amount == null) {
+    return typeof coupon.value === "string" ? coupon.value : "คูปอง";
+  }
+  if (type === "percentage") return `${amount}%`;
+  return `฿${amount.toLocaleString("th-TH")}`;
+}
+
+function getMinimumSpendText(coupon: ApiCouponListItem): string {
+  const amount =
+    asNumber(coupon.minimumSpend) ??
+    asNumber(coupon.minimumSubtotal) ??
+    asNumber(coupon.minimumOrderAmount) ??
+    asNumber(coupon.minOrderAmount);
+
+  return amount && amount > 0
+    ? `ซื้อครบ ฿${amount.toLocaleString("th-TH")}`
+    : "ใช้ได้ตอนชำระเงิน";
+}
+
+function getExpireText(coupon: ApiCouponListItem): string {
+  const value = coupon.endsAtUtc || coupon.expiresAt || coupon.endAt;
+  if (!value) return "ตรวจสอบวันหมดอายุตอนใช้คูปอง";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return `หมดอายุ ${date.toLocaleDateString("th-TH", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  })}`;
+}
+
+function mapApiCoupon(coupon: ApiCouponListItem): CouponItem | null {
+  if (!coupon.code) return null;
+
+  const type = getCouponType(coupon);
+  const kind: CouponKind =
+    type === "free_shipping"
+      ? "shipping"
+      : coupon.scopeLabels?.length
+        ? "gift"
+        : "discount";
+  const endsAt = coupon.endsAtUtc || coupon.expiresAt || coupon.endAt;
+  const status: CouponStatus =
+    endsAt && new Date(endsAt).getTime() < Date.now()
+      ? "expired"
+      : "available";
+
+  return {
+    id: coupon.id || coupon.code,
+    title:
+      coupon.name ||
+      coupon.title ||
+      (type === "free_shipping" ? "คูปองส่งฟรี" : "คูปองส่วนลด"),
+    description:
+      coupon.description ||
+      coupon.conditionLabels?.join(" · ") ||
+      getMinimumSpendText(coupon),
+    code: coupon.code,
+    value: getCouponValue(coupon),
+    minimumSpend: getMinimumSpendText(coupon),
+    expireAt: getExpireText(coupon),
+    status,
+    kind,
+    icon: getCouponIcon(kind),
+  };
+}
+
 export default function CouponsPage({
   searchParams,
 }: {
@@ -186,11 +284,31 @@ export default function CouponsPage({
   const router = useRouter();
   const [activeFilter, setActiveFilter] = useState<CouponFilter>("available");
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  const [remoteCoupons, setRemoteCoupons] = useState<ApiCouponListItem[]>([]);
+  const coupons = useMemo(() => {
+    const apiCoupons = remoteCoupons
+      .map(mapApiCoupon)
+      .filter((coupon): coupon is CouponItem => Boolean(coupon));
+    return apiCoupons.length > 0 ? apiCoupons : fallbackCoupons;
+  }, [remoteCoupons]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchMyCoupons().then((items) => {
+      if (!cancelled && items.length > 0) {
+        setRemoteCoupons(items);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const filteredCoupons = useMemo(() => {
     if (activeFilter === "all") return coupons;
     return coupons.filter((coupon) => coupon.status === activeFilter);
-  }, [activeFilter]);
+  }, [activeFilter, coupons]);
 
   const availableCount = coupons.filter(
     (coupon) => coupon.status === "available",
