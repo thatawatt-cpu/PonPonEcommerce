@@ -184,48 +184,46 @@ export function CouponSection({ coupons: apiCoupons = [] }: CouponSectionProps) 
           return (
             <article
               key={coupon.id}
-              className="home-panel-shadow relative flex min-h-[10.25rem] min-w-[20.5rem] flex-1 overflow-hidden rounded-[1.4rem] bg-[#ffe6ec] p-2 md:min-w-0"
+              className="home-panel-shadow relative flex min-w-[18rem] flex-1 overflow-hidden rounded-card bg-white ring-1 ring-brand/10 md:min-w-0"
             >
-              <span className="absolute -left-3 top-1/2 z-20 h-8 w-8 -translate-y-1/2 rounded-full bg-surface-muted" />
-              <div className="relative flex w-full overflow-hidden rounded-[1.15rem] bg-white">
-                <div className="flex w-[8.5rem] shrink-0 flex-col items-center justify-center bg-brand px-3 py-4 text-center text-white">
-                  <span className="text-[2.15rem] font-black leading-none">
-                    {coupon.value}
-                  </span>
-                  <span className="mt-3 text-sm font-extrabold leading-tight text-white">
-                    {coupon.minimumLabel}
-                  </span>
-                </div>
-                <div className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-4 py-4">
-                  <div className="min-w-0">
-                    <p className="truncate text-lg font-black text-ink">
-                      {coupon.title}
-                    </p>
-                    <p className="mt-2 line-clamp-2 text-sm font-extrabold leading-snug text-ink-soft">
-                      {coupon.detail}
-                    </p>
-                    <p className="mt-3 truncate text-sm font-black uppercase text-ink-soft">
-                      CODE {coupon.code}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => claim(coupon.id)}
-                    disabled={!canClaim}
-                    className={cn(
-                      "flex shrink-0 items-center justify-center rounded-full text-sm font-extrabold transition active:scale-95 disabled:shadow-none",
-                      isClaimed
-                        ? "h-14 min-w-[4.75rem] px-3 bg-emerald-100 text-emerald-600 shadow-[0_0_0_6px_rgba(16,185,129,0.12)]"
-                        : canClaim
-                          ? "h-14 w-14 bg-brand text-white shadow-[0_0_0_6px_rgba(247,18,35,0.12),0_12px_24px_rgba(247,18,35,0.24)]"
-                          : "h-14 w-14 bg-surface-muted text-ink-soft"
-                    )}
-                    aria-label={isClaimed ? "เก็บคูปองแล้ว" : "เก็บคูปอง"}
-                  >
-                    {isClaimed ? "เก็บแล้ว" : "เก็บ"}
-                  </button>
-                </div>
+              <div className="flex w-24 shrink-0 flex-col items-center justify-center bg-brand px-2 py-4 text-center text-white">
+                <span className="text-xl font-extrabold leading-none">
+                  {coupon.value}
+                </span>
+                <span className="mt-1 text-[10px] font-bold leading-tight text-white/80">
+                  {coupon.minimumLabel}
+                </span>
               </div>
+              <div className="flex min-w-0 flex-1 items-center justify-between gap-2 px-3 py-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-extrabold text-ink">
+                    {coupon.title}
+                  </p>
+                  <p className="mt-0.5 line-clamp-1 text-xs font-semibold text-ink-soft">
+                    {coupon.detail}
+                  </p>
+                  <p className="mt-1 truncate text-[10px] font-bold uppercase text-ink-soft">
+                    CODE {coupon.code}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => claim(coupon.id)}
+                  disabled={!canClaim}
+                  className={cn(
+                    "flex h-9 shrink-0 items-center justify-center rounded-full px-3 text-xs font-bold transition",
+                    isClaimed
+                      ? "bg-[#d9fbe7] text-[#12a85a]"
+                      : canClaim
+                        ? "brand-button text-white"
+                        : "bg-surface-muted text-ink-soft"
+                  )}
+                  aria-label={isClaimed ? "เก็บคูปองแล้ว" : "เก็บคูปอง"}
+                >
+                  {isClaimed ? "เก็บแล้ว" : "เก็บ"}
+                </button>
+              </div>
+              <span className="absolute -left-2 top-1/2 h-4 w-4 -translate-y-1/2 rounded-full bg-surface-muted" />
             </article>
           );
         })}
