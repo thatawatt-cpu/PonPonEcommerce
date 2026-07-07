@@ -235,24 +235,43 @@ export function ProductDetailClient({ product }: { product: Product }) {
   const [reviewFilter, setReviewFilter] = useState<ReviewFilter>("all");
   const [claimedProductCoupons, setClaimedProductCoupons] = useState<string[]>([]);
   const [remoteProductCoupons, setRemoteProductCoupons] = useState<ApiCouponListItem[]>([]);
+  const [productCouponsLoaded, setProductCouponsLoaded] = useState(false);
   const [activeReviewMedia, setActiveReviewMedia] = useState<ReviewMedia | null>(null);
   const [activeTab, setActiveTab] = useState<DetailTab>("detail");
   const apiProductCoupons = remoteProductCoupons
     .map(mapApiCoupon)
     .filter((coupon): coupon is ProductCoupon => Boolean(coupon));
-  const displayProductCoupons =
-    apiProductCoupons.length > 0 ? apiProductCoupons : productCoupons;
+  const visibleProductCoupons = apiProductCoupons.filter(
+    (coupon) => coupon.canClaim && !coupon.isClaimed
+  );
+  const visibleFallbackProductCoupons = productCoupons.filter(
+    (coupon) => !claimedProductCoupons.includes(coupon.id)
+  );
+  const displayProductCoupons = productCouponsLoaded
+    ? visibleProductCoupons
+    : visibleFallbackProductCoupons;
 
   useEffect(() => {
     let cancelled = false;
 
     fetchAvailableCoupons({
       salesChannel: "line_liff",
-    }).then((items) => {
-      if (!cancelled && items.length > 0) {
-        setRemoteProductCoupons(items);
-      }
-    });
+    })
+      .then((items) => {
+        if (!cancelled) {
+          setRemoteProductCoupons(items);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setRemoteProductCoupons([]);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setProductCouponsLoaded(true);
+        }
+      });
 
     return () => {
       cancelled = true;
@@ -815,63 +834,65 @@ export function ProductDetailClient({ product }: { product: Product }) {
 
           {/* ── Coupons ── */}
 
-          <div className="product-detail-wide app-panel-shadow mt-2 bg-white px-4 pb-4 pt-3.5">
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="flex items-center gap-1.5 text-sm font-bold text-ink">
-                <TicketPercent className="h-4 w-4 text-brand" />
-                คูปองสำหรับคุณ
-              </h2>
-              <Link href="/coupons" className="flex items-center gap-0.5 text-xs font-bold text-brand">
-                ดูทั้งหมด <ChevronRight className="h-3.5 w-3.5" />
-              </Link>
-            </div>
-            <div className="no-scrollbar -mx-2 flex gap-2.5 overflow-x-auto px-2 pb-1.5 pt-0.5">
-              {displayProductCoupons.map((coupon) => {
-                const isClaimed =
-                  coupon.isClaimed || claimedProductCoupons.includes(coupon.id);
-                const canClaim = coupon.canClaim && !isClaimed;
-                return (
-                  <article
-                    key={coupon.id}
-                    className="relative flex min-h-[4.75rem] min-w-[16.75rem] rounded-2xl bg-white shadow-sm ring-1 ring-brand/15"
-                  >
-                    <div className="flex w-[4.75rem] shrink-0 flex-col items-center justify-center rounded-l-2xl bg-brand px-2 py-3 text-center text-white">
-                      <span className="text-lg font-extrabold leading-none">{coupon.value}</span>
-                      <span className="mt-0.5 text-[9px] font-bold leading-tight text-white/90">{coupon.minimumLabel}</span>
-                    </div>
-                    <div className="flex flex-1 items-center justify-between gap-2 px-3 py-2">
-                      <div className="min-w-0">
-                        <p className="truncate text-xs font-bold text-ink">{coupon.title}</p>
-                        <p className="mt-0.5 line-clamp-1 text-[10px] font-semibold text-ink-soft">{coupon.detail}</p>
-                        <p className="mt-0.5 truncate text-[10px] font-bold uppercase text-ink-soft">
-                          CODE {coupon.code}
-                        </p>
+          {displayProductCoupons.length > 0 && (
+            <div className="product-detail-wide app-panel-shadow mt-2 bg-white px-4 pb-4 pt-3.5">
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="flex items-center gap-1.5 text-sm font-bold text-ink">
+                  <TicketPercent className="h-4 w-4 text-brand" />
+                  คูปองสำหรับคุณ
+                </h2>
+                <Link href="/coupons" className="flex items-center gap-0.5 text-xs font-bold text-brand">
+                  ดูทั้งหมด <ChevronRight className="h-3.5 w-3.5" />
+                </Link>
+              </div>
+              <div className="no-scrollbar -mx-2 flex gap-2.5 overflow-x-auto px-2 pb-1.5 pt-0.5">
+                {displayProductCoupons.map((coupon) => {
+                  const isClaimed =
+                    coupon.isClaimed || claimedProductCoupons.includes(coupon.id);
+                  const canClaim = coupon.canClaim && !isClaimed;
+                  return (
+                    <article
+                      key={coupon.id}
+                      className="relative flex min-h-[4.75rem] min-w-[16.75rem] rounded-2xl bg-white shadow-sm ring-1 ring-brand/15"
+                    >
+                      <div className="flex w-[4.75rem] shrink-0 flex-col items-center justify-center rounded-l-2xl bg-brand px-2 py-3 text-center text-white">
+                        <span className="text-lg font-extrabold leading-none">{coupon.value}</span>
+                        <span className="mt-0.5 text-[9px] font-bold leading-tight text-white/90">{coupon.minimumLabel}</span>
                       </div>
-                      <button
-                        type="button"
-                        disabled={!canClaim}
-                        onClick={() => claimProductCoupon(coupon)}
-                        className={cn(
-                          "flex h-8 shrink-0 items-center justify-center rounded-full px-2.5 text-[10px] font-bold text-white transition active:scale-95 disabled:shadow-none",
-                          isClaimed
-                            ? "bg-emerald-100 text-emerald-600"
-                            : canClaim
-                              ? "bg-brand shadow-md shadow-brand/25"
-                              : "bg-surface-muted text-ink-soft"
-                        )}
-                        aria-label={isClaimed ? "เก็บคูปองแล้ว" : "เก็บคูปอง"}
-                      >
-                        {isClaimed ? "เก็บแล้ว" : "เก็บ"}
-                      </button>
-                    </div>
-                    <span className="absolute bottom-0 left-[4.75rem] top-0 border-l border-dashed border-brand/20" />
-                    <span className="absolute left-[4.75rem] top-0 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white ring-1 ring-brand/15" />
-                    <span className="absolute bottom-0 left-[4.75rem] h-3.5 w-3.5 -translate-x-1/2 translate-y-1/2 rounded-full bg-white ring-1 ring-brand/15" />
-                  </article>
-                );
-              })}
+                      <div className="flex flex-1 items-center justify-between gap-2 px-3 py-2">
+                        <div className="min-w-0">
+                          <p className="truncate text-xs font-bold text-ink">{coupon.title}</p>
+                          <p className="mt-0.5 line-clamp-1 text-[10px] font-semibold text-ink-soft">{coupon.detail}</p>
+                          <p className="mt-0.5 truncate text-[10px] font-bold uppercase text-ink-soft">
+                            CODE {coupon.code}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          disabled={!canClaim}
+                          onClick={() => claimProductCoupon(coupon)}
+                          className={cn(
+                            "flex h-8 shrink-0 items-center justify-center rounded-full px-2.5 text-[10px] font-bold text-white transition active:scale-95 disabled:shadow-none",
+                            isClaimed
+                              ? "bg-emerald-100 text-emerald-600"
+                              : canClaim
+                                ? "bg-brand shadow-md shadow-brand/25"
+                                : "bg-surface-muted text-ink-soft"
+                          )}
+                          aria-label={isClaimed ? "เก็บคูปองแล้ว" : "เก็บคูปอง"}
+                        >
+                          {isClaimed ? "เก็บแล้ว" : "เก็บ"}
+                        </button>
+                      </div>
+                      <span className="absolute bottom-0 left-[4.75rem] top-0 border-l border-dashed border-brand/20" />
+                      <span className="absolute left-[4.75rem] top-0 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white ring-1 ring-brand/15" />
+                      <span className="absolute bottom-0 left-[4.75rem] h-3.5 w-3.5 -translate-x-1/2 translate-y-1/2 rounded-full bg-white ring-1 ring-brand/15" />
+                    </article>
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* ── Detail tabs ── */}
           <div className="product-detail-wide app-panel-shadow mt-2 bg-white overflow-hidden">

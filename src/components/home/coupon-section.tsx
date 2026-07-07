@@ -125,21 +125,41 @@ export function CouponSection({ coupons: apiCoupons = [] }: CouponSectionProps) 
   const [claimed, setClaimed] = useState<string[]>([]);
   const [remoteCoupons, setRemoteCoupons] =
     useState<ApiCouponListItem[]>(apiCoupons);
+  const [couponsLoaded, setCouponsLoaded] = useState(apiCoupons.length > 0);
   const coupons = remoteCoupons
     .map(mapApiCoupon)
     .filter((coupon): coupon is HomeCoupon => Boolean(coupon));
-  const displayCoupons = coupons.length > 0 ? coupons : fallbackCoupons;
+  const visibleCoupons = coupons.filter(
+    (coupon) => coupon.canClaim && !coupon.isClaimed
+  );
+  const visibleFallbackCoupons = fallbackCoupons.filter(
+    (coupon) => !claimed.includes(coupon.id)
+  );
+  const displayCoupons = couponsLoaded
+    ? visibleCoupons
+    : visibleFallbackCoupons;
 
   useEffect(() => {
     let cancelled = false;
 
     fetchAvailableCoupons({
       salesChannel: "line_liff",
-    }).then((items) => {
-      if (!cancelled && items.length > 0) {
-        setRemoteCoupons(items);
-      }
-    });
+    })
+      .then((items) => {
+        if (!cancelled) {
+          setRemoteCoupons(items);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setRemoteCoupons([]);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setCouponsLoaded(true);
+        }
+      });
 
     return () => {
       cancelled = true;
@@ -164,6 +184,8 @@ export function CouponSection({ coupons: apiCoupons = [] }: CouponSectionProps) 
       current.includes(id) ? current : [...current, id]
     );
   };
+
+  if (displayCoupons.length === 0) return null;
 
   return (
     <section className="mt-5">
