@@ -248,18 +248,53 @@ function getDefaultSelectedOptions(
   );
 }
 
-export function ProductDetailClient({ product }: { product: Product }) {
+function getInitialSelectedOptions(
+  product: Product,
+  initialSelectedOptions?: Record<string, string>
+): Record<string, string> {
+  const defaults = getDefaultSelectedOptions(product);
+  if (!initialSelectedOptions) return defaults;
+
+  return {
+    ...defaults,
+    ...Object.fromEntries(
+      Object.entries(initialSelectedOptions).filter(([, value]) =>
+        Boolean(value)
+      )
+    ),
+  };
+}
+
+interface ProductDetailClientProps {
+  product: Product;
+  cartEditItemKey?: string;
+  initialQuantity?: number;
+  initialSelectedOptions?: Record<string, string>;
+}
+
+export function ProductDetailClient({
+  product,
+  cartEditItemKey,
+  initialQuantity,
+  initialSelectedOptions,
+}: ProductDetailClientProps) {
   const router = useRouter();
   const addItem = useCartStore((s) => s.addItem);
+  const removeItem = useCartStore((s) => s.removeItem);
   const favoritesHydrated = useFavoritesHydrated();
   const favoriteProductIds = useFavoriteStore((s) => s.productIds);
   const toggleFavorite = useFavoriteStore((s) => s.toggleFavorite);
   const isFavorite =
     favoritesHydrated && favoriteProductIds.includes(product.id);
 
-  const [quantity, setQuantity] = useState(1);
+  const isEditingCartItem = Boolean(cartEditItemKey);
+  const [quantity, setQuantity] = useState(() =>
+    Number.isFinite(initialQuantity) && initialQuantity && initialQuantity > 0
+      ? initialQuantity
+      : 1
+  );
   const [selected, setSelected] = useState<Record<string, string>>(() =>
-    getDefaultSelectedOptions(product)
+    getInitialSelectedOptions(product, initialSelectedOptions)
   );
   const [added, setAdded] = useState(false);
   const [activeGallery, setActiveGallery] = useState("main");
@@ -488,6 +523,9 @@ export function ProductDetailClient({ product }: { product: Product }) {
 
   const handleAdd = () => {
     if (purchaseDisabled) return;
+    if (cartEditItemKey) {
+      removeItem(cartEditItemKey);
+    }
     addItem({
       product,
       quantity,
@@ -495,6 +533,10 @@ export function ProductDetailClient({ product }: { product: Product }) {
       variantId: selectedVariant?.id,
       imageUrl: selectedProductImageUrl,
     });
+    if (cartEditItemKey) {
+      router.push("/cart");
+      return;
+    }
     setAdded(true);
     setTimeout(() => setAdded(false), 1500);
   };
@@ -1182,6 +1224,8 @@ export function ProductDetailClient({ product }: { product: Product }) {
                   <><Check className="mr-1.5 h-4 w-4" /> เพิ่มแล้ว</>
                 ) : allVariantsSoldOut ? (
                   "สินค้าหมด"
+                ) : isEditingCartItem ? (
+                  <><ShoppingCart className="mr-1.5 h-4 w-4" /> อัปเดตตะกร้า</>
                 ) : (
                   <><ShoppingCart className="mr-1.5 h-4 w-4" /> เพิ่มลงตะกร้า</>
                 )}

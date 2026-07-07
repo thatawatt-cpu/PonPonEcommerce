@@ -15,12 +15,14 @@ interface ProductsClientProps {
   products: Product[];
   categories: Category[];
   initialCategory?: string;
+  selectedCouponCode?: string;
 }
 
 export function ProductsClient({
   products,
   categories,
   initialCategory = "all",
+  selectedCouponCode,
 }: ProductsClientProps) {
   const [query, setQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState(initialCategory);
@@ -58,6 +60,12 @@ export function ProductsClient({
       <p className="mt-4 mb-3 text-sm text-ink-soft">
         พบ {results.length} รายการ
       </p>
+
+      {selectedCouponCode ? (
+        <div className="mb-3 rounded-card bg-brand-soft px-3 py-2 text-xs font-bold text-brand ring-1 ring-brand/10">
+          เลือกสินค้าเพื่อใช้คูปอง {selectedCouponCode.toUpperCase()}
+        </div>
+      ) : null}
 
       {results.length > 0 ? (
         <>

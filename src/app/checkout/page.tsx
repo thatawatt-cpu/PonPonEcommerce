@@ -61,6 +61,7 @@ import {
 import { calculateEarnedPoints, getTierBySpend } from "@/lib/membership";
 import { formatBaht } from "@/lib/format";
 import { SHIPPING_FEE } from "@/lib/constants";
+import { consumePendingCouponCode } from "@/features/coupons/pending-coupon";
 import {
   useMembershipHydrated,
   useMembershipStore,
@@ -321,8 +322,15 @@ function getCouponErrorMessage(
 
     if (err.code === "coupon_minimum_subtotal_not_met") {
       const remainingSubtotal = getNumberDetail(details, "remainingSubtotal");
+      const eligibleSubtotal = getNumberDetail(details, "eligibleSubtotal");
       if (remainingSubtotal != null && remainingSubtotal > 0) {
-        return `ซื้อเพิ่มอีก ${remainingSubtotal.toLocaleString("th-TH")} บาทเพื่อใช้คูปองนี้`;
+        const eligibleText =
+          eligibleSubtotal != null
+            ? ` ยอดสินค้าที่เข้าเงื่อนไขตอนนี้ ${eligibleSubtotal.toLocaleString(
+                "th-TH"
+              )} บาท`
+            : "";
+        return `ซื้อเพิ่มอีก ${remainingSubtotal.toLocaleString("th-TH")} บาทเพื่อใช้คูปองนี้${eligibleText}`;
       }
       return "ยอดสินค้ายังไม่ถึงขั้นต่ำของคูปองนี้";
     }
@@ -575,6 +583,37 @@ export default function CheckoutPage({
 
     return () => window.clearTimeout(timer);
   }, [mode, promo, router]);
+
+  useEffect(() => {
+    if (promo) return;
+
+    const nextCode = consumePendingCouponCode();
+    if (!nextCode) return;
+
+    const timer = window.setTimeout(() => {
+      setCouponCodes((current) => {
+        if (current.includes(nextCode)) {
+          setPromoMessage("คูปองนี้ถูกใช้แล้ว");
+          setPromoError(true);
+          return current;
+        }
+
+        if (current.length >= 2) {
+          setPromoMessage(
+            "ใช้คูปองได้สูงสุด 2 ใบ: คูปองส่วนลด 1 ใบ และคูปองส่งฟรี 1 ใบ"
+          );
+          setPromoError(true);
+          return current;
+        }
+
+        setPromoMessage("");
+        setPromoError(false);
+        return [...current, nextCode];
+      });
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [promo]);
 
   useEffect(() => {
     if (!usesStoredCheckoutItems) return;

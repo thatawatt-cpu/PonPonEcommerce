@@ -9,9 +9,9 @@ import { ProductsClient } from "./products-client";
 export default async function ProductsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ category?: string }>;
+  searchParams: Promise<{ category?: string; coupon?: string }>;
 }) {
-  const { category } = await searchParams;
+  const { category, coupon } = await searchParams;
 
   const [products, categories] = await Promise.all([
     getAllProductsServer(),
@@ -26,6 +26,7 @@ export default async function ProductsPage({
           products={products}
           categories={categories}
           initialCategory={category ?? "all"}
+          selectedCouponCode={coupon}
         />
       </PageContainer>
     </>

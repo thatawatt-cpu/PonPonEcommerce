@@ -16,6 +16,7 @@ import { AppHeader } from "@/components/layout/app-header";
 import { PageContainer } from "@/components/layout/page-container";
 import { Card } from "@/components/ui/card";
 import { fetchMyCoupons } from "@/features/coupons/coupon-api";
+import { storePendingCouponCode } from "@/features/coupons/pending-coupon";
 import { getStoredBuyNowCheckout } from "@/features/checkout/buy-now-checkout";
 import { getStoredCartSelectionCheckout } from "@/features/checkout/cart-selection-checkout";
 import { parseApiDate, parseApiTime } from "@/lib/date-time";
@@ -222,16 +223,20 @@ export default function CouponsPage({
   };
 
   const applyCouponNow = (code: string) => {
+    if (returnTo !== "checkout") {
+      storePendingCouponCode(code);
+      router.push(`/products?coupon=${encodeURIComponent(code)}`);
+      return;
+    }
+
     const params = new URLSearchParams({
       promo: code,
     });
 
-    if (returnTo === "checkout") {
-      if (getStoredBuyNowCheckout()) {
-        params.set("mode", "buy-now");
-      } else if (getStoredCartSelectionCheckout().length > 0) {
-        params.set("mode", "cart-selection");
-      }
+    if (getStoredBuyNowCheckout()) {
+      params.set("mode", "buy-now");
+    } else if (getStoredCartSelectionCheckout().length > 0) {
+      params.set("mode", "cart-selection");
     }
 
     router.push(`/checkout?${params.toString()}#checkout-coupon-section`);

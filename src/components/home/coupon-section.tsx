@@ -1,12 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { TicketPercent } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   claimCoupon,
   fetchAvailableCoupons,
 } from "@/features/coupons/coupon-api";
+import { storePendingCouponCode } from "@/features/coupons/pending-coupon";
 import type { ApiCouponListItem } from "@/types/api";
 
 interface HomeCoupon {
@@ -154,6 +157,7 @@ interface CouponSectionProps {
 }
 
 export function CouponSection({ coupons: apiCoupons = [] }: CouponSectionProps) {
+  const router = useRouter();
   const [claimed, setClaimed] = useState<string[]>([]);
   const [remoteCoupons, setRemoteCoupons] =
     useState<ApiCouponListItem[]>(apiCoupons);
@@ -215,6 +219,11 @@ export function CouponSection({ coupons: apiCoupons = [] }: CouponSectionProps) 
     );
   };
 
+  const handleUseCoupon = (coupon: HomeCoupon) => {
+    storePendingCouponCode(coupon.code);
+    router.push(`/products?coupon=${encodeURIComponent(coupon.code)}`);
+  };
+
   if (displayCoupons.length === 0) return null;
 
   return (
@@ -224,9 +233,12 @@ export function CouponSection({ coupons: apiCoupons = [] }: CouponSectionProps) 
           <TicketPercent className="h-5 w-5 text-brand" />
           คูปองสำหรับคุณ
         </h2>
-        <span className="text-[11px] font-semibold text-ink-soft">
-          เก็บไว้ใช้ตอนชำระเงิน
-        </span>
+        <Link
+          href="/coupons"
+          className="text-[11px] font-extrabold text-brand"
+        >
+          คูปองของฉัน
+        </Link>
       </div>
 
       <div className="no-scrollbar -mx-3.5 flex gap-2.5 overflow-x-auto px-3.5 pb-1 md:mx-0 md:grid md:grid-cols-2 md:gap-3 md:overflow-visible md:px-0">
@@ -260,8 +272,10 @@ export function CouponSection({ coupons: apiCoupons = [] }: CouponSectionProps) 
                 </div>
                 <button
                   type="button"
-                  onClick={() => claim(coupon.id)}
-                  disabled={!canClaim}
+                  onClick={() =>
+                    isClaimed ? handleUseCoupon(coupon) : claim(coupon.id)
+                  }
+                  disabled={!isClaimed && !canClaim}
                   className={cn(
                     "flex h-9 shrink-0 items-center justify-center rounded-full px-3 text-xs font-bold transition",
                     isClaimed
@@ -270,9 +284,9 @@ export function CouponSection({ coupons: apiCoupons = [] }: CouponSectionProps) 
                         ? "brand-button text-white"
                         : "bg-surface-muted text-ink-soft"
                   )}
-                  aria-label={isClaimed ? "เก็บคูปองแล้ว" : "เก็บคูปอง"}
+                  aria-label={isClaimed ? "ใช้คูปอง" : "เก็บคูปอง"}
                 >
-                  {isClaimed ? "เก็บแล้ว" : "เก็บ"}
+                  {isClaimed ? "ใช้" : "เก็บ"}
                 </button>
               </div>
               <span className="absolute -left-2 top-1/2 h-4 w-4 -translate-y-1/2 rounded-full bg-surface-muted" />

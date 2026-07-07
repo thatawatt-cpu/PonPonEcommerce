@@ -26,13 +26,28 @@ export function CartItem({ item, checked = false, onCheckedChange }: CartItemPro
     : null;
   const unitPrice = item.price;
   const itemKey = getCartItemKey(item);
+  const editParams = new URLSearchParams({
+    cartItemKey: itemKey,
+    quantity: String(item.quantity),
+  });
+  if (item.selectedOptions) {
+    editParams.set("options", JSON.stringify(item.selectedOptions));
+  }
+  const productHref = `/products/${encodeURIComponent(item.productId)}?${editParams.toString()}`;
+
+  const openProduct = () => {
+    router.push(productHref);
+  };
 
   return (
     <div className="flex items-center gap-3">
       {/* Checkbox — outside the card */}
       <button
         type="button"
-        onClick={() => onCheckedChange?.(!checked)}
+        onClick={(event) => {
+          event.stopPropagation();
+          onCheckedChange?.(!checked);
+        }}
         aria-label={checked ? "ยกเลิกการเลือก" : "เลือกสินค้า"}
         aria-pressed={checked}
         className={cn(
@@ -44,21 +59,26 @@ export function CartItem({ item, checked = false, onCheckedChange }: CartItemPro
       </button>
 
       {/* Card */}
-      <div className="flex min-w-0 flex-1 items-start gap-3 rounded-2xl bg-white p-3 ring-1 ring-black/[0.06]">
+      <div
+        role="link"
+        tabIndex={0}
+        onClick={openProduct}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            openProduct();
+          }
+        }}
+        aria-label={`ดูรายละเอียด ${item.name}`}
+        className="flex min-w-0 flex-1 cursor-pointer items-start gap-3 rounded-2xl bg-white p-3 ring-1 ring-black/[0.06] transition hover:ring-brand/20 active:scale-[0.99]"
+      >
         {/* Image */}
-        <button
-          type="button"
-          onClick={() => router.push(`/products/${item.productId}`)}
-          aria-label={`ดูรายละเอียด ${item.name}`}
-          className="shrink-0"
-        >
-          <ProductImage
-            imageUrl={item.imageUrl}
-            emoji={item.emoji}
-            size="sm"
-            className="h-[4.5rem] w-[4.5rem] rounded-xl"
-          />
-        </button>
+        <ProductImage
+          imageUrl={item.imageUrl}
+          emoji={item.emoji}
+          size="sm"
+          className="h-[4.5rem] w-[4.5rem] shrink-0 rounded-xl"
+        />
 
         {/* Content */}
         <div className="min-w-0 flex-1">
@@ -74,7 +94,10 @@ export function CartItem({ item, checked = false, onCheckedChange }: CartItemPro
             </div>
             <button
               type="button"
-              onClick={() => remove(itemKey)}
+              onClick={(event) => {
+                event.stopPropagation();
+                remove(itemKey);
+              }}
               aria-label="ลบสินค้า"
               className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-ink-soft/30 transition hover:text-brand active:scale-90"
             >
@@ -90,14 +113,20 @@ export function CartItem({ item, checked = false, onCheckedChange }: CartItemPro
                 ฿{unitPrice.toLocaleString("th-TH")} / ชิ้น
               </p>
             </div>
-            <QuantitySelector
-              value={item.quantity}
-              size="sm"
-              min={1}
-              onChange={(next) =>
-                next > item.quantity ? increase(itemKey) : decrease(itemKey)
-              }
-            />
+            <div onClick={(event) => event.stopPropagation()}>
+              <QuantitySelector
+                value={item.quantity}
+                size="sm"
+                min={1}
+                onChange={(next) => {
+                  if (next > item.quantity) {
+                    increase(itemKey);
+                  } else {
+                    decrease(itemKey);
+                  }
+                }}
+              />
+            </div>
           </div>
         </div>
       </div>
