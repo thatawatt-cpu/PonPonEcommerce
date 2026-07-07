@@ -18,6 +18,9 @@ interface HomeCoupon {
   code: string;
   isClaimed: boolean;
   canClaim: boolean;
+  remainingTotalUses?: number | null;
+  maximumUsesPerCustomer?: number | null;
+  customerUsedCount?: number | null;
   isFallback?: boolean;
 }
 
@@ -31,6 +34,9 @@ const fallbackCoupons: HomeCoupon[] = [
     code: "PONPON50",
     isClaimed: false,
     canClaim: true,
+    remainingTotalUses: null,
+    maximumUsesPerCustomer: null,
+    customerUsedCount: null,
     isFallback: true,
   },
   {
@@ -42,6 +48,9 @@ const fallbackCoupons: HomeCoupon[] = [
     code: "FREESHIP",
     isClaimed: false,
     canClaim: true,
+    remainingTotalUses: null,
+    maximumUsesPerCustomer: null,
+    customerUsedCount: null,
     isFallback: true,
   },
 ];
@@ -114,7 +123,30 @@ function mapApiCoupon(coupon: ApiCouponListItem): HomeCoupon | null {
     code: coupon.code,
     isClaimed: coupon.isClaimed === true,
     canClaim: coupon.canClaim !== false,
+    remainingTotalUses: asNumber(coupon.remainingTotalUses),
+    maximumUsesPerCustomer: asNumber(
+      coupon.maximumUsesPerCustomer ?? coupon.maxUsesPerCustomer
+    ),
+    customerUsedCount: asNumber(
+      coupon.customerUsedCount ??
+        coupon.customerUsageCount ??
+        coupon.usedByCustomer ??
+        coupon.usedCountByCustomer
+    ),
   };
+}
+
+function canShowAvailableCoupon(coupon: HomeCoupon): boolean {
+  if (coupon.remainingTotalUses === 0) return false;
+  if (
+    coupon.maximumUsesPerCustomer != null &&
+    coupon.customerUsedCount != null &&
+    coupon.customerUsedCount >= coupon.maximumUsesPerCustomer
+  ) {
+    return false;
+  }
+
+  return coupon.isClaimed || coupon.canClaim;
 }
 
 interface CouponSectionProps {
@@ -129,9 +161,7 @@ export function CouponSection({ coupons: apiCoupons = [] }: CouponSectionProps) 
   const coupons = remoteCoupons
     .map(mapApiCoupon)
     .filter((coupon): coupon is HomeCoupon => Boolean(coupon));
-  const visibleCoupons = coupons.filter(
-    (coupon) => coupon.canClaim && !coupon.isClaimed
-  );
+  const visibleCoupons = coupons.filter(canShowAvailableCoupon);
   const visibleFallbackCoupons = fallbackCoupons.filter(
     (coupon) => !claimed.includes(coupon.id)
   );

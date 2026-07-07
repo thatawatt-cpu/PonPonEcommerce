@@ -55,6 +55,9 @@ const productCoupons = [
     code: "PONPON50",
     isClaimed: false,
     canClaim: true,
+    remainingTotalUses: null,
+    maximumUsesPerCustomer: null,
+    customerUsedCount: null,
     isFallback: true,
   },
   {
@@ -66,6 +69,9 @@ const productCoupons = [
     code: "FREESHIP",
     isClaimed: false,
     canClaim: true,
+    remainingTotalUses: null,
+    maximumUsesPerCustomer: null,
+    customerUsedCount: null,
     isFallback: true,
   },
   {
@@ -77,6 +83,9 @@ const productCoupons = [
     code: "PONFRIEND50",
     isClaimed: false,
     canClaim: true,
+    remainingTotalUses: null,
+    maximumUsesPerCustomer: null,
+    customerUsedCount: null,
     isFallback: true,
   },
 ];
@@ -90,6 +99,9 @@ interface ProductCoupon {
   code: string;
   isClaimed: boolean;
   canClaim: boolean;
+  remainingTotalUses?: number | null;
+  maximumUsesPerCustomer?: number | null;
+  customerUsedCount?: number | null;
   isFallback?: boolean;
 }
 
@@ -168,7 +180,30 @@ function mapApiCoupon(coupon: ApiCouponListItem): ProductCoupon | null {
     code: coupon.code,
     isClaimed: coupon.isClaimed === true,
     canClaim: coupon.canClaim !== false,
+    remainingTotalUses: asNumber(coupon.remainingTotalUses),
+    maximumUsesPerCustomer: asNumber(
+      coupon.maximumUsesPerCustomer ?? coupon.maxUsesPerCustomer
+    ),
+    customerUsedCount: asNumber(
+      coupon.customerUsedCount ??
+        coupon.customerUsageCount ??
+        coupon.usedByCustomer ??
+        coupon.usedCountByCustomer
+    ),
   };
+}
+
+function canShowAvailableCoupon(coupon: ProductCoupon): boolean {
+  if (coupon.remainingTotalUses === 0) return false;
+  if (
+    coupon.maximumUsesPerCustomer != null &&
+    coupon.customerUsedCount != null &&
+    coupon.customerUsedCount >= coupon.maximumUsesPerCustomer
+  ) {
+    return false;
+  }
+
+  return coupon.isClaimed || coupon.canClaim;
 }
 
 function getPreferredVariant(
@@ -242,7 +277,7 @@ export function ProductDetailClient({ product }: { product: Product }) {
     .map(mapApiCoupon)
     .filter((coupon): coupon is ProductCoupon => Boolean(coupon));
   const visibleProductCoupons = apiProductCoupons.filter(
-    (coupon) => coupon.canClaim && !coupon.isClaimed
+    canShowAvailableCoupon
   );
   const visibleFallbackProductCoupons = productCoupons.filter(
     (coupon) => !claimedProductCoupons.includes(coupon.id)
