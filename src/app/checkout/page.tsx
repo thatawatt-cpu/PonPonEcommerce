@@ -1349,7 +1349,8 @@ export default function CheckoutPage({
               }}
               onApply={applyPromoCode}
               onRemove={removePromoCode}
-              appliedCodes={couponCodes}
+              appliedCoupons={pricingPreview?.appliedCoupons ?? []}
+              couponCodeCount={couponCodes.length}
               message={promoMessage}
               error={promoError}
               applying={pricingPreviewLoading}

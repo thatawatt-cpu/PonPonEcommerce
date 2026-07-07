@@ -146,6 +146,7 @@ export interface ApiPricingPreviewLine {
 export interface ApiAppliedCoupon {
   couponId: string;
   code: string;
+  name: string;
   type: "fixed" | "percentage" | "free_shipping" | string;
   discountAmount: number;
 }

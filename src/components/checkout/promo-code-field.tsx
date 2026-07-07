@@ -3,16 +3,35 @@
 import Link from "next/link";
 import { Check, ChevronRight, X } from "lucide-react";
 
+interface AppliedCouponDisplay {
+  code: string;
+  name: string;
+  type: string;
+  discountAmount: number;
+}
+
 interface PromoCodeFieldProps {
   value: string;
   onChange: (value: string) => void;
   onApply: () => void;
   onRemove: (code: string) => void;
-  appliedCode?: string;
-  appliedCodes?: string[];
+  appliedCoupons?: AppliedCouponDisplay[];
+  couponCodeCount?: number;
   message?: string;
   error?: boolean;
   applying?: boolean;
+}
+
+function formatDiscountAmount(amount: number): string {
+  return `${amount.toLocaleString("th-TH")} บาท`;
+}
+
+function getCouponDiscountText(coupon: AppliedCouponDisplay): string {
+  if (coupon.type === "free_shipping") {
+    return `ลดค่าส่ง ${formatDiscountAmount(coupon.discountAmount)}`;
+  }
+
+  return `ลด ${formatDiscountAmount(coupon.discountAmount)}`;
 }
 
 export function PromoCodeField({
@@ -20,14 +39,12 @@ export function PromoCodeField({
   onChange,
   onApply,
   onRemove,
-  appliedCode,
-  appliedCodes,
+  appliedCoupons = [],
+  couponCodeCount = appliedCoupons.length,
   message,
   error,
   applying = false,
 }: PromoCodeFieldProps) {
-  const codes = appliedCodes ?? (appliedCode ? [appliedCode] : []);
-
   return (
     <div>
       <div className="mb-3 flex items-center justify-between gap-3">
@@ -43,23 +60,23 @@ export function PromoCodeField({
         </Link>
       </div>
 
-      {codes.length > 0 && (
+      {appliedCoupons.length > 0 && (
         <div className="mb-3 space-y-2">
-          {codes.map((code) => (
+          {appliedCoupons.map((coupon) => (
             <div
-              key={code}
+              key={coupon.code}
               className="flex items-center gap-3 rounded-2xl border border-success/20 bg-success-soft px-3 py-2.5"
             >
               <Check className="h-5 w-5 shrink-0 text-success" />
               <div className="min-w-0 flex-1">
                 <p className="text-xs font-extrabold text-success">
-                  ใช้โค้ด {code} แล้ว
+                  {coupon.name || coupon.code} - {getCouponDiscountText(coupon)}
                 </p>
               </div>
               <button
                 type="button"
-                onClick={() => onRemove(code)}
-                aria-label={`ยกเลิกโค้ด ${code}`}
+                onClick={() => onRemove(coupon.code)}
+                aria-label={`ยกเลิกโค้ด ${coupon.code}`}
                 className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-ink-soft shadow-sm"
               >
                 <X className="h-4 w-4" />
@@ -69,7 +86,7 @@ export function PromoCodeField({
         </div>
       )}
 
-      {codes.length < 2 && (
+      {couponCodeCount < 2 && (
         <>
           <div className="flex gap-2">
             <input
