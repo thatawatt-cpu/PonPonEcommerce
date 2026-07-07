@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, TicketPercent } from "lucide-react";
+import { TicketPercent } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   claimCoupon,
@@ -196,7 +196,7 @@ export function CouponSection({ coupons: apiCoupons = [] }: CouponSectionProps) 
                     {coupon.minimumLabel}
                   </span>
                 </div>
-                <div className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_4.25rem] items-center gap-3 px-4 py-4">
+                <div className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-4 py-4">
                   <div className="min-w-0">
                     <p className="truncate text-lg font-black text-ink">
                       {coupon.title}
@@ -213,16 +213,16 @@ export function CouponSection({ coupons: apiCoupons = [] }: CouponSectionProps) 
                     onClick={() => claim(coupon.id)}
                     disabled={!canClaim}
                     className={cn(
-                      "flex h-14 w-14 shrink-0 items-center justify-center rounded-full text-sm font-extrabold transition active:scale-95 disabled:shadow-none",
+                      "flex shrink-0 items-center justify-center rounded-full text-sm font-extrabold transition active:scale-95 disabled:shadow-none",
                       isClaimed
-                        ? "bg-emerald-100 text-emerald-600 shadow-[0_0_0_6px_rgba(16,185,129,0.12)]"
+                        ? "h-14 min-w-[4.75rem] px-3 bg-emerald-100 text-emerald-600 shadow-[0_0_0_6px_rgba(16,185,129,0.12)]"
                         : canClaim
-                          ? "bg-brand text-white shadow-[0_0_0_6px_rgba(247,18,35,0.12),0_12px_24px_rgba(247,18,35,0.24)]"
-                          : "bg-surface-muted text-ink-soft"
+                          ? "h-14 w-14 bg-brand text-white shadow-[0_0_0_6px_rgba(247,18,35,0.12),0_12px_24px_rgba(247,18,35,0.24)]"
+                          : "h-14 w-14 bg-surface-muted text-ink-soft"
                     )}
                     aria-label={isClaimed ? "เก็บคูปองแล้ว" : "เก็บคูปอง"}
                   >
-                    {isClaimed ? <Check className="h-5 w-5" /> : "เก็บ"}
+                    {isClaimed ? "เก็บแล้ว" : "เก็บ"}
                   </button>
                 </div>
               </div>

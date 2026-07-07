@@ -841,7 +841,7 @@ export function ProductDetailClient({ product }: { product: Product }) {
                         <span className="text-[1.9rem] font-black leading-none">{coupon.value}</span>
                         <span className="mt-2.5 text-xs font-extrabold leading-tight text-white">{coupon.minimumLabel}</span>
                       </div>
-                      <div className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_3.75rem] items-center gap-3 px-3.5 py-3">
+                      <div className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-3.5 py-3">
                         <div className="min-w-0">
                           <p className="truncate text-base font-black text-ink">{coupon.title}</p>
                           <p className="mt-1.5 line-clamp-2 text-xs font-extrabold leading-snug text-ink-soft">{coupon.detail}</p>
@@ -854,16 +854,16 @@ export function ProductDetailClient({ product }: { product: Product }) {
                           disabled={!canClaim}
                           onClick={() => claimProductCoupon(coupon)}
                           className={cn(
-                            "flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-xs font-extrabold transition active:scale-95 disabled:shadow-none",
+                            "flex shrink-0 items-center justify-center rounded-full text-xs font-extrabold transition active:scale-95 disabled:shadow-none",
                             isClaimed
-                              ? "bg-emerald-100 text-emerald-600 shadow-[0_0_0_5px_rgba(16,185,129,0.12)]"
+                              ? "h-12 min-w-[4.25rem] px-3 bg-emerald-100 text-emerald-600 shadow-[0_0_0_5px_rgba(16,185,129,0.12)]"
                               : canClaim
-                                ? "bg-brand text-white shadow-[0_0_0_5px_rgba(247,18,35,0.12),0_10px_22px_rgba(247,18,35,0.24)]"
-                                : "bg-surface-muted text-ink-soft"
+                                ? "h-12 w-12 bg-brand text-white shadow-[0_0_0_5px_rgba(247,18,35,0.12),0_10px_22px_rgba(247,18,35,0.24)]"
+                                : "h-12 w-12 bg-surface-muted text-ink-soft"
                           )}
                           aria-label={isClaimed ? "เก็บคูปองแล้ว" : "เก็บคูปอง"}
                         >
-                          {isClaimed ? <Check className="h-4 w-4" /> : "เก็บ"}
+                          {isClaimed ? "เก็บแล้ว" : "เก็บ"}
                         </button>
                       </div>
                     </div>
