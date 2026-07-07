@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronRight, TicketPercent, Truck, X } from "lucide-react";
+import { ChevronRight, X } from "lucide-react";
 
 interface AppliedCouponDisplay {
   code: string;
@@ -52,34 +52,22 @@ export function PromoCodeField({
         <div className="mb-3 space-y-1.5">
           {appliedCoupons.map((coupon) => {
             const isFreeShipping = coupon.type === "free_shipping";
-            const Icon = isFreeShipping ? Truck : TicketPercent;
 
             return (
               <div
                 key={coupon.code}
-                className={`grid min-h-[3.625rem] grid-cols-[2.5rem_minmax(0,1fr)_auto] items-center gap-2 rounded-2xl border px-2.5 py-2 shadow-sm ${
-                  isFreeShipping
-                    ? "border-emerald-200 bg-emerald-50/80"
-                    : "border-brand/20 bg-brand-soft/80"
+                className={`flex min-h-11 items-center gap-2 rounded-2xl px-3 py-2 text-white shadow-sm ${
+                  isFreeShipping ? "bg-emerald-600" : "bg-brand"
                 }`}
               >
-                <span
-                  className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white ${
-                    isFreeShipping
-                      ? "bg-emerald-600"
-                      : "bg-brand"
-                  }`}
-                >
-                  <Icon className="h-5 w-5" />
-                </span>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-base font-extrabold leading-tight text-ink">
+                  <p className="truncate text-sm font-extrabold leading-tight">
                     {coupon.name || coupon.code}
                   </p>
                 </div>
-                <div className="flex h-10 shrink-0 items-center gap-2 border-l border-dashed border-black/10 pl-3">
+                <div className="flex shrink-0 items-center gap-1.5">
                   <span
-                    className={`rounded-full bg-white/80 px-3 py-1 text-sm font-extrabold ${
+                    className={`rounded-full bg-white px-3 py-1 text-xs font-extrabold ${
                       isFreeShipping ? "text-emerald-700" : "text-brand"
                     }`}
                   >
@@ -89,9 +77,9 @@ export function PromoCodeField({
                     type="button"
                     onClick={() => onRemove(coupon.code)}
                     aria-label={`ลบคูปอง ${coupon.name || coupon.code}`}
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/75 text-ink-soft transition active:scale-95"
+                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/18 text-white transition active:scale-95"
                   >
-                    <X className="h-4 w-4" />
+                    <X className="h-3.5 w-3.5" />
                   </button>
                 </div>
               </div>

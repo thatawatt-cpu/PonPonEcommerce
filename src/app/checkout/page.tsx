@@ -301,8 +301,8 @@ export default function CheckoutPage({
   const [promoError, setPromoError] = useState(false);
   const [pricingPreview, setPricingPreview] =
     useState<ApiPricingPreviewResponse | null>(null);
+  const [pricingPreviewSignature, setPricingPreviewSignature] = useState("");
   const [pricingPreviewLoading, setPricingPreviewLoading] = useState(false);
-  const [pricingPreviewResolved, setPricingPreviewResolved] = useState(false);
   const [addressPickerOpen, setAddressPickerOpen] = useState(false);
   const [showAllAddresses, setShowAllAddresses] = useState(false);
   const [showAllItems, setShowAllItems] = useState(false);
@@ -388,10 +388,35 @@ export default function CheckoutPage({
     items.length > 0;
   const totalLoading =
     !addressesLoaded ||
-    (canLoadShippingRates && !shippingQuoteResolved) ||
-    (previewCanLoad && !pricingPreviewResolved) ||
-    pricingPreviewLoading;
+    (canLoadShippingRates && !shippingQuoteResolved);
   const apiPaymentMethod = method === "mobile_banking" ? bankType : method;
+  const currentPricingPreviewSignature = useMemo(
+    () =>
+      JSON.stringify({
+        customerEmail: selectedAddress?.email || null,
+        shippingName: shipping.customerName.trim(),
+        shippingPhone: shipping.phone.trim(),
+        shippingAddress: shipping.address.trim(),
+        shippingChannel: selectedShippingRate?.courierCode ?? null,
+        paymentMethod: apiPaymentMethod,
+        couponCodes,
+        items: items.map((item) => ({
+          productId: item.productId,
+          variantId: item.variantId ?? null,
+          quantity: item.quantity,
+        })),
+      }),
+    [
+      apiPaymentMethod,
+      couponCodes,
+      items,
+      selectedAddress?.email,
+      selectedShippingRate?.courierCode,
+      shipping.address,
+      shipping.customerName,
+      shipping.phone,
+    ]
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -506,19 +531,51 @@ export default function CheckoutPage({
     setPlaceError(null);
   };
 
-  const previewSubtotal = pricingPreview?.itemSubtotal ?? subtotal;
-  const previewShippingAmount = pricingPreview?.shippingAmount ?? shippingFee;
+  const pricingPreviewIsCurrent =
+    pricingPreview != null &&
+    pricingPreviewSignature === currentPricingPreviewSignature;
+  const estimatedAppliedCoupons =
+    pricingPreview?.appliedCoupons.filter((coupon) =>
+      couponCodes.includes(coupon.code)
+    ) ?? [];
+  const localShippingDiscountAmount = Math.min(
+    shippingFee,
+    estimatedAppliedCoupons
+      .filter((coupon) => coupon.type === "free_shipping")
+      .reduce((sum, coupon) => sum + coupon.discountAmount, 0)
+  );
+  const localCouponDiscountAmount = estimatedAppliedCoupons
+    .filter((coupon) => coupon.type !== "free_shipping")
+    .reduce((sum, coupon) => sum + coupon.discountAmount, 0);
+  const previewSubtotal = pricingPreviewIsCurrent
+    ? pricingPreview.itemSubtotal
+    : subtotal;
+  const previewShippingAmount = pricingPreviewIsCurrent
+    ? pricingPreview.shippingAmount
+    : shippingFee;
   const shippingDiscountAmount =
-    pricingPreview?.shippingDiscountAmount ?? 0;
-  const couponDiscountAmount = pricingPreview?.couponDiscountAmount ?? 0;
+    pricingPreviewIsCurrent
+      ? pricingPreview.shippingDiscountAmount
+      : localShippingDiscountAmount;
+  const couponDiscountAmount = pricingPreviewIsCurrent
+    ? pricingPreview.couponDiscountAmount
+    : localCouponDiscountAmount;
   const promotionDiscountAmount =
-    pricingPreview?.promotionDiscountAmount ?? 0;
+    pricingPreviewIsCurrent ? pricingPreview.promotionDiscountAmount : 0;
   const discountAmount =
-    pricingPreview?.orderDiscountAmount ??
-    couponDiscountAmount + promotionDiscountAmount;
+    pricingPreviewIsCurrent
+      ? pricingPreview.orderDiscountAmount
+      : couponDiscountAmount + promotionDiscountAmount;
   const payableTotal =
-    pricingPreview?.grandTotal ??
-    Math.max(subtotal + shippingFee - discountAmount, 0);
+    pricingPreviewIsCurrent
+      ? pricingPreview.grandTotal
+      : Math.max(
+          subtotal + shippingFee - shippingDiscountAmount - discountAmount,
+          0
+        );
+  const displayAppliedCoupons = pricingPreviewIsCurrent
+    ? pricingPreview.appliedCoupons
+    : estimatedAppliedCoupons;
   const memberTier = getTierBySpend(lifetimeSpend);
   const earnedPoints = calculateEarnedPoints(payableTotal, memberTier.id);
   const totalQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
@@ -539,16 +596,16 @@ export default function CheckoutPage({
     if (!previewCanLoad) {
       const resetTimer = window.setTimeout(() => {
         setPricingPreview(null);
+        setPricingPreviewSignature("");
         setPricingPreviewLoading(false);
-        setPricingPreviewResolved(false);
       }, 0);
       return () => window.clearTimeout(resetTimer);
     }
 
     let cancelled = false;
+    const requestSignature = currentPricingPreviewSignature;
     const timer = window.setTimeout(() => {
       setPricingPreviewLoading(true);
-      setPricingPreviewResolved(false);
 
       fetchPricingPreview({
         customerEmail: selectedAddress?.email || null,
@@ -567,6 +624,7 @@ export default function CheckoutPage({
         .then((preview) => {
           if (cancelled) return;
           setPricingPreview(preview);
+          setPricingPreviewSignature(requestSignature);
           setPromoError(false);
           if (couponCodes.length > 0) {
             const appliedCodes = preview.appliedCoupons.map(
@@ -597,7 +655,6 @@ export default function CheckoutPage({
         .finally(() => {
           if (!cancelled) {
             setPricingPreviewLoading(false);
-            setPricingPreviewResolved(true);
           }
         });
     }, 250);
@@ -610,6 +667,7 @@ export default function CheckoutPage({
     checkoutSourceLoaded,
     apiPaymentMethod,
     couponCodes,
+    currentPricingPreviewSignature,
     hydrated,
     items,
     previewCanLoad,
@@ -1350,7 +1408,7 @@ export default function CheckoutPage({
               }}
               onApply={applyPromoCode}
               onRemove={removePromoCode}
-              appliedCoupons={pricingPreview?.appliedCoupons ?? []}
+              appliedCoupons={displayAppliedCoupons}
               couponCodeCount={couponCodes.length}
               message={promoMessage}
               error={promoError}
@@ -1543,12 +1601,6 @@ export default function CheckoutPage({
                 label="โปรโมชันอัตโนมัติ"
                 value={`-${formatBaht(promotionDiscountAmount)}`}
                 tone="discount"
-              />
-            )}
-            {pricingPreview && pricingPreview.vatAmount > 0 && (
-              <SummaryLine
-                label="VAT"
-                value={formatBaht(pricingPreview.vatAmount)}
               />
             )}
             <div className="border-t border-dashed border-black/10 pt-3">
