@@ -15,13 +15,15 @@ import {
 } from "@/features/products/product-service.server";
 import { getHomeSlidesServer } from "@/features/home-slides/home-slides-service.server";
 import { getActiveFlashSaleServer } from "@/features/flash-sales/flash-sales-service.server";
+import { getCouponsServer } from "@/features/coupons/coupon-service.server";
 
 export default async function HomePage() {
-  const [products, rawCategories, homeSlides, flashSale] = await Promise.all([
+  const [products, rawCategories, homeSlides, flashSale, coupons] = await Promise.all([
     getAllProductsServer({ pageSize: 24 }),
     getCategoriesServer(),
     getHomeSlidesServer(),
     getActiveFlashSaleServer(),
+    getCouponsServer(),
   ]);
 
   const categories = rawCategories.filter((c) => c.id !== "all");
@@ -84,7 +86,7 @@ export default async function HomePage() {
           products={flashSaleProducts}
           slots={flashSale?.slots}
         />
-        <CouponSectionLazy />
+        <CouponSectionLazy coupons={coupons} />
         <ShopBenefits />
 
         <section className="mt-5">

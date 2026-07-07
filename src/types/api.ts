@@ -151,6 +151,31 @@ export interface ApiAppliedCoupon {
   discountAmount: number;
 }
 
+export interface ApiCouponListItem {
+  id: string;
+  code: string;
+  name?: string | null;
+  title?: string | null;
+  description?: string | null;
+  type?: "fixed" | "percentage" | "free_shipping" | string | null;
+  discountType?: "fixed" | "percentage" | "free_shipping" | string | null;
+  discountAmount?: number | null;
+  discountValue?: number | null;
+  value?: number | string | null;
+  maxDiscountAmount?: number | null;
+  minimumSpend?: number | string | null;
+  minimumOrderAmount?: number | null;
+  minOrderAmount?: number | null;
+  startAt?: string | null;
+  endAt?: string | null;
+  expiresAt?: string | null;
+  status?: string | null;
+  isActive?: boolean | null;
+  usageCount?: number | null;
+  usedCount?: number | null;
+  [key: string]: unknown;
+}
+
 export interface ApiPricingAdjustment {
   type?: string;
   label?: string;

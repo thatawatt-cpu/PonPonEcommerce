@@ -1,10 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Check, TicketPercent } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { fetchCoupons } from "@/features/coupons/coupon-api";
+import type { ApiCouponListItem } from "@/types/api";
 
-const coupons = [
+interface HomeCoupon {
+  id: string;
+  value: string;
+  title: string;
+  detail: string;
+  code: string;
+}
+
+const fallbackCoupons: HomeCoupon[] = [
   {
     id: "welcome50",
     value: "฿50",
@@ -21,8 +31,88 @@ const coupons = [
   },
 ];
 
-export function CouponSection() {
+function asNumber(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const parsed = Number(value.replace(/[^\d.-]/g, ""));
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
+function getCouponType(coupon: ApiCouponListItem): string {
+  return (coupon.type || coupon.discountType || "").trim().toLowerCase();
+}
+
+function getCouponValue(coupon: ApiCouponListItem): string {
+  const type = getCouponType(coupon);
+  if (type === "free_shipping") return "FREE";
+
+  const amount =
+    asNumber(coupon.discountAmount) ??
+    asNumber(coupon.discountValue) ??
+    asNumber(coupon.value);
+
+  if (amount == null) return typeof coupon.value === "string" ? coupon.value : "คูปอง";
+  if (type === "percentage") return `${amount}%`;
+  return `฿${amount.toLocaleString("th-TH")}`;
+}
+
+function getMinimumSpendText(coupon: ApiCouponListItem): string {
+  const amount =
+    asNumber(coupon.minimumSpend) ??
+    asNumber(coupon.minimumOrderAmount) ??
+    asNumber(coupon.minOrderAmount);
+
+  return amount && amount > 0
+    ? `เมื่อช้อปครบ ฿${amount.toLocaleString("th-TH")}`
+    : "ใช้ได้ตอนชำระเงิน";
+}
+
+function mapApiCoupon(coupon: ApiCouponListItem): HomeCoupon | null {
+  if (!coupon.code) return null;
+
+  const type = getCouponType(coupon);
+  const title =
+    coupon.name ||
+    coupon.title ||
+    (type === "free_shipping" ? "ส่งฟรี" : "ลดทันที");
+
+  return {
+    id: coupon.id || coupon.code,
+    value: getCouponValue(coupon),
+    title,
+    detail: coupon.description || getMinimumSpendText(coupon),
+    code: coupon.code,
+  };
+}
+
+interface CouponSectionProps {
+  coupons?: ApiCouponListItem[];
+}
+
+export function CouponSection({ coupons: apiCoupons = [] }: CouponSectionProps) {
   const [claimed, setClaimed] = useState<string[]>([]);
+  const [remoteCoupons, setRemoteCoupons] =
+    useState<ApiCouponListItem[]>(apiCoupons);
+  const coupons = remoteCoupons
+    .map(mapApiCoupon)
+    .filter((coupon): coupon is HomeCoupon => Boolean(coupon));
+  const displayCoupons = coupons.length > 0 ? coupons : fallbackCoupons;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    fetchCoupons().then((items) => {
+      if (!cancelled && items.length > 0) {
+        setRemoteCoupons(items);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const claim = (id: string) => {
     setClaimed((current) =>
@@ -43,7 +133,7 @@ export function CouponSection() {
       </div>
 
       <div className="no-scrollbar -mx-3.5 flex gap-2.5 overflow-x-auto px-3.5 pb-1 md:mx-0 md:grid md:grid-cols-2 md:gap-3 md:overflow-visible md:px-0">
-        {coupons.map((coupon) => {
+        {displayCoupons.map((coupon) => {
           const isClaimed = claimed.includes(coupon.id);
           return (
             <article

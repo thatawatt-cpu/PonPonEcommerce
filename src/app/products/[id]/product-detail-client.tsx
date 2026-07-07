@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   Check,
@@ -30,7 +30,9 @@ import {
   useFavoriteStore,
   useFavoritesHydrated,
 } from "@/store/favorite-store";
+import { fetchCoupons } from "@/features/coupons/coupon-api";
 import { cn } from "@/lib/utils";
+import type { ApiCouponListItem } from "@/types/api";
 import type { Product } from "@/types/product";
 
 type ReviewMedia =
@@ -63,6 +65,77 @@ const productCoupons = [
     code: "PONFRIEND50",
   },
 ];
+
+interface ProductCoupon {
+  id: string;
+  value: string;
+  title: string;
+  detail: string;
+  code: string;
+}
+
+function asNumber(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const parsed = Number(value.replace(/[^\d.-]/g, ""));
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
+function getCouponType(coupon: ApiCouponListItem): string {
+  return (coupon.type || coupon.discountType || "").trim().toLowerCase();
+}
+
+function getCouponValue(coupon: ApiCouponListItem): string {
+  const type = getCouponType(coupon);
+  if (type === "free_shipping") return "FREE";
+
+  const amount =
+    asNumber(coupon.discountAmount) ??
+    asNumber(coupon.discountValue) ??
+    asNumber(coupon.value);
+
+  if (amount == null) {
+    return typeof coupon.value === "string" ? coupon.value : "คูปอง";
+  }
+  if (type === "percentage") return `${amount}%`;
+  return `฿${amount.toLocaleString("th-TH")}`;
+}
+
+function getMinimumSpendText(coupon: ApiCouponListItem): string {
+  const amount =
+    asNumber(coupon.minimumSpend) ??
+    asNumber(coupon.minimumOrderAmount) ??
+    asNumber(coupon.minOrderAmount);
+
+  return amount && amount > 0
+    ? `เมื่อช้อปครบ ฿${amount.toLocaleString("th-TH")}`
+    : "ใช้ได้ตอนชำระเงิน";
+}
+
+function isCouponVisible(coupon: ApiCouponListItem): boolean {
+  if (coupon.isActive === false) return false;
+  const status = coupon.status?.trim().toLowerCase();
+  if (!status) return true;
+  return ["active", "available", "published", "live"].includes(status);
+}
+
+function mapApiCoupon(coupon: ApiCouponListItem): ProductCoupon | null {
+  if (!coupon.code || !isCouponVisible(coupon)) return null;
+
+  const type = getCouponType(coupon);
+  return {
+    id: coupon.id || coupon.code,
+    value: getCouponValue(coupon),
+    title:
+      coupon.name ||
+      coupon.title ||
+      (type === "free_shipping" ? "ส่งฟรี" : "ลดทันที"),
+    detail: coupon.description || getMinimumSpendText(coupon),
+    code: coupon.code,
+  };
+}
 
 function getPreferredVariant(
   product: Product,
@@ -127,8 +200,28 @@ export function ProductDetailClient({ product }: { product: Product }) {
   const [reviewsOpen, setReviewsOpen] = useState(false);
   const [reviewFilter, setReviewFilter] = useState<ReviewFilter>("all");
   const [claimedProductCoupons, setClaimedProductCoupons] = useState<string[]>([]);
+  const [remoteProductCoupons, setRemoteProductCoupons] = useState<ApiCouponListItem[]>([]);
   const [activeReviewMedia, setActiveReviewMedia] = useState<ReviewMedia | null>(null);
   const [activeTab, setActiveTab] = useState<DetailTab>("detail");
+  const apiProductCoupons = remoteProductCoupons
+    .map(mapApiCoupon)
+    .filter((coupon): coupon is ProductCoupon => Boolean(coupon));
+  const displayProductCoupons =
+    apiProductCoupons.length > 0 ? apiProductCoupons : productCoupons;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    fetchCoupons().then((items) => {
+      if (!cancelled && items.length > 0) {
+        setRemoteProductCoupons(items);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const detailContent =
     product.detailContent ??
@@ -677,7 +770,7 @@ export function ProductDetailClient({ product }: { product: Product }) {
               </Link>
             </div>
             <div className="no-scrollbar -mx-2 flex gap-2.5 overflow-x-auto px-2 pb-1.5 pt-0.5">
-              {productCoupons.map((coupon) => {
+              {displayProductCoupons.map((coupon) => {
                 const isClaimed = claimedProductCoupons.includes(coupon.id);
                 return (
                   <article
