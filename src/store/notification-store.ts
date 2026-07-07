@@ -4,6 +4,7 @@ import { useSyncExternalStore } from "react";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { ponponFetch } from "@/features/auth/ponpon-auth";
+import { parseApiTime } from "@/lib/date-time";
 
 export type ShopNotificationType =
   | "order_created"
@@ -241,7 +242,7 @@ function getUnreadCount(data: unknown): number {
 }
 
 export function formatNotificationTime(createdAtUtc: string): string {
-  const createdAt = Date.parse(createdAtUtc);
+  const createdAt = parseApiTime(createdAtUtc, { utc: true });
   if (!Number.isFinite(createdAt)) return "";
 
   const diffMs = Date.now() - createdAt;

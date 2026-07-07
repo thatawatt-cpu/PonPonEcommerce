@@ -17,6 +17,9 @@ import { AppHeader } from "@/components/layout/app-header";
 import { PageContainer } from "@/components/layout/page-container";
 import { Card } from "@/components/ui/card";
 import { fetchMyCoupons } from "@/features/coupons/coupon-api";
+import { getStoredBuyNowCheckout } from "@/features/checkout/buy-now-checkout";
+import { getStoredCartSelectionCheckout } from "@/features/checkout/cart-selection-checkout";
+import { parseApiDate, parseApiTime } from "@/lib/date-time";
 import { cn } from "@/lib/utils";
 import type { ApiCouponListItem } from "@/types/api";
 
@@ -252,7 +255,7 @@ function getExpireText(coupon: ApiCouponListItem): string {
   const value = coupon.endsAtUtc || coupon.expiresAt || coupon.endAt;
   if (!value) return "ตรวจสอบวันหมดอายุตอนใช้คูปอง";
 
-  const date = new Date(value);
+  const date = parseApiDate(value, { utc: Boolean(coupon.endsAtUtc) });
   if (Number.isNaN(date.getTime())) return value;
   return `หมดอายุ ${date.toLocaleDateString("th-TH", {
     day: "numeric",
@@ -273,7 +276,8 @@ function mapApiCoupon(coupon: ApiCouponListItem): CouponItem | null {
         : "discount";
   const endsAt = coupon.endsAtUtc || coupon.expiresAt || coupon.endAt;
   const status: CouponStatus =
-    endsAt && new Date(endsAt).getTime() < Date.now()
+    endsAt &&
+    parseApiTime(endsAt, { utc: Boolean(coupon.endsAtUtc) }) < Date.now()
       ? "expired"
       : "available";
 
@@ -303,7 +307,7 @@ export default function CouponsPage({
 }: {
   searchParams: Promise<{ returnTo?: string }>;
 }) {
-  use(searchParams);
+  const { returnTo } = use(searchParams);
   const router = useRouter();
   const [activeFilter, setActiveFilter] = useState<CouponFilter>("available");
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
@@ -349,7 +353,19 @@ export default function CouponsPage({
   };
 
   const applyCouponNow = (code: string) => {
-    router.push(`/checkout?promo=${encodeURIComponent(code)}`);
+    const params = new URLSearchParams({
+      promo: code,
+    });
+
+    if (returnTo === "checkout") {
+      if (getStoredBuyNowCheckout()) {
+        params.set("mode", "buy-now");
+      } else if (getStoredCartSelectionCheckout().length > 0) {
+        params.set("mode", "cart-selection");
+      }
+    }
+
+    router.push(`/checkout?${params.toString()}`);
   };
 
   return (

@@ -4,6 +4,7 @@ import {
   PONPON_AUTH_EXCHANGE_URL,
   PONPON_AUTH_REFRESH_URL,
 } from "@/lib/auth-config";
+import { parseApiTime } from "@/lib/date-time";
 import type { PonPonMeResponse } from "@/types/customer";
 
 const JWT_STORAGE_KEY = "ponpon.auth.jwt";
@@ -172,7 +173,7 @@ function buildSessionFromPayload(
       : payload && typeof payload.expiresAt === "number"
         ? payload.expiresAt
         : payload && typeof payload.expiresAt === "string"
-          ? Date.parse(payload.expiresAt)
+          ? parseApiTime(payload.expiresAt, { utc: true })
           : undefined;
 
   return {

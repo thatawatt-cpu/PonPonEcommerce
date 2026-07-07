@@ -294,9 +294,7 @@ export default function CheckoutPage({
   const [cardForm, setCardForm] =
     useState<CreditCardFormState>(emptyCardForm);
   const [promoCode, setPromoCode] = useState("");
-  const [couponCodes, setCouponCodes] = useState<string[]>(
-    promo ? [promo.toUpperCase()] : []
-  );
+  const [couponCodes, setCouponCodes] = useState<string[]>([]);
   const [promoMessage, setPromoMessage] = useState("");
   const [promoError, setPromoError] = useState(false);
   const [pricingPreview, setPricingPreview] =
@@ -462,6 +460,42 @@ export default function CheckoutPage({
   useEffect(() => {
     router.prefetch("/payment");
   }, [router]);
+
+  useEffect(() => {
+    const nextCode = promo?.trim().toUpperCase();
+    if (!nextCode) return;
+
+    const timer = window.setTimeout(() => {
+      setCouponCodes((current) => {
+        if (current.includes(nextCode)) {
+          setPromoMessage("คูปองนี้ถูกใช้แล้ว");
+          setPromoError(true);
+          return current;
+        }
+
+        if (current.length >= 2) {
+          setPromoMessage(
+            "ใช้คูปองได้สูงสุด 2 ใบ: คูปองส่วนลด 1 ใบ และคูปองส่งฟรี 1 ใบ"
+          );
+          setPromoError(true);
+          return current;
+        }
+
+        setPromoMessage("");
+        setPromoError(false);
+        return [...current, nextCode];
+      });
+
+      const params = new URLSearchParams();
+      if (mode) params.set("mode", mode);
+      router.replace(
+        params.size > 0 ? `/checkout?${params.toString()}` : "/checkout",
+        { scroll: false }
+      );
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [mode, promo, router]);
 
   useEffect(() => {
     if (!usesStoredCheckoutItems) return;
