@@ -78,6 +78,7 @@ interface CreditCardFormState {
 }
 
 const PENDING_PAYMENT_STORAGE_KEY = "ponpon.pendingPayment";
+const CHECKOUT_COUPON_SECTION_ID = "checkout-coupon-section";
 
 const emptyCardForm: CreditCardFormState = {
   name: "",
@@ -492,6 +493,13 @@ export default function CheckoutPage({
         params.size > 0 ? `/checkout?${params.toString()}` : "/checkout",
         { scroll: false }
       );
+
+      window.setTimeout(() => {
+        document.getElementById(CHECKOUT_COUPON_SECTION_ID)?.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+      }, 120);
     }, 0);
 
     return () => window.clearTimeout(timer);
@@ -1418,7 +1426,10 @@ export default function CheckoutPage({
           </details>
         </Card>
 
-        <Card className="overflow-hidden bg-white">
+        <Card
+          id={CHECKOUT_COUPON_SECTION_ID}
+          className="scroll-mt-24 overflow-hidden bg-white"
+        >
           <div className="flex items-center justify-between gap-3 px-4 py-3">
             <div className="flex min-w-0 items-center gap-2">
               <TicketPercent className="h-5 w-5 shrink-0 text-brand" />

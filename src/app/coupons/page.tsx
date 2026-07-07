@@ -365,7 +365,7 @@ export default function CouponsPage({
       }
     }
 
-    router.push(`/checkout?${params.toString()}`);
+    router.push(`/checkout?${params.toString()}#checkout-coupon-section`);
   };
 
   return (

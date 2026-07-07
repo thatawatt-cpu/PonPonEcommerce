@@ -1,5 +1,6 @@
 import "server-only";
 import { PONPON_BACKEND_BASE_URL } from "@/lib/server/api-backend";
+import { getActiveFlashSaleServer } from "@/features/flash-sales/flash-sales-service.server";
 import {
   mapApiCategoryToCategory,
   mapApiProductDetailToProduct,
@@ -14,6 +15,31 @@ import type {
 } from "@/types/api";
 
 const ALL_CATEGORY: Category = { id: "all", name: "ทั้งหมด", emoji: "🛍️" };
+
+export async function applyActiveFlashSaleToProduct(
+  product: Product
+): Promise<Product> {
+  const flashSale = await getActiveFlashSaleServer();
+  const flashSaleProduct = flashSale?.products.find(
+    (item) => item.productId === product.id
+  );
+
+  if (!flashSaleProduct) return product;
+
+  const compareAtPrice =
+    flashSaleProduct.originalPrice > flashSaleProduct.salePrice
+      ? flashSaleProduct.originalPrice
+      : product.compareAtPrice;
+
+  return {
+    ...product,
+    price: flashSaleProduct.salePrice,
+    compareAtPrice,
+    badges: product.badges.includes("ลดราคา")
+      ? product.badges
+      : [...product.badges, "ลดราคา"],
+  };
+}
 
 export async function getAllProductsServer(params?: {
   keyword?: string;
@@ -48,7 +74,7 @@ export async function getProductByIdServer(
     if (!res.ok) return null;
 
     const data: ApiProductDetail = await res.json();
-    return mapApiProductDetailToProduct(data);
+    return applyActiveFlashSaleToProduct(mapApiProductDetailToProduct(data));
   } catch (err) {
     console.error("[products] getProductByIdServer failed:", err);
     return null;
@@ -66,7 +92,7 @@ export async function getProductBySlugServer(
     if (!res.ok) return null;
 
     const data: ApiProductDetail = await res.json();
-    return mapApiProductDetailToProduct(data);
+    return applyActiveFlashSaleToProduct(mapApiProductDetailToProduct(data));
   } catch (err) {
     console.error("[products] getProductBySlugServer failed:", err);
     return null;
