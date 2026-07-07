@@ -102,6 +102,9 @@ export interface ApiCreateOrderRequest {
   shippingAddress: string;
   shippingChannel: string | null;
   shippingAmount: number;
+  paymentMethod: string;
+  couponCodes?: string[];
+  couponCode?: string;
   description: string | null;
   items: ApiCreateOrderItem[];
 }
@@ -116,6 +119,56 @@ export interface ApiCreateOrderResponse {
   shippingAmount: number;
   discountAmount: number;
   paymentExpiresAt: string;
+}
+
+export interface ApiPricingPreviewRequest {
+  customerEmail: string | null;
+  shippingName: string;
+  shippingPhone: string;
+  shippingAddress: string;
+  shippingChannel: string | null;
+  paymentMethod: string;
+  couponCodes?: string[];
+  couponCode?: string;
+  items: ApiCreateOrderItem[];
+}
+
+export interface ApiPricingPreviewLine {
+  productId: string | null;
+  variantId: string | null;
+  quantity: number;
+  unitPrice?: number;
+  totalPrice?: number;
+  discountAmount?: number;
+  [key: string]: unknown;
+}
+
+export interface ApiAppliedCoupon {
+  couponId: string;
+  code: string;
+  type: "fixed" | "percentage" | "free_shipping" | string;
+  discountAmount: number;
+}
+
+export interface ApiPricingAdjustment {
+  type?: string;
+  label?: string;
+  amount?: number;
+  [key: string]: unknown;
+}
+
+export interface ApiPricingPreviewResponse {
+  lines: ApiPricingPreviewLine[];
+  itemSubtotal: number;
+  shippingAmount: number;
+  shippingDiscountAmount: number;
+  couponDiscountAmount: number;
+  promotionDiscountAmount: number;
+  orderDiscountAmount: number;
+  vatAmount: number;
+  grandTotal: number;
+  appliedCoupons: ApiAppliedCoupon[];
+  adjustments: ApiPricingAdjustment[];
 }
 
 export interface ApiOrderPreviewItem {

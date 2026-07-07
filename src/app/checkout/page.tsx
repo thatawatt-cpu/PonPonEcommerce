@@ -37,7 +37,7 @@ import {
   type CartSelectionCheckoutItem,
 } from "@/features/checkout/cart-selection-checkout";
 import { fetchCustomerAddresses } from "@/features/customer-addresses/customer-address-api";
-import { createOrder } from "@/features/orders/order-api";
+import { createOrder, fetchPricingPreview } from "@/features/orders/order-api";
 import { fetchShippingRates } from "@/features/shipping/shipping-api";
 import {
   bahtToSatang,
@@ -54,7 +54,6 @@ import {
   toSavedAddress,
   type SavedAddress,
 } from "@/lib/address-storage";
-import { evaluatePromotion } from "@/lib/promotions";
 import { calculateEarnedPoints, getTierBySpend } from "@/lib/membership";
 import { formatBaht } from "@/lib/format";
 import { SHIPPING_FEE } from "@/lib/constants";
@@ -65,7 +64,10 @@ import {
 import type { ShippingInfo } from "@/types/customer";
 import type { PaymentMethod } from "@/types/order";
 import type { CartItem } from "@/types/cart";
-import type { ApiMobileBankingType } from "@/types/api";
+import type {
+  ApiMobileBankingType,
+  ApiPricingPreviewResponse,
+} from "@/types/api";
 import type { ShippingRateOption, ShippingRateRequest } from "@/features/shipping/shipping-types";
 
 interface CreditCardFormState {
@@ -291,10 +293,16 @@ export default function CheckoutPage({
     useState<ApiMobileBankingType>("mobile_banking_kbank");
   const [cardForm, setCardForm] =
     useState<CreditCardFormState>(emptyCardForm);
-  const [promoCode, setPromoCode] = useState(promo?.toUpperCase() ?? "");
-  const [appliedCode, setAppliedCode] = useState<string | undefined>();
+  const [promoCode, setPromoCode] = useState("");
+  const [couponCodes, setCouponCodes] = useState<string[]>(
+    promo ? [promo.toUpperCase()] : []
+  );
   const [promoMessage, setPromoMessage] = useState("");
   const [promoError, setPromoError] = useState(false);
+  const [pricingPreview, setPricingPreview] =
+    useState<ApiPricingPreviewResponse | null>(null);
+  const [pricingPreviewLoading, setPricingPreviewLoading] = useState(false);
+  const [pricingPreviewResolved, setPricingPreviewResolved] = useState(false);
   const [addressPickerOpen, setAddressPickerOpen] = useState(false);
   const [showAllAddresses, setShowAllAddresses] = useState(false);
   const [showAllItems, setShowAllItems] = useState(false);
@@ -373,8 +381,16 @@ export default function CheckoutPage({
       shipping.phone,
     ]
   );
+  const previewCanLoad =
+    hydrated &&
+    !(usesStoredCheckoutItems && !checkoutSourceLoaded) &&
+    shippingQuoteResolved &&
+    items.length > 0;
   const totalLoading =
-    !addressesLoaded || (canLoadShippingRates && !shippingQuoteResolved);
+    !addressesLoaded ||
+    (canLoadShippingRates && !shippingQuoteResolved) ||
+    (previewCanLoad && !pricingPreviewResolved) ||
+    pricingPreviewLoading;
 
   useEffect(() => {
     let cancelled = false;
@@ -489,17 +505,21 @@ export default function CheckoutPage({
     setPlaceError(null);
   };
 
-  const activePromotion = appliedCode
-    ? evaluatePromotion(appliedCode, items, subtotal, shippingFee)
-    : undefined;
-  const discountAmount = activePromotion?.discountAmount ?? 0;
-  const payableTotal = Math.max(
-    subtotal + shippingFee - discountAmount,
-    0
-  );
+  const previewSubtotal = pricingPreview?.itemSubtotal ?? subtotal;
+  const previewShippingAmount = pricingPreview?.shippingAmount ?? shippingFee;
+  const shippingDiscountAmount =
+    pricingPreview?.shippingDiscountAmount ?? 0;
+  const couponDiscountAmount = pricingPreview?.couponDiscountAmount ?? 0;
+  const promotionDiscountAmount =
+    pricingPreview?.promotionDiscountAmount ?? 0;
+  const discountAmount =
+    pricingPreview?.orderDiscountAmount ??
+    couponDiscountAmount + promotionDiscountAmount;
+  const payableTotal =
+    pricingPreview?.grandTotal ??
+    Math.max(subtotal + shippingFee - discountAmount, 0);
   const memberTier = getTierBySpend(lifetimeSpend);
   const earnedPoints = calculateEarnedPoints(payableTotal, memberTier.id);
-  const discountLabel = activePromotion?.discountLabel ?? "ส่วนลดคูปอง";
   const totalQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
   const visibleAddresses = showAllAddresses
     ? savedAddresses
@@ -514,45 +534,116 @@ export default function CheckoutPage({
         return firstTwo;
       })();
 
-  const applyPromoCode = () => {
-    const result = evaluatePromotion(
-      promoCode,
-      items,
-      subtotal,
-      shippingFee,
-    );
-    setAppliedCode(result.code);
-    setPromoMessage(result.message);
-    setPromoError(result.error);
-  };
-
   useEffect(() => {
-    if (!hydrated || !promo || (usesStoredCheckoutItems && !checkoutSourceLoaded)) {
-      return;
+    if (!previewCanLoad) {
+      const resetTimer = window.setTimeout(() => {
+        setPricingPreview(null);
+        setPricingPreviewLoading(false);
+        setPricingPreviewResolved(false);
+      }, 0);
+      return () => window.clearTimeout(resetTimer);
     }
 
+    let cancelled = false;
     const timer = window.setTimeout(() => {
-      const result = evaluatePromotion(promo, items, subtotal, shippingFee);
-      setPromoCode(promo.toUpperCase());
-      setAppliedCode(result.code);
-      setPromoMessage(result.message);
-      setPromoError(result.error);
-    }, 0);
+      setPricingPreviewLoading(true);
+      setPricingPreviewResolved(false);
 
-    return () => window.clearTimeout(timer);
+      fetchPricingPreview({
+        customerEmail: selectedAddress?.email || null,
+        shippingName: shipping.customerName.trim(),
+        shippingPhone: shipping.phone.trim(),
+        shippingAddress: shipping.address.trim(),
+        shippingChannel: selectedShippingRate?.courierCode ?? null,
+        paymentMethod: method,
+        couponCodes,
+        items: items.map((item) => ({
+          productId: item.productId,
+          variantId: item.variantId ?? null,
+          quantity: item.quantity,
+        })),
+      })
+        .then((preview) => {
+          if (cancelled) return;
+          setPricingPreview(preview);
+          setPromoError(false);
+          if (couponCodes.length > 0) {
+            const appliedCodes = preview.appliedCoupons.map(
+              (coupon) => coupon.code
+            );
+            const missingCodes = couponCodes.filter(
+              (code) => !appliedCodes.includes(code)
+            );
+            setPromoMessage(
+              missingCodes.length > 0
+                ? `คูปอง ${missingCodes.join(", ")} ยังไม่ได้ถูกใช้กับออเดอร์นี้`
+                : "ใช้คูปองเรียบร้อย"
+            );
+          } else {
+            setPromoMessage("");
+          }
+        })
+        .catch((err) => {
+          if (cancelled) return;
+          setPricingPreview(null);
+          setPromoError(true);
+          setPromoMessage(
+            err instanceof Error
+              ? err.message
+              : "ใช้คูปองได้สูงสุด 2 ใบ: คูปองส่วนลด 1 ใบ และคูปองส่งฟรี 1 ใบ"
+          );
+        })
+        .finally(() => {
+          if (!cancelled) {
+            setPricingPreviewLoading(false);
+            setPricingPreviewResolved(true);
+          }
+        });
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
   }, [
     checkoutSourceLoaded,
+    couponCodes,
     hydrated,
     items,
-    promo,
+    method,
+    previewCanLoad,
+    selectedAddress?.email,
+    selectedShippingRate?.courierCode,
+    shipping.address,
+    shipping.customerName,
+    shipping.phone,
     shippingFee,
-    subtotal,
     usesStoredCheckoutItems,
   ]);
 
-  const removePromoCode = () => {
-    setAppliedCode(undefined);
+  const applyPromoCode = () => {
+    const nextCode = promoCode.trim().toUpperCase();
+    if (!nextCode) return;
+    if (couponCodes.includes(nextCode)) {
+      setPromoMessage("คูปองนี้ถูกใช้แล้ว");
+      setPromoError(true);
+      return;
+    }
+    if (couponCodes.length >= 2) {
+      setPromoMessage(
+        "ใช้คูปองได้สูงสุด 2 ใบ: คูปองส่วนลด 1 ใบ และคูปองส่งฟรี 1 ใบ"
+      );
+      setPromoError(true);
+      return;
+    }
+    setCouponCodes((current) => [...current, nextCode]);
     setPromoCode("");
+    setPromoMessage("");
+    setPromoError(false);
+  };
+
+  const removePromoCode = (code: string) => {
+    setCouponCodes((current) => current.filter((item) => item !== code));
     setPromoMessage("");
     setPromoError(false);
   };
@@ -640,7 +731,9 @@ export default function CheckoutPage({
         shippingAddress: shipping.address,
         shippingChannel: selectedShippingRate?.courierCode ?? null,
         shippingAmount: shippingFee,
-        description: appliedCode ? `คูปอง: ${appliedCode}` : (shipping.note || null),
+        paymentMethod: method,
+        couponCodes,
+        description: shipping.note || null,
         items: items.map((item) => ({
           productId: item.productId,
           variantId: item.variantId ?? null,
@@ -1240,9 +1333,9 @@ export default function CheckoutPage({
                 โค้ดส่วนลด PonPon
               </h2>
             </div>
-            {activePromotion?.discountAmount ? (
+            {discountAmount > 0 ? (
               <span className="shrink-0 rounded-full border border-success/20 bg-success-soft px-2.5 py-1 text-xs font-extrabold text-success">
-                -{formatBaht(activePromotion.discountAmount)}
+                -{formatBaht(discountAmount)}
               </span>
             ) : null}
           </div>
@@ -1256,9 +1349,10 @@ export default function CheckoutPage({
               }}
               onApply={applyPromoCode}
               onRemove={removePromoCode}
-              appliedCode={appliedCode}
+              appliedCodes={couponCodes}
               message={promoMessage}
               error={promoError}
+              applying={pricingPreviewLoading}
             />
           </div>
         </Card>
@@ -1416,16 +1510,43 @@ export default function CheckoutPage({
             </span>
           </div>
           <div className="space-y-3 border-t border-black/[0.05] px-4 py-4">
-            <SummaryLine label="รวมการสั่งซื้อ" value={formatBaht(subtotal)} />
+            <SummaryLine
+              label="รวมการสั่งซื้อ"
+              value={formatBaht(previewSubtotal)}
+            />
             <SummaryLine
               label="การจัดส่ง"
-              value={shippingFee === 0 ? "ฟรี" : formatBaht(shippingFee)}
+              value={
+                previewShippingAmount === 0
+                  ? "ฟรี"
+                  : formatBaht(previewShippingAmount)
+              }
             />
-            {discountAmount > 0 && (
+            {shippingDiscountAmount > 0 && (
               <SummaryLine
-                label={discountLabel}
-                value={`-${formatBaht(discountAmount)}`}
+                label="ส่วนลดค่าส่ง"
+                value={`-${formatBaht(shippingDiscountAmount)}`}
                 tone="discount"
+              />
+            )}
+            {couponDiscountAmount > 0 && (
+              <SummaryLine
+                label="ส่วนลดคูปอง"
+                value={`-${formatBaht(couponDiscountAmount)}`}
+                tone="discount"
+              />
+            )}
+            {promotionDiscountAmount > 0 && (
+              <SummaryLine
+                label="โปรโมชันอัตโนมัติ"
+                value={`-${formatBaht(promotionDiscountAmount)}`}
+                tone="discount"
+              />
+            )}
+            {pricingPreview && pricingPreview.vatAmount > 0 && (
+              <SummaryLine
+                label="VAT"
+                value={formatBaht(pricingPreview.vatAmount)}
               />
             )}
             <div className="border-t border-dashed border-black/10 pt-3">

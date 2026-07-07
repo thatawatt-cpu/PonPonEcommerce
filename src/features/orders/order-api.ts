@@ -4,6 +4,8 @@ import { ponponFetch } from "@/features/auth/ponpon-auth";
 import type {
   ApiCreateOrderRequest,
   ApiCreateOrderResponse,
+  ApiPricingPreviewRequest,
+  ApiPricingPreviewResponse,
   ApiOrderListItem,
   ApiOrderListResponse,
   ApiOrderDetail,
@@ -23,6 +25,27 @@ export async function createOrder(
     throw new Error(
       (err as { message?: string } | null)?.message ??
         `สร้างออเดอร์ไม่สำเร็จ (${response.status})`
+    );
+  }
+
+  return response.json();
+}
+
+export async function fetchPricingPreview(
+  body: ApiPricingPreviewRequest
+): Promise<ApiPricingPreviewResponse> {
+  const response = await ponponFetch("/api/orders/pricing-preview", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => null);
+    throw new Error(
+      (err as { message?: string; error?: string } | null)?.message ??
+        (err as { error?: string } | null)?.error ??
+        `คำนวณราคาไม่สำเร็จ (${response.status})`
     );
   }
 
