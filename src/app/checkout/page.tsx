@@ -710,9 +710,15 @@ export default function CheckoutPage({
     currentPricingPreview.calculationStatus === "final"
       ? currentPricingPreview
       : null;
+  const manualShippingRequired =
+    currentPricingPreview?.calculationStatus === "manual_shipping_required";
   const waitingForFinalQuote =
-    previewCanLoad && (!finalPricingQuote || pricingPreviewLoading);
+    previewCanLoad &&
+    !manualShippingRequired &&
+    (!finalPricingQuote || pricingPreviewLoading);
   const totalConfirming = totalLoading || waitingForFinalQuote;
+  const paymentBlocked = totalConfirming || manualShippingRequired;
+  const previewPackages = currentPricingPreview?.packages ?? [];
   const estimatedAppliedCoupons =
     pricingPreview?.appliedCoupons.filter((coupon) =>
       couponCodes.includes(coupon.code)
@@ -942,6 +948,11 @@ export default function CheckoutPage({
   const handleConfirm = async () => {
     if (!validate() || placing || redirecting || totalLoading) return;
     const quoteId = currentQuoteId;
+    if (manualShippingRequired) {
+      setPlaceError("ออเดอร์นี้ต้องให้ร้านยืนยันค่าจัดส่งก่อนชำระเงิน");
+      return;
+    }
+
     if (!finalPricingQuote || !quoteId) {
       setPlaceError("กรุณารอระบบยืนยันยอดล่าสุดก่อนชำระเงิน");
       return;
@@ -1788,10 +1799,35 @@ export default function CheckoutPage({
                 tone="discount"
               />
             )}
+            {previewPackages.length > 0 && (
+              <div className="rounded-2xl bg-surface-muted/60 px-3 py-2 text-xs text-ink-soft">
+                <p className="font-extrabold text-ink">กล่องจัดส่ง</p>
+                <div className="mt-1 space-y-1">
+                  {previewPackages.map((pkg, index) => (
+                    <p key={`${pkg.boxCode}-${index}`}>
+                      กล่อง {pkg.boxCode} · {pkg.widthCm}x{pkg.lengthCm}x
+                      {pkg.heightCm} ซม. ·{" "}
+                      {pkg.weightKg.toLocaleString("th-TH")} กก. ·{" "}
+                      {pkg.itemCount} ชิ้น
+                    </p>
+                  ))}
+                </div>
+              </div>
+            )}
+            {manualShippingRequired && (
+              <div className="rounded-2xl bg-amber-50 px-3 py-2 text-xs font-semibold leading-relaxed text-amber-700">
+                คำสั่งซื้อนี้ต้องให้ร้านยืนยันค่าจัดส่งก่อนชำระเงิน
+                กรุณาติดต่อร้านหรือรอร้านแจ้งค่าส่ง
+              </div>
+            )}
             <div className="border-t border-dashed border-black/10 pt-3">
               <SummaryLine
                 label="ยอดชำระเงินทั้งหมด"
-                value={formatBaht(payableTotal)}
+                value={
+                  manualShippingRequired
+                    ? "รอประเมินค่าส่ง"
+                    : formatBaht(payableTotal)
+                }
                 strong
                 tone="brand"
                 loading={totalConfirming}
@@ -1831,7 +1867,9 @@ export default function CheckoutPage({
                   </span>
                 ) : (
                   <p className="min-w-[6.5rem] text-2xl font-extrabold leading-none tabular-nums text-brand">
-                    {formatBaht(payableTotal)}
+                    {manualShippingRequired
+                      ? "รอค่าส่ง"
+                      : formatBaht(payableTotal)}
                   </p>
                 )}
                 <p className="text-sm font-bold text-ink-soft">
@@ -1842,7 +1880,7 @@ export default function CheckoutPage({
             <Button
               size="lg"
               onClick={handleConfirm}
-              disabled={placing || totalConfirming}
+              disabled={placing || paymentBlocked}
               className="h-14 min-w-[165px] shrink-0 px-4 text-sm shadow-[0_8px_20px_rgba(237,23,28,0.22)]"
             >
               {placing ? (
@@ -1850,6 +1888,8 @@ export default function CheckoutPage({
                   <Loader2 className="h-5 w-5 animate-spin" />
                   กำลังดำเนินการ
                 </>
+              ) : manualShippingRequired ? (
+                "รอร้านยืนยันค่าส่ง"
               ) : waitingForFinalQuote ? (
                 <>
                   <Loader2 className="h-5 w-5 animate-spin" />

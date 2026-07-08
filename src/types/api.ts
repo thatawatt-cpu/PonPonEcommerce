@@ -194,12 +194,22 @@ export interface ApiPricingAdjustment {
   [key: string]: unknown;
 }
 
+export interface ApiPricingPreviewPackage {
+  boxCode: string;
+  widthCm: number;
+  lengthCm: number;
+  heightCm: number;
+  weightKg: number;
+  itemCount: number;
+}
+
 export interface ApiPricingPreviewResponse {
   quoteId?: string | null;
   expiresAt?: string | null;
   isFinal?: boolean;
-  calculationStatus?: "partial" | "final" | string;
+  calculationStatus?: "partial" | "final" | "manual_shipping_required" | string;
   shippingFinalized?: boolean;
+  packages?: ApiPricingPreviewPackage[];
   lines: ApiPricingPreviewLine[];
   itemSubtotal: number;
   shippingAmount: number;
