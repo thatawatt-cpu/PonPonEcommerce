@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import {
   claimCoupon,
   fetchAvailableCoupons,
+  getCachedAvailableCoupons,
 } from "@/features/coupons/coupon-api";
 import { storePendingCouponCode } from "@/features/coupons/pending-coupon";
 import type { ApiCouponListItem } from "@/types/api";
@@ -160,8 +161,16 @@ export function CouponSection({ coupons: apiCoupons = [] }: CouponSectionProps) 
   const router = useRouter();
   const [claimed, setClaimed] = useState<string[]>([]);
   const [remoteCoupons, setRemoteCoupons] =
-    useState<ApiCouponListItem[]>(apiCoupons);
-  const [couponsLoaded, setCouponsLoaded] = useState(apiCoupons.length > 0);
+    useState<ApiCouponListItem[]>(() =>
+      apiCoupons.length > 0
+        ? apiCoupons
+        : getCachedAvailableCoupons({ salesChannel: "line_liff" })
+    );
+  const [couponsLoaded, setCouponsLoaded] = useState(
+    () =>
+      apiCoupons.length > 0 ||
+      getCachedAvailableCoupons({ salesChannel: "line_liff" }).length > 0
+  );
   const coupons = remoteCoupons
     .map(mapApiCoupon)
     .filter((coupon): coupon is HomeCoupon => Boolean(coupon));
@@ -175,10 +184,9 @@ export function CouponSection({ coupons: apiCoupons = [] }: CouponSectionProps) 
 
   useEffect(() => {
     let cancelled = false;
+    const params = { salesChannel: "line_liff" };
 
-    fetchAvailableCoupons({
-      salesChannel: "line_liff",
-    })
+    fetchAvailableCoupons(params)
       .then((items) => {
         if (!cancelled) {
           setRemoteCoupons(items);

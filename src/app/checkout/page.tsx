@@ -718,7 +718,6 @@ export default function CheckoutPage({
     (!finalPricingQuote || pricingPreviewLoading);
   const totalConfirming = totalLoading || waitingForFinalQuote;
   const paymentBlocked = totalConfirming || manualShippingRequired;
-  const previewPackages = currentPricingPreview?.packages ?? [];
   const estimatedAppliedCoupons =
     pricingPreview?.appliedCoupons.filter((coupon) =>
       couponCodes.includes(coupon.code)
@@ -1794,25 +1793,10 @@ export default function CheckoutPage({
             )}
             {promotionDiscountAmount > 0 && (
               <SummaryLine
-                label="โปรโมชันอัตโนมัติ"
+                label="โปรโมชัน"
                 value={`-${formatBaht(promotionDiscountAmount)}`}
                 tone="discount"
               />
-            )}
-            {previewPackages.length > 0 && (
-              <div className="rounded-2xl bg-surface-muted/60 px-3 py-2 text-xs text-ink-soft">
-                <p className="font-extrabold text-ink">กล่องจัดส่ง</p>
-                <div className="mt-1 space-y-1">
-                  {previewPackages.map((pkg, index) => (
-                    <p key={`${pkg.boxCode}-${index}`}>
-                      กล่อง {pkg.boxCode} · {pkg.widthCm}x{pkg.lengthCm}x
-                      {pkg.heightCm} ซม. ·{" "}
-                      {pkg.weightKg.toLocaleString("th-TH")} กก. ·{" "}
-                      {pkg.itemCount} ชิ้น
-                    </p>
-                  ))}
-                </div>
-              </div>
             )}
             {manualShippingRequired && (
               <div className="rounded-2xl bg-amber-50 px-3 py-2 text-xs font-semibold leading-relaxed text-amber-700">

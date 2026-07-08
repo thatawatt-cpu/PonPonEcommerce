@@ -4,7 +4,6 @@ import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   Check,
-  ChevronRight,
   X,
   Heart,
   PackageCheck,
@@ -33,7 +32,9 @@ import {
 import {
   claimCoupon,
   fetchAvailableCoupons,
+  getCachedAvailableCoupons,
 } from "@/features/coupons/coupon-api";
+import { storePendingCouponCode } from "@/features/coupons/pending-coupon";
 import { cn } from "@/lib/utils";
 import type { ApiCouponListItem } from "@/types/api";
 import type { Product } from "@/types/product";
@@ -44,51 +45,6 @@ type ReviewMedia =
 
 type ReviewFilter = "all" | "media" | "5" | "4" | "3" | "2" | "1" | "latest";
 type DetailTab = "detail" | "shipping" | "review";
-
-const productCoupons = [
-  {
-    id: "ponpon50",
-    value: "฿50",
-    title: "ส่วนลด 50 ฿",
-    detail: "เฉพาะร้านที่ไม่เคยลอง",
-    minimumLabel: "ขั้นต่ำ 499 ฿",
-    code: "PONPON50",
-    isClaimed: false,
-    canClaim: true,
-    remainingTotalUses: null,
-    maximumUsesPerCustomer: null,
-    customerUsedCount: null,
-    isFallback: true,
-  },
-  {
-    id: "freeship",
-    value: "FREE",
-    title: "ส่งฟรี",
-    detail: "เมื่อช้อปครบ ฿399",
-    minimumLabel: "ขั้นต่ำ 399 ฿",
-    code: "FREESHIP",
-    isClaimed: false,
-    canClaim: true,
-    remainingTotalUses: null,
-    maximumUsesPerCustomer: null,
-    customerUsedCount: null,
-    isFallback: true,
-  },
-  {
-    id: "friend50",
-    value: "฿50",
-    title: "เพื่อนใหม่",
-    detail: "เมื่อช้อปครบ ฿299",
-    minimumLabel: "ขั้นต่ำ 299 ฿",
-    code: "PONFRIEND50",
-    isClaimed: false,
-    canClaim: true,
-    remainingTotalUses: null,
-    maximumUsesPerCustomer: null,
-    customerUsedCount: null,
-    isFallback: true,
-  },
-];
 
 interface ProductCoupon {
   id: string;
@@ -102,7 +58,6 @@ interface ProductCoupon {
   remainingTotalUses?: number | null;
   maximumUsesPerCustomer?: number | null;
   customerUsedCount?: number | null;
-  isFallback?: boolean;
 }
 
 function asNumber(value: unknown): number | null {
@@ -303,9 +258,13 @@ export function ProductDetailClient({
   const touchStartX = useRef<number | null>(null);
   const [reviewsOpen, setReviewsOpen] = useState(false);
   const [reviewFilter, setReviewFilter] = useState<ReviewFilter>("all");
-  const [claimedProductCoupons, setClaimedProductCoupons] = useState<string[]>([]);
-  const [remoteProductCoupons, setRemoteProductCoupons] = useState<ApiCouponListItem[]>([]);
-  const [productCouponsLoaded, setProductCouponsLoaded] = useState(false);
+  const [remoteProductCoupons, setRemoteProductCoupons] = useState<ApiCouponListItem[]>(
+    () => getCachedAvailableCoupons({ salesChannel: "line_liff" })
+  );
+  const [productCouponsLoaded, setProductCouponsLoaded] = useState(
+    () => getCachedAvailableCoupons({ salesChannel: "line_liff" }).length > 0
+  );
+  const [claimingProductCouponIds, setClaimingProductCouponIds] = useState<string[]>([]);
   const [activeReviewMedia, setActiveReviewMedia] = useState<ReviewMedia | null>(null);
   const [activeTab, setActiveTab] = useState<DetailTab>("detail");
   const apiProductCoupons = remoteProductCoupons
@@ -314,19 +273,15 @@ export function ProductDetailClient({
   const visibleProductCoupons = apiProductCoupons.filter(
     canShowAvailableCoupon
   );
-  const visibleFallbackProductCoupons = productCoupons.filter(
-    (coupon) => !claimedProductCoupons.includes(coupon.id)
-  );
-  const displayProductCoupons = productCouponsLoaded
-    ? visibleProductCoupons
-    : visibleFallbackProductCoupons;
+  const displayProductCoupons = productCouponsLoaded ? visibleProductCoupons : [];
+  const showProductCouponSection =
+    !productCouponsLoaded || displayProductCoupons.length > 0;
 
   useEffect(() => {
     let cancelled = false;
+    const params = { salesChannel: "line_liff" };
 
-    fetchAvailableCoupons({
-      salesChannel: "line_liff",
-    })
+    fetchAvailableCoupons(params)
       .then((items) => {
         if (!cancelled) {
           setRemoteProductCoupons(items);
@@ -351,21 +306,29 @@ export function ProductDetailClient({
   const claimProductCoupon = (coupon: ProductCoupon) => {
     if (coupon.isClaimed || !coupon.canClaim) return;
 
-    if (!coupon.isFallback) {
-      claimCoupon(coupon.id).then((claimedCoupon) => {
+    setClaimingProductCouponIds((current) =>
+      current.includes(coupon.id) ? current : [...current, coupon.id]
+    );
+
+    claimCoupon(coupon.id)
+      .then((claimedCoupon) => {
         if (!claimedCoupon) return;
         setRemoteProductCoupons((current) =>
           current.map((item) =>
             item.id === coupon.id ? claimedCoupon : item
           )
         );
+      })
+      .finally(() => {
+        setClaimingProductCouponIds((current) =>
+          current.filter((id) => id !== coupon.id)
+        );
       });
-      return;
-    }
+  };
 
-    setClaimedProductCoupons((current) =>
-      current.includes(coupon.id) ? current : [...current, coupon.id]
-    );
+  const handleUseProductCoupon = (coupon: ProductCoupon) => {
+    storePendingCouponCode(coupon.code);
+    router.push(`/products?coupon=${encodeURIComponent(coupon.code)}`);
   };
 
   const detailContent =
@@ -911,59 +874,79 @@ export function ProductDetailClient({
 
           {/* ── Coupons ── */}
 
-          {displayProductCoupons.length > 0 && (
+          {showProductCouponSection && (
             <div className="product-detail-wide app-panel-shadow mt-2 bg-white px-4 pb-4 pt-3.5">
               <div className="mb-3 flex items-center justify-between">
                 <h2 className="flex items-center gap-1.5 text-sm font-bold text-ink">
                   <TicketPercent className="h-4 w-4 text-brand" />
                   คูปองสำหรับคุณ
                 </h2>
-                <Link href="/coupons" className="flex items-center gap-0.5 text-xs font-bold text-brand">
-                  ดูทั้งหมด <ChevronRight className="h-3.5 w-3.5" />
+                <Link href="/coupons" className="text-[11px] font-extrabold text-brand">
+                  คูปองของฉัน
                 </Link>
               </div>
-              <div className="no-scrollbar -mx-2 flex gap-2.5 overflow-x-auto px-2 pb-1.5 pt-0.5">
-                {displayProductCoupons.map((coupon) => {
-                  const isClaimed =
-                    coupon.isClaimed || claimedProductCoupons.includes(coupon.id);
+              <div className="no-scrollbar -mx-3.5 flex gap-2.5 overflow-x-auto px-3.5 pb-1 md:mx-0 md:grid md:grid-cols-2 md:gap-3 md:overflow-visible md:px-0">
+                {!productCouponsLoaded
+                  ? [0, 1].map((item) => (
+                      <div
+                        key={item}
+                        className="home-panel-shadow relative flex min-w-[18rem] flex-1 overflow-hidden rounded-card bg-white ring-1 ring-brand/10 md:min-w-0"
+                      >
+                        <div className="h-[5.75rem] w-24 shrink-0 animate-pulse bg-brand/15" />
+                        <div className="flex min-w-0 flex-1 items-center justify-between gap-2 px-3 py-3">
+                          <div className="min-w-0 flex-1 space-y-2">
+                            <div className="h-4 w-28 animate-pulse rounded-full bg-surface-muted" />
+                            <div className="h-3 w-36 animate-pulse rounded-full bg-surface-muted" />
+                            <div className="h-3 w-24 animate-pulse rounded-full bg-surface-muted" />
+                          </div>
+                          <div className="h-9 w-14 shrink-0 animate-pulse rounded-full bg-surface-muted" />
+                        </div>
+                        <span className="absolute -left-2 top-1/2 h-4 w-4 -translate-y-1/2 rounded-full bg-surface-muted" />
+                      </div>
+                    ))
+                  : displayProductCoupons.map((coupon) => {
+                  const isClaimed = coupon.isClaimed;
                   const canClaim = coupon.canClaim && !isClaimed;
+                  const isClaiming = claimingProductCouponIds.includes(coupon.id);
                   return (
                     <article
                       key={coupon.id}
-                      className="relative flex min-h-[4.75rem] min-w-[16.75rem] rounded-2xl bg-white shadow-sm ring-1 ring-brand/15"
+                      className="home-panel-shadow relative flex min-w-[18rem] flex-1 overflow-hidden rounded-card bg-white ring-1 ring-brand/10 md:min-w-0"
                     >
-                      <div className="flex w-[4.75rem] shrink-0 flex-col items-center justify-center rounded-l-2xl bg-brand px-2 py-3 text-center text-white">
-                        <span className="text-lg font-extrabold leading-none">{coupon.value}</span>
-                        <span className="mt-0.5 text-[9px] font-bold leading-tight text-white/90">{coupon.minimumLabel}</span>
+                      <div className="flex w-24 shrink-0 flex-col items-center justify-center bg-brand px-2 py-4 text-center text-white">
+                        <span className="text-xl font-extrabold leading-none">{coupon.value}</span>
+                        <span className="mt-1 text-[10px] font-bold leading-tight text-white/80">{coupon.minimumLabel}</span>
                       </div>
-                      <div className="flex flex-1 items-center justify-between gap-2 px-3 py-2">
+                      <div className="flex min-w-0 flex-1 items-center justify-between gap-2 px-3 py-3">
                         <div className="min-w-0">
-                          <p className="truncate text-xs font-bold text-ink">{coupon.title}</p>
-                          <p className="mt-0.5 line-clamp-1 text-[10px] font-semibold text-ink-soft">{coupon.detail}</p>
-                          <p className="mt-0.5 truncate text-[10px] font-bold uppercase text-ink-soft">
+                          <p className="truncate text-sm font-extrabold text-ink">{coupon.title}</p>
+                          <p className="mt-0.5 line-clamp-1 text-xs font-semibold text-ink-soft">{coupon.detail}</p>
+                          <p className="mt-1 truncate text-[10px] font-bold uppercase text-ink-soft">
                             CODE {coupon.code}
                           </p>
                         </div>
                         <button
                           type="button"
-                          disabled={!canClaim}
-                          onClick={() => claimProductCoupon(coupon)}
-                          className={cn(
-                            "flex h-8 shrink-0 items-center justify-center rounded-full px-2.5 text-[10px] font-bold text-white transition active:scale-95 disabled:shadow-none",
+                          disabled={isClaiming || (!isClaimed && !canClaim)}
+                          onClick={() =>
                             isClaimed
-                              ? "bg-emerald-100 text-emerald-600"
+                              ? handleUseProductCoupon(coupon)
+                              : claimProductCoupon(coupon)
+                          }
+                          className={cn(
+                            "flex h-9 shrink-0 items-center justify-center rounded-full px-3 text-xs font-bold transition active:scale-95 disabled:shadow-none",
+                            isClaimed
+                              ? "brand-button text-white"
                               : canClaim
-                                ? "bg-brand shadow-md shadow-brand/25"
+                                ? "brand-button text-white"
                                 : "bg-surface-muted text-ink-soft"
                           )}
-                          aria-label={isClaimed ? "เก็บคูปองแล้ว" : "เก็บคูปอง"}
+                          aria-label={isClaimed ? "ใช้คูปอง" : "เก็บคูปอง"}
                         >
-                          {isClaimed ? "เก็บแล้ว" : "เก็บ"}
+                          {isClaiming ? "..." : isClaimed ? "ใช้เลย" : "เก็บ"}
                         </button>
                       </div>
-                      <span className="absolute bottom-0 left-[4.75rem] top-0 border-l border-dashed border-brand/20" />
-                      <span className="absolute left-[4.75rem] top-0 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white ring-1 ring-brand/15" />
-                      <span className="absolute bottom-0 left-[4.75rem] h-3.5 w-3.5 -translate-x-1/2 translate-y-1/2 rounded-full bg-white ring-1 ring-brand/15" />
+                      <span className="absolute -left-2 top-1/2 h-4 w-4 -translate-y-1/2 rounded-full bg-surface-muted" />
                     </article>
                   );
                 })}
