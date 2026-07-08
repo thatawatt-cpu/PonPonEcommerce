@@ -293,6 +293,15 @@ const COUPON_ERROR_MESSAGES: Record<string, string> = {
   coupon_quota_no_longer_available: "คูปองนี้เพิ่งหมดสิทธิ์แล้ว",
 };
 
+const QUOTE_ERROR_MESSAGES: Record<string, string> = {
+  quote_required: "กรุณารอระบบยืนยันยอดล่าสุดก่อนชำระเงิน",
+  quote_not_found: "ไม่พบยอดยืนยันล่าสุด กรุณารอสักครู่แล้วลองใหม่",
+  quote_expired: "ยอดยืนยันหมดอายุแล้ว กรุณารอระบบคำนวณใหม่",
+  quote_not_final: "ยอดนี้ยังไม่พร้อมสร้างคำสั่งซื้อ กรุณารอสักครู่",
+  quote_shipping_not_finalized: "กรุณารอระบบยืนยันค่าจัดส่งก่อนชำระเงิน",
+  quote_mismatch: "ข้อมูลคำสั่งซื้อเปลี่ยนไป กรุณารอระบบคำนวณยอดใหม่",
+};
+
 function getErrorDetails(err: ApiRequestError): Record<string, unknown> | null {
   return err.details && typeof err.details === "object"
     ? (err.details as Record<string, unknown>)
@@ -335,7 +344,11 @@ function getCouponErrorMessage(
       return "ยอดสินค้ายังไม่ถึงขั้นต่ำของคูปองนี้";
     }
 
-    return COUPON_ERROR_MESSAGES[err.code] ?? err.message;
+    return (
+      COUPON_ERROR_MESSAGES[err.code] ??
+      QUOTE_ERROR_MESSAGES[err.code] ??
+      err.message
+    );
   }
 
   return err instanceof Error
@@ -460,10 +473,7 @@ export default function CheckoutPage({
     ]
   );
   const previewCanLoad =
-    hydrated &&
-    !(usesStoredCheckoutItems && !checkoutSourceLoaded) &&
-    shippingQuoteResolved &&
-    items.length > 0;
+    canLoadShippingRates;
   const totalLoading =
     !addressesLoaded ||
     (canLoadShippingRates && !shippingQuoteResolved);
@@ -686,6 +696,22 @@ export default function CheckoutPage({
   const pricingPreviewIsCurrent =
     pricingPreview != null &&
     pricingPreviewSignature === currentPricingPreviewSignature;
+  const currentPricingPreview = pricingPreviewIsCurrent
+    ? pricingPreview
+    : null;
+  const currentQuoteId =
+    currentPricingPreview && typeof currentPricingPreview.quoteId === "string"
+      ? currentPricingPreview.quoteId
+      : null;
+  const finalPricingQuote =
+    currentQuoteId &&
+    currentPricingPreview?.isFinal === true &&
+    currentPricingPreview.shippingFinalized === true &&
+    currentPricingPreview.calculationStatus === "final"
+      ? currentPricingPreview
+      : null;
+  const waitingForFinalQuote =
+    previewCanLoad && (!finalPricingQuote || pricingPreviewLoading);
   const estimatedAppliedCoupons =
     pricingPreview?.appliedCoupons.filter((coupon) =>
       couponCodes.includes(coupon.code)
@@ -914,6 +940,12 @@ export default function CheckoutPage({
 
   const handleConfirm = async () => {
     if (!validate() || placing || redirecting || totalLoading) return;
+    const quoteId = currentQuoteId;
+    if (!finalPricingQuote || !quoteId) {
+      setPlaceError("กรุณารอระบบยืนยันยอดล่าสุดก่อนชำระเงิน");
+      return;
+    }
+
     setPlacing(true);
     setPlaceError(null);
 
@@ -929,6 +961,7 @@ export default function CheckoutPage({
 
       const order = await createOrder({
         clientRequestId: crypto.randomUUID(),
+        quoteId,
         customerName: shipping.customerName,
         customerEmail: null,
         customerPhone: shipping.phone,
@@ -1808,13 +1841,18 @@ export default function CheckoutPage({
             <Button
               size="lg"
               onClick={handleConfirm}
-              disabled={placing || totalLoading}
+              disabled={placing || totalLoading || waitingForFinalQuote}
               className="h-14 min-w-[165px] shrink-0 px-4 text-sm shadow-[0_8px_20px_rgba(237,23,28,0.22)]"
             >
               {placing ? (
                 <>
                   <Loader2 className="h-5 w-5 animate-spin" />
                   กำลังดำเนินการ
+                </>
+              ) : waitingForFinalQuote ? (
+                <>
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  กำลังยืนยันยอด
                 </>
               ) : (
                 "ยืนยันและชำระเงิน"

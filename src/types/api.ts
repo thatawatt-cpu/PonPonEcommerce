@@ -93,6 +93,7 @@ export interface ApiCreateOrderItem {
 
 export interface ApiCreateOrderRequest {
   clientRequestId: string;
+  quoteId: string;
   customerName: string;
   customerEmail: string | null;
   customerPhone: string;
@@ -194,6 +195,11 @@ export interface ApiPricingAdjustment {
 }
 
 export interface ApiPricingPreviewResponse {
+  quoteId?: string | null;
+  expiresAt?: string | null;
+  isFinal?: boolean;
+  calculationStatus?: "partial" | "final" | string;
+  shippingFinalized?: boolean;
   lines: ApiPricingPreviewLine[];
   itemSubtotal: number;
   shippingAmount: number;
