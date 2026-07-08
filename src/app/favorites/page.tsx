@@ -8,12 +8,12 @@ import { PageContainer } from "@/components/layout/page-container";
 import { ProductImage } from "@/components/product/product-image";
 import { Price } from "@/components/ui/price";
 import { Card } from "@/components/ui/card";
-import { mapApiProductToProduct } from "@/features/products/product-mapper";
+import { mapApiShopProductToProduct } from "@/features/products/product-mapper";
 import {
   useFavoriteStore,
   useFavoritesHydrated,
 } from "@/store/favorite-store";
-import type { ApiProductListItem } from "@/types/api";
+import type { ApiShopProductListItem } from "@/types/api";
 import type { Product } from "@/types/product";
 
 export default function FavoritesPage() {
@@ -30,11 +30,11 @@ export default function FavoritesPage() {
   useEffect(() => {
     const controller = new AbortController();
 
-    fetch("/api/products?pageSize=100", { signal: controller.signal })
+    fetch("/api/shop/products?pageSize=100", { signal: controller.signal })
       .then(async (response) => {
         if (!response.ok) return [];
-        const data = (await response.json()) as ApiProductListItem[];
-        return Array.isArray(data) ? data.map(mapApiProductToProduct) : [];
+        const data = (await response.json()) as ApiShopProductListItem[];
+        return Array.isArray(data) ? data.map(mapApiShopProductToProduct) : [];
       })
       .then(setProducts)
       .catch((error: unknown) => {

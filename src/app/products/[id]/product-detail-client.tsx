@@ -19,6 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { Price } from "@/components/ui/price";
 import { Button } from "@/components/ui/button";
 import { ProductImage } from "@/components/product/product-image";
+import { ProductCard } from "@/components/product/product-card";
 import { QuantitySelector } from "@/components/product/quantity-selector";
 import { useCartStore } from "@/store/cart-store";
 import {
@@ -236,6 +237,8 @@ function getInitialSelectedOptions(
 
 interface ProductDetailClientProps {
   product: Product;
+  initialCoupons?: ApiCouponListItem[];
+  relatedProducts?: Product[];
   cartEditItemKey?: string;
   initialQuantity?: number;
   initialSelectedOptions?: Record<string, string>;
@@ -243,6 +246,8 @@ interface ProductDetailClientProps {
 
 export function ProductDetailClient({
   product,
+  initialCoupons = [],
+  relatedProducts = [],
   cartEditItemKey,
   initialQuantity,
   initialSelectedOptions,
@@ -273,10 +278,15 @@ export function ProductDetailClient({
   const [reviewsOpen, setReviewsOpen] = useState(false);
   const [reviewFilter, setReviewFilter] = useState<ReviewFilter>("all");
   const [remoteProductCoupons, setRemoteProductCoupons] = useState<ApiCouponListItem[]>(
-    () => getCachedAvailableCoupons(getProductCouponParams(product))
+    () =>
+      initialCoupons.length > 0
+        ? initialCoupons
+        : getCachedAvailableCoupons(getProductCouponParams(product))
   );
   const [productCouponsLoaded, setProductCouponsLoaded] = useState(
-    () => getCachedAvailableCoupons(getProductCouponParams(product)).length > 0
+    () =>
+      initialCoupons.length > 0 ||
+      getCachedAvailableCoupons(getProductCouponParams(product)).length > 0
   );
   const [claimingProductCouponIds, setClaimingProductCouponIds] = useState<string[]>([]);
   const [activeReviewMedia, setActiveReviewMedia] = useState<ReviewMedia | null>(null);
@@ -425,6 +435,11 @@ export function ProductDetailClient({
 
     void Promise.resolve().then(() => {
       if (cancelled) return;
+      if (initialCoupons.length > 0 && !selectedVariant) {
+        setRemoteProductCoupons(initialCoupons);
+        setProductCouponsLoaded(true);
+        return;
+      }
       if (cachedCoupons.length > 0) {
         setRemoteProductCoupons(cachedCoupons);
         setProductCouponsLoaded(true);
@@ -453,7 +468,7 @@ export function ProductDetailClient({
     return () => {
       cancelled = true;
     };
-  }, [product, selectedVariant]);
+  }, [initialCoupons, product, selectedVariant]);
 
   const getPriorSelections = (optionName: string) => {
     const optionIndex =
@@ -1192,6 +1207,31 @@ export function ProductDetailClient({
               )}
             </div>
           </div>
+
+          {relatedProducts.length > 0 && (
+            <section className="product-detail-wide app-panel-shadow mt-2 bg-white px-4 py-4">
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="text-sm font-extrabold text-ink">
+                  สินค้าที่เกี่ยวข้อง
+                </h2>
+                <Link
+                  href={`/products?category=${encodeURIComponent(product.categoryId)}`}
+                  className="text-[11px] font-extrabold text-brand"
+                >
+                  ดูทั้งหมด
+                </Link>
+              </div>
+              <div className="grid grid-cols-2 gap-2.5 md:grid-cols-4 md:gap-3">
+                {relatedProducts.map((relatedProduct, index) => (
+                  <ProductCard
+                    key={relatedProduct.id}
+                    product={relatedProduct}
+                    index={index}
+                  />
+                ))}
+              </div>
+            </section>
+          )}
 
           <div className="product-detail-action-spacer product-detail-wide" />
         </div>

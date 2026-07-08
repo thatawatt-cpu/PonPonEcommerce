@@ -4,7 +4,6 @@ import {
   getAllProductsServer,
   getCategoriesServer,
 } from "@/features/products/product-service.server";
-import { getActiveFlashSaleServer } from "@/features/flash-sales/flash-sales-service.server";
 import { ProductsClient } from "./products-client";
 
 export const dynamic = "force-dynamic";
@@ -16,28 +15,15 @@ export default async function ProductsPage({
 }) {
   const { category, coupon, flashSale: flashSaleParam } = await searchParams;
 
-  const [products, categories, flashSale] = await Promise.all([
+  const [products, categories] = await Promise.all([
     getAllProductsServer(),
     getCategoriesServer(),
-    getActiveFlashSaleServer(),
   ]);
-  const flashSaleProductMap = new Map(
-    flashSale?.products.map((p) => [p.productId, p]) ?? []
-  );
-  const productsWithFlashSale = flashSaleProductMap.size > 0
-    ? products.map((product) => {
-        const flashSaleProduct = flashSaleProductMap.get(product.id);
-        return flashSaleProduct
-          ? {
-              ...product,
-              price: flashSaleProduct.salePrice,
-              compareAtPrice: flashSaleProduct.originalPrice,
-            }
-          : product;
-      })
-    : products;
+  const flashSaleProductIds = products
+    .filter((product) => product.priceSource === "flash_sale")
+    .map((product) => product.id);
   const initialCategory =
-    flashSaleParam === "1" && flashSaleProductMap.size > 0
+    flashSaleParam === "1" && flashSaleProductIds.length > 0
       ? "flash-sale"
       : category ?? "all";
 
@@ -46,11 +32,11 @@ export default async function ProductsPage({
       <AppHeader title="สินค้าทั้งหมด" />
       <PageContainer className="pt-4 md:max-w-5xl md:px-8 xl:max-w-6xl">
         <ProductsClient
-          products={productsWithFlashSale}
+          products={products}
           categories={categories}
           initialCategory={initialCategory}
           selectedCouponCode={coupon}
-          flashSaleProductIds={[...flashSaleProductMap.keys()]}
+          flashSaleProductIds={flashSaleProductIds}
         />
       </PageContainer>
     </>

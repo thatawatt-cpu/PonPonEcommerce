@@ -31,6 +31,12 @@ function getMockReview(product: Product): string {
   return (4.7 + (seed % 3) / 10).toFixed(1);
 }
 
+function getReviewLabel(product: Product): string {
+  return typeof product.rating === "number"
+    ? product.rating.toFixed(1)
+    : getMockReview(product);
+}
+
 export function ProductCard({
   product,
   index = 0,
@@ -44,7 +50,7 @@ export function ProductCard({
 }) {
   const discountPercent = getDiscountPercent(product);
   const soldCountLabel = formatSoldCount(product.soldCount);
-  const reviewLabel = getMockReview(product);
+  const reviewLabel = getReviewLabel(product);
   const visibleBadges = product.badges
     .filter((badge) => badge !== "ลดราคา" || discountPercent === null)
     .slice(0, discountPercent === null ? 2 : 1);

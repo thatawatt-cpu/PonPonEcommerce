@@ -18,6 +18,50 @@ export interface ApiProductListItem {
   status: string;
 }
 
+export interface ApiShopProductListItem {
+  id: string;
+  slug: string | null;
+  name: string;
+  imageUrl: string | null;
+  sellPrice: number;
+  displayPrice: number;
+  displayOriginalPrice: number | null;
+  priceSource: "base" | "flash_sale" | string;
+  activeFlashSaleId: string | null;
+  soldCount: number;
+  rating: number | null;
+  reviewCount: number;
+  badges: string[];
+  sku?: string | null;
+  baseSku?: string | null;
+  availableStock?: number | null;
+  stock?: number | null;
+  categoryName?: string | null;
+  isFeatured?: boolean | null;
+  isBestSeller?: boolean | null;
+}
+
+export interface ApiShopHomeResponse {
+  slides: ApiHomeSlide[];
+  flashSale: ApiFlashSale | null;
+  featuredProducts: ApiShopProductListItem[];
+  availableCoupons: ApiCouponListItem[];
+}
+
+export interface ApiResolvedProductPrice {
+  displayPrice: number;
+  displayOriginalPrice: number | null;
+  priceSource: "base" | "flash_sale" | string;
+  activeFlashSaleId: string | null;
+}
+
+export interface ApiShopProductDetailResponse {
+  product: ApiProductDetail;
+  availableCoupons: ApiCouponListItem[];
+  relatedProducts: ApiShopProductListItem[];
+  resolvedPrice: ApiResolvedProductPrice;
+}
+
 export interface ApiProductImage {
   id: string;
   url: string;
@@ -68,6 +112,10 @@ export interface ApiProductDetail extends ApiProductListItem {
   isOnHomepage: boolean;
   slug: string | null;
   originalPrice: number | null;
+  displayPrice?: number | null;
+  displayOriginalPrice?: number | null;
+  priceSource?: "base" | "flash_sale" | string | null;
+  activeFlashSaleId?: string | null;
   promotionBadge: string | null;
   highlights: string | null;
   richDescription: string | null;

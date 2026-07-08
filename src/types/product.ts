@@ -55,6 +55,8 @@ export interface Product {
   description: string;
   price: number;
   compareAtPrice?: number;
+  priceSource?: "base" | "flash_sale" | string;
+  activeFlashSaleId?: string | null;
   imageUrl: string;
   gallery?: ProductGalleryItem[];
   detailContent?: ProductDetailContent;
@@ -65,6 +67,8 @@ export interface Product {
   badges: ProductBadge[];
   stock: number;
   soldCount?: number;
+  rating?: number | null;
+  reviewCount?: number;
   options?: ProductOption[];
   variants?: ProductVariantStock[];
   isFeatured: boolean;

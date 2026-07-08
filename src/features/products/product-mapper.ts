@@ -2,6 +2,7 @@ import type { Product, ProductBadge } from "@/types/product";
 import type { Category } from "@/types/common";
 import type {
   ApiProductListItem,
+  ApiShopProductListItem,
   ApiProductDetail,
   ApiCategory,
 } from "@/types/api";
@@ -24,6 +25,28 @@ function getSoldCount(product: ApiProductListItem | ApiProductDetail): number | 
   return product.soldCount > 0 ? product.soldCount : undefined;
 }
 
+function mapShopBadges(badges: string[] = []): ProductBadge[] {
+  return badges.includes("flash_sale") ? ["ลดราคา"] : [];
+}
+
+function getDetailDisplayPrice(api: ApiProductDetail): number {
+  return typeof api.displayPrice === "number" ? api.displayPrice : api.sellPrice;
+}
+
+function getDetailCompareAtPrice(
+  api: ApiProductDetail,
+  displayPrice: number
+): number | undefined {
+  const compareAtPrice =
+    typeof api.displayOriginalPrice === "number"
+      ? api.displayOriginalPrice
+      : api.originalPrice;
+
+  return compareAtPrice && compareAtPrice > displayPrice
+    ? compareAtPrice
+    : undefined;
+}
+
 export function mapApiProductToProduct(api: ApiProductListItem): Product {
   return {
     id: api.id,
@@ -44,6 +67,34 @@ export function mapApiProductToProduct(api: ApiProductListItem): Product {
   };
 }
 
+export function mapApiShopProductToProduct(api: ApiShopProductListItem): Product {
+  return {
+    id: api.id,
+    sku: api.sku || api.baseSku || undefined,
+    name: api.name,
+    slug: api.slug ?? api.id,
+    description: "",
+    price: api.displayPrice,
+    compareAtPrice:
+      api.displayOriginalPrice && api.displayOriginalPrice > api.displayPrice
+        ? api.displayOriginalPrice
+        : undefined,
+    priceSource: api.priceSource,
+    activeFlashSaleId: api.activeFlashSaleId,
+    imageUrl: api.imageUrl ?? "",
+    emoji: "📦",
+    categoryId: api.categoryName ?? "",
+    categoryName: api.categoryName ?? "",
+    badges: mapShopBadges(api.badges),
+    stock: api.availableStock ?? api.stock ?? 0,
+    soldCount: api.soldCount > 0 ? api.soldCount : undefined,
+    rating: api.rating,
+    reviewCount: api.reviewCount,
+    isFeatured: Boolean(api.isFeatured),
+    isBestSeller: Boolean(api.isBestSeller),
+  };
+}
+
 export function mapApiProductDetailToProduct(api: ApiProductDetail): Product {
   const sortedImages = api.images?.slice().sort((a, b) => a.sortOrder - b.sortOrder) ?? [];
   const primaryImageObj = sortedImages.find((img) => img.isPrimary) ?? sortedImages[0];
@@ -54,6 +105,7 @@ export function mapApiProductDetailToProduct(api: ApiProductDetail): Product {
     .map((img) => ({ id: img.id, label: "รูปสินค้า", imageUrl: img.url }));
 
   const activeVariants = api.variants?.filter((v) => v.isActiveFromZort) ?? [];
+  const displayPrice = getDetailDisplayPrice(api);
 
   return {
     id: api.id,
@@ -62,11 +114,10 @@ export function mapApiProductDetailToProduct(api: ApiProductDetail): Product {
     name: api.name,
     slug: api.slug ?? api.baseSku.toLowerCase().replace(/\s+/g, "-"),
     description: api.description ?? "",
-    price: api.sellPrice,
-    compareAtPrice:
-      api.originalPrice && api.originalPrice > api.sellPrice
-        ? api.originalPrice
-        : undefined,
+    price: displayPrice,
+    compareAtPrice: getDetailCompareAtPrice(api, displayPrice),
+    priceSource: api.priceSource ?? undefined,
+    activeFlashSaleId: api.activeFlashSaleId ?? null,
     imageUrl: primaryImage,
     gallery: galleryImages,
     emoji: "📦",

@@ -1,43 +1,67 @@
 import "server-only";
 import { PONPON_BACKEND_BASE_URL } from "@/lib/server/api-backend";
-import { getActiveFlashSaleServer } from "@/features/flash-sales/flash-sales-service.server";
 import {
   mapApiCategoryToCategory,
   mapApiProductDetailToProduct,
-  mapApiProductToProduct,
+  mapApiShopProductToProduct,
 } from "./product-mapper";
 import type { Category } from "@/types/common";
 import type { Product } from "@/types/product";
 import type {
   ApiCategory,
-  ApiProductDetail,
-  ApiProductListItem,
+  ApiCouponListItem,
+  ApiResolvedProductPrice,
+  ApiShopProductDetailResponse,
+  ApiShopProductListItem,
 } from "@/types/api";
 
 const ALL_CATEGORY: Category = { id: "all", name: "ทั้งหมด", emoji: "🛍️" };
 
-export async function applyActiveFlashSaleToProduct(
-  product: Product
-): Promise<Product> {
-  const flashSale = await getActiveFlashSaleServer();
-  const flashSaleProduct = flashSale?.products.find(
-    (item) => item.productId === product.id
-  );
+export interface ProductDetailServerData {
+  product: Product;
+  availableCoupons: ApiCouponListItem[];
+  relatedProducts: Product[];
+}
 
-  if (!flashSaleProduct) return product;
+function getArray<T>(value: T[] | null | undefined): T[] {
+  return Array.isArray(value) ? value : [];
+}
 
-  const compareAtPrice =
-    flashSaleProduct.originalPrice > flashSaleProduct.salePrice
-      ? flashSaleProduct.originalPrice
-      : product.compareAtPrice;
+function applyResolvedPrice(
+  product: Product,
+  resolvedPrice?: ApiResolvedProductPrice | null
+): Product {
+  if (!resolvedPrice || typeof resolvedPrice.displayPrice !== "number") {
+    return product;
+  }
 
   return {
     ...product,
-    price: flashSaleProduct.salePrice,
-    compareAtPrice,
-    badges: product.badges.includes("ลดราคา")
-      ? product.badges
-      : [...product.badges, "ลดราคา"],
+    price: resolvedPrice.displayPrice,
+    compareAtPrice:
+      resolvedPrice.displayOriginalPrice &&
+      resolvedPrice.displayOriginalPrice > resolvedPrice.displayPrice
+        ? resolvedPrice.displayOriginalPrice
+        : undefined,
+    priceSource: resolvedPrice.priceSource,
+    activeFlashSaleId: resolvedPrice.activeFlashSaleId,
+  };
+}
+
+function mapShopProductDetail(
+  data: ApiShopProductDetailResponse | null
+): ProductDetailServerData | null {
+  if (!data?.product) return null;
+
+  return {
+    product: applyResolvedPrice(
+      mapApiProductDetailToProduct(data.product),
+      data.resolvedPrice
+    ),
+    availableCoupons: getArray(data.availableCoupons),
+    relatedProducts: getArray(data.relatedProducts).map(
+      mapApiShopProductToProduct
+    ),
   };
 }
 
@@ -47,7 +71,7 @@ export async function getAllProductsServer(params?: {
   pageSize?: number;
 }): Promise<Product[]> {
   try {
-    const url = new URL(`${PONPON_BACKEND_BASE_URL}/api/products`);
+    const url = new URL(`${PONPON_BACKEND_BASE_URL}/api/shop/products`);
     if (params?.keyword) url.searchParams.set("keyword", params.keyword);
     if (params?.category && params.category !== "all")
       url.searchParams.set("category", params.category);
@@ -56,8 +80,8 @@ export async function getAllProductsServer(params?: {
     const res = await fetch(url.toString(), { cache: "no-store" });
     if (!res.ok) return [];
 
-    const data: ApiProductListItem[] = await res.json();
-    return Array.isArray(data) ? data.map(mapApiProductToProduct) : [];
+    const data: ApiShopProductListItem[] = await res.json();
+    return Array.isArray(data) ? data.map(mapApiShopProductToProduct) : [];
   } catch (err) {
     console.error("[products] getAllProductsServer failed:", err);
     return [];
@@ -67,16 +91,29 @@ export async function getAllProductsServer(params?: {
 export async function getProductByIdServer(
   id: string
 ): Promise<Product | null> {
+  const detail = await getProductDetailByIdServer(id);
+  return detail?.product ?? null;
+}
+
+export async function getProductDetailByIdServer(
+  id: string
+): Promise<ProductDetailServerData | null> {
   try {
-    const res = await fetch(`${PONPON_BACKEND_BASE_URL}/api/products/${id}`, {
-      cache: "no-store",
-    });
+    const url = new URL(
+      `${PONPON_BACKEND_BASE_URL}/api/shop/products/${id}/detail`
+    );
+    url.searchParams.set("salesChannel", "line_liff");
+    url.searchParams.set("relatedProductLimit", "8");
+
+    const res = await fetch(url.toString(), { cache: "no-store" });
     if (!res.ok) return null;
 
-    const data: ApiProductDetail = await res.json();
-    return applyActiveFlashSaleToProduct(mapApiProductDetailToProduct(data));
+    const data = (await res.json().catch(() => null)) as
+      | ApiShopProductDetailResponse
+      | null;
+    return mapShopProductDetail(data);
   } catch (err) {
-    console.error("[products] getProductByIdServer failed:", err);
+    console.error("[products] getProductDetailByIdServer failed:", err);
     return null;
   }
 }
@@ -84,17 +121,29 @@ export async function getProductByIdServer(
 export async function getProductBySlugServer(
   slug: string
 ): Promise<Product | null> {
+  const detail = await getProductDetailBySlugServer(slug);
+  return detail?.product ?? null;
+}
+
+export async function getProductDetailBySlugServer(
+  slug: string
+): Promise<ProductDetailServerData | null> {
   try {
-    const res = await fetch(
-      `${PONPON_BACKEND_BASE_URL}/api/products/slug/${encodeURIComponent(slug)}`,
-      { cache: "no-store" }
+    const url = new URL(
+      `${PONPON_BACKEND_BASE_URL}/api/shop/products/slug/${encodeURIComponent(slug)}/detail`
     );
+    url.searchParams.set("salesChannel", "line_liff");
+    url.searchParams.set("relatedProductLimit", "8");
+
+    const res = await fetch(url.toString(), { cache: "no-store" });
     if (!res.ok) return null;
 
-    const data: ApiProductDetail = await res.json();
-    return applyActiveFlashSaleToProduct(mapApiProductDetailToProduct(data));
+    const data = (await res.json().catch(() => null)) as
+      | ApiShopProductDetailResponse
+      | null;
+    return mapShopProductDetail(data);
   } catch (err) {
-    console.error("[products] getProductBySlugServer failed:", err);
+    console.error("[products] getProductDetailBySlugServer failed:", err);
     return null;
   }
 }

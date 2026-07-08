@@ -9,23 +9,19 @@ import { PromoHeroCarousel } from "@/components/home/promo-hero-carousel";
 import { ShopBenefits } from "@/components/home/shop-benefits";
 import { ReorderSection } from "@/components/home/reorder-section";
 import { CouponSectionLazy } from "@/components/home/coupon-section-lazy";
-import {
-  getAllProductsServer,
-  getCategoriesServer,
-} from "@/features/products/product-service.server";
-import { getHomeSlidesServer } from "@/features/home-slides/home-slides-service.server";
-import { getActiveFlashSaleServer } from "@/features/flash-sales/flash-sales-service.server";
+import { getCategoriesServer } from "@/features/products/product-service.server";
+import { getShopHomeServer } from "@/features/shop-home/shop-home-service.server";
+import { buildFlashSaleProducts } from "@/features/flash-sales/flash-sale-products";
 
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  const [products, rawCategories, homeSlides, flashSale] = await Promise.all([
-    getAllProductsServer({ pageSize: 24 }),
+  const [home, rawCategories] = await Promise.all([
+    getShopHomeServer({ salesChannel: "line_liff", featuredProductLimit: 12 }),
     getCategoriesServer(),
-    getHomeSlidesServer(),
-    getActiveFlashSaleServer(),
   ]);
 
+  const products = home.featuredProducts;
   const categories = rawCategories.filter((c) => c.id !== "all");
   const bestSellers = products.filter((p) => p.isBestSeller);
   const featured = products.filter((p) => p.isFeatured);
@@ -35,15 +31,7 @@ export default async function HomePage() {
   const displayFeatured =
     featured.length > 0 ? featured : products.slice(0, 6);
 
-  const flashSaleProductMap = new Map(
-    flashSale?.products.map((p) => [p.productId, p]) ?? []
-  );
-  const flashSaleProducts = products
-    .filter((p) => flashSaleProductMap.has(p.id))
-    .map((p) => {
-      const fsp = flashSaleProductMap.get(p.id)!;
-      return { ...p, price: fsp.salePrice, compareAtPrice: fsp.originalPrice };
-    });
+  const flashSaleProducts = buildFlashSaleProducts(products, home.flashSale);
 
   const reorderProducts = products.slice(0, 3);
 
@@ -51,7 +39,7 @@ export default async function HomePage() {
     <>
       <AppHeader />
       <PageContainer className="pt-3.5 md:max-w-5xl md:px-8 xl:max-w-6xl">
-        <PromoHeroCarousel slides={homeSlides} />
+        <PromoHeroCarousel slides={home.slides} />
 
         <section className="home-panel-shadow mt-4 rounded-card bg-white">
           <div className="no-scrollbar flex overflow-x-auto px-2 py-3 md:grid md:grid-cols-5 md:overflow-visible md:px-4 lg:grid-cols-10">
@@ -75,13 +63,13 @@ export default async function HomePage() {
           </div>
         </section>
 
-        {flashSale && flashSaleProducts.length > 0 && (
+        {home.flashSale && flashSaleProducts.length > 0 && (
           <FlashSaleSection
             products={flashSaleProducts}
-            slots={flashSale.slots}
+            slots={home.flashSale.slots}
           />
         )}
-        <CouponSectionLazy />
+        <CouponSectionLazy coupons={home.availableCoupons} />
         <ShopBenefits />
 
         <section className="mt-5">
