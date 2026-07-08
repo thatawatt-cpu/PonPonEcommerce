@@ -712,6 +712,7 @@ export default function CheckoutPage({
       : null;
   const waitingForFinalQuote =
     previewCanLoad && (!finalPricingQuote || pricingPreviewLoading);
+  const totalConfirming = totalLoading || waitingForFinalQuote;
   const estimatedAppliedCoupons =
     pricingPreview?.appliedCoupons.filter((coupon) =>
       couponCodes.includes(coupon.code)
@@ -1793,7 +1794,7 @@ export default function CheckoutPage({
                 value={formatBaht(payableTotal)}
                 strong
                 tone="brand"
-                loading={totalLoading}
+                loading={totalConfirming}
               />
             </div>
           </div>
@@ -1820,9 +1821,9 @@ export default function CheckoutPage({
                 ยอดรวมทั้งหมด
               </p>
               <div className="mt-0.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                {totalLoading ? (
+                {totalConfirming ? (
                   <span
-                    aria-label="กำลังโหลดยอดรวม"
+                    aria-label="กำลังยืนยันยอดรวม"
                     role="status"
                     className="flex min-w-[6.5rem] items-center"
                   >
@@ -1841,7 +1842,7 @@ export default function CheckoutPage({
             <Button
               size="lg"
               onClick={handleConfirm}
-              disabled={placing || totalLoading || waitingForFinalQuote}
+              disabled={placing || totalConfirming}
               className="h-14 min-w-[165px] shrink-0 px-4 text-sm shadow-[0_8px_20px_rgba(237,23,28,0.22)]"
             >
               {placing ? (
