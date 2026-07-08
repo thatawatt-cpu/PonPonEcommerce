@@ -1603,6 +1603,7 @@ export default function CheckoutPage({
               }}
               onApply={applyPromoCode}
               onRemove={removePromoCode}
+              selectedCouponCodes={couponCodes}
               appliedCoupons={displayAppliedCoupons}
               couponCodeCount={couponCodes.length}
               message={promoMessage}
