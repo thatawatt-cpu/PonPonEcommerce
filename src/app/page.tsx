@@ -16,6 +16,8 @@ import {
 import { getHomeSlidesServer } from "@/features/home-slides/home-slides-service.server";
 import { getActiveFlashSaleServer } from "@/features/flash-sales/flash-sales-service.server";
 
+export const dynamic = "force-dynamic";
+
 export default async function HomePage() {
   const [products, rawCategories, homeSlides, flashSale] = await Promise.all([
     getAllProductsServer({ pageSize: 24 }),

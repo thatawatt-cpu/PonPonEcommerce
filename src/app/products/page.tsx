@@ -7,6 +7,8 @@ import {
 import { getActiveFlashSaleServer } from "@/features/flash-sales/flash-sales-service.server";
 import { ProductsClient } from "./products-client";
 
+export const dynamic = "force-dynamic";
+
 export default async function ProductsPage({
   searchParams,
 }: {
