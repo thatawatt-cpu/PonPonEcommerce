@@ -10,12 +10,14 @@ import type { Product } from "@/types/product";
 import type { Category } from "@/types/common";
 
 const PAGE_SIZE = 24;
+const FLASH_SALE_CATEGORY_ID = "flash-sale";
 
 interface ProductsClientProps {
   products: Product[];
   categories: Category[];
   initialCategory?: string;
   selectedCouponCode?: string;
+  flashSaleProductIds?: string[];
 }
 
 export function ProductsClient({
@@ -23,15 +25,44 @@ export function ProductsClient({
   categories,
   initialCategory = "all",
   selectedCouponCode,
+  flashSaleProductIds = [],
 }: ProductsClientProps) {
   const [query, setQuery] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState(initialCategory);
-  const [page, setPage] = useState(1);
-
-  const results = useMemo(
-    () => filterProducts(products, query, selectedCategory),
-    [products, query, selectedCategory]
+  const hasFlashSaleFilter = flashSaleProductIds.length > 0;
+  const [selectedCategory, setSelectedCategory] = useState(
+    initialCategory === FLASH_SALE_CATEGORY_ID && hasFlashSaleFilter
+      ? FLASH_SALE_CATEGORY_ID
+      : initialCategory
   );
+  const [page, setPage] = useState(1);
+  const filterCategories = useMemo(
+    () =>
+      hasFlashSaleFilter
+        ? [
+            ...categories.slice(0, 1),
+            { id: FLASH_SALE_CATEGORY_ID, name: "Flash Sale", emoji: "⚡" },
+            ...categories.slice(1),
+          ]
+        : categories,
+    [categories, hasFlashSaleFilter]
+  );
+  const flashSaleProductIdSet = useMemo(
+    () => new Set(flashSaleProductIds),
+    [flashSaleProductIds]
+  );
+
+  const results = useMemo(() => {
+    const nextProducts =
+      selectedCategory === FLASH_SALE_CATEGORY_ID
+        ? products.filter((product) => flashSaleProductIdSet.has(product.id))
+        : products;
+
+    return filterProducts(
+      nextProducts,
+      query,
+      selectedCategory === FLASH_SALE_CATEGORY_ID ? "all" : selectedCategory
+    );
+  }, [flashSaleProductIdSet, products, query, selectedCategory]);
 
   const handleQueryChange = (q: string) => {
     setQuery(q);
@@ -51,7 +82,7 @@ export function ProductsClient({
       <div className="home-panel-shadow space-y-3 rounded-card bg-white p-3 md:p-4">
         <ProductSearch value={query} onChange={handleQueryChange} />
         <CategoryFilter
-          categories={categories}
+          categories={filterCategories}
           selected={selectedCategory}
           onSelect={handleCategoryChange}
         />

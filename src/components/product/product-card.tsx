@@ -89,18 +89,6 @@ export function ProductCard({
           <h3 className="line-clamp-2 text-[13px] font-bold leading-snug text-ink">
             {product.name}
           </h3>
-          <div className="mt-1.5 flex min-h-5 items-center gap-1.5 text-[11px] font-bold text-ink-soft">
-            <span className="inline-flex items-center gap-0.5 text-amber-500">
-              <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
-              {reviewLabel}
-            </span>
-            {soldCountLabel ? (
-              <>
-                <span className="h-1 w-1 rounded-full bg-ink-soft/35" />
-                <span className="min-w-0 truncate">{soldCountLabel}</span>
-              </>
-            ) : null}
-          </div>
           <div className="mt-auto flex items-end justify-between gap-1.5 pt-2">
             <Price
               value={product.price}
@@ -113,6 +101,18 @@ export function ProductCard({
                 <ArrowUpRight className="h-3.5 w-3.5" />
               </span>
             </div>
+          </div>
+          <div className="mt-1.5 flex min-h-5 items-center gap-1.5 text-[11px] font-bold text-ink-soft">
+            <span className="inline-flex items-center gap-0.5 text-amber-500">
+              <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+              {reviewLabel}
+            </span>
+            {soldCountLabel ? (
+              <>
+                <span className="h-1 w-1 rounded-full bg-ink-soft/35" />
+                <span className="min-w-0 truncate">{soldCountLabel}</span>
+              </>
+            ) : null}
           </div>
         </div>
       </Link>

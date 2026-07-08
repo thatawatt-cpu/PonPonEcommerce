@@ -117,7 +117,7 @@ function FlashSaleItem({ product, priority = false }: { product: Product; priori
   const discount = getDiscountPercent(product) ?? 15;
 
   return (
-    <article className="home-panel-shadow w-32 shrink-0 overflow-hidden rounded-2xl bg-white ring-1 ring-black/[0.04] md:w-40 lg:w-auto">
+    <article className="home-panel-shadow w-32 shrink-0 snap-start overflow-hidden rounded-2xl bg-white ring-1 ring-black/[0.04] md:w-40 lg:w-44">
       <Link href={`/products/${product.slug}`} className="group block">
         <div className="relative">
           <ProductImage
@@ -206,7 +206,7 @@ export function FlashSaleSection({
             ))}
           </div>
           <Link
-            href="/products"
+            href="/products?flashSale=1"
             className="flex items-center text-[11px] font-bold text-brand"
           >
             ดูทั้งหมด
@@ -214,7 +214,7 @@ export function FlashSaleSection({
           </Link>
         </div>
 
-        <div className="no-scrollbar flex gap-2.5 overflow-x-auto px-3.5 pb-1.5 lg:grid lg:grid-cols-[repeat(auto-fit,minmax(11rem,1fr))] lg:overflow-visible">
+        <div className="no-scrollbar flex snap-x snap-mandatory gap-2.5 overflow-x-auto scroll-smooth px-3.5 pb-1.5">
           {products.map((product, index) => (
             <FlashSaleItem key={product.id} product={product} priority={index < 2} />
           ))}

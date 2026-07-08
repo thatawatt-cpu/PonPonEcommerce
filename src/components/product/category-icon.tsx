@@ -12,6 +12,7 @@ import {
   ShoppingBag,
   Sparkles,
   UtensilsCrossed,
+  Zap,
   type LucideIcon,
 } from "lucide-react";
 
@@ -41,6 +42,7 @@ const categoryIconMap: Record<string, LucideIcon> = {
   fashion: Shirt,
   beauty: Sparkles,
   gadget: Gift,
+  "flash-sale": Zap,
 };
 
 interface CategoryIconProps {
