@@ -297,7 +297,7 @@ export function CouponSection({ coupons: apiCoupons = [] }: CouponSectionProps) 
                   {isClaimed ? "ใช้เลย" : "เก็บ"}
                 </button>
               </div>
-              <span className="absolute -left-2 top-1/2 h-4 w-4 -translate-y-1/2 rounded-full bg-surface-muted" />
+              <span className="absolute -left-2 top-1/2 h-4 w-4 -translate-y-1/2 rounded-full bg-[var(--background)]" />
             </article>
           );
         })}

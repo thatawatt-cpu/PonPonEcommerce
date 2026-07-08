@@ -39,6 +39,8 @@ export interface ProductDetailContent {
 
 export interface ProductVariantStock {
   id?: string;
+  sku?: string;
+  variantCode?: string;
   options: Record<string, string>;
   stock: number;
   imageUrl?: string;
@@ -46,6 +48,8 @@ export interface ProductVariantStock {
 
 export interface Product {
   id: string;
+  sku?: string;
+  zortCategoryId?: number | null;
   name: string;
   slug: string;
   description: string;

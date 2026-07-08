@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowUpRight } from "lucide-react";
+import { ArrowUpRight, Star } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Price } from "@/components/ui/price";
@@ -8,13 +8,13 @@ import type { Product } from "@/types/product";
 
 function formatSoldCount(count?: number): string | null {
   if (!count || count <= 0) return null;
-  if (count >= 10000) return `ขายแล้ว ${Math.floor(count / 1000)}พัน+`;
+  if (count >= 10000) return `ขายได้ ${Math.floor(count / 1000)}พัน+`;
   if (count >= 1000) {
     const value = count / 1000;
-    return `ขายแล้ว ${value.toFixed(value >= 10 ? 0 : 1)}พัน+`;
+    return `ขายได้ ${value.toFixed(value >= 10 ? 0 : 1)}พัน+`;
   }
 
-  return `ขายแล้ว ${count.toLocaleString("th-TH")}`;
+  return `ขายได้ ${count.toLocaleString("th-TH")}`;
 }
 
 function getDiscountPercent(product: Product) {
@@ -22,6 +22,13 @@ function getDiscountPercent(product: Product) {
   return Math.round(
     ((product.compareAtPrice - product.price) / product.compareAtPrice) * 100,
   );
+}
+
+function getMockReview(product: Product): string {
+  const seed = product.id
+    .split("")
+    .reduce((sum, char) => sum + char.charCodeAt(0), 0);
+  return (4.7 + (seed % 3) / 10).toFixed(1);
 }
 
 export function ProductCard({
@@ -37,6 +44,7 @@ export function ProductCard({
 }) {
   const discountPercent = getDiscountPercent(product);
   const soldCountLabel = formatSoldCount(product.soldCount);
+  const reviewLabel = getMockReview(product);
   const visibleBadges = product.badges
     .filter((badge) => badge !== "ลดราคา" || discountPercent === null)
     .slice(0, discountPercent === null ? 2 : 1);
@@ -71,11 +79,6 @@ export function ProductCard({
               </div>
             ) : null}
           </div>
-          {soldCountLabel !== null && (
-            <span className="absolute right-2 top-2 max-w-[52%] truncate rounded-full border border-white/75 bg-white px-2 py-1 text-[10px] font-extrabold text-ink shadow-[0_4px_12px_rgba(65,25,25,0.12)] ">
-              {soldCountLabel}
-            </span>
-          )}
           {metaLabel ? (
             <span className="absolute bottom-2 left-2 max-w-[calc(100%-1rem)] truncate rounded-full border border-white/75 bg-white px-2 py-1 text-[10px] font-extrabold text-ink-soft shadow-[0_4px_12px_rgba(65,25,25,0.12)] ">
               {metaLabel}
@@ -86,6 +89,18 @@ export function ProductCard({
           <h3 className="line-clamp-2 text-[13px] font-bold leading-snug text-ink">
             {product.name}
           </h3>
+          <div className="mt-1.5 flex min-h-5 items-center gap-1.5 text-[11px] font-bold text-ink-soft">
+            <span className="inline-flex items-center gap-0.5 text-amber-500">
+              <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+              {reviewLabel}
+            </span>
+            {soldCountLabel ? (
+              <>
+                <span className="h-1 w-1 rounded-full bg-ink-soft/35" />
+                <span className="min-w-0 truncate">{soldCountLabel}</span>
+              </>
+            ) : null}
+          </div>
           <div className="mt-auto flex items-end justify-between gap-1.5 pt-2">
             <Price
               value={product.price}

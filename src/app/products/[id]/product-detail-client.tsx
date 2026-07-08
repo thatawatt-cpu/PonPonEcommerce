@@ -37,7 +37,7 @@ import {
 import { storePendingCouponCode } from "@/features/coupons/pending-coupon";
 import { cn } from "@/lib/utils";
 import type { ApiCouponListItem } from "@/types/api";
-import type { Product } from "@/types/product";
+import type { Product, ProductVariantStock } from "@/types/product";
 
 type ReviewMedia =
   | { type: "image"; imageUrl: string }
@@ -161,6 +161,20 @@ function canShowAvailableCoupon(coupon: ProductCoupon): boolean {
   return coupon.isClaimed || coupon.canClaim;
 }
 
+function getProductCouponParams(
+  product: Product,
+  variant?: ProductVariantStock
+) {
+  return {
+    salesChannel: "line_liff",
+    productId: product.id,
+    variantId: variant?.id,
+    sku: variant?.sku ?? product.sku,
+    zortCategoryId: product.zortCategoryId,
+    categoryName: product.categoryName || product.categoryId,
+  };
+}
+
 function getPreferredVariant(
   product: Product,
   requiredOptions: Record<string, string> = {}
@@ -259,10 +273,10 @@ export function ProductDetailClient({
   const [reviewsOpen, setReviewsOpen] = useState(false);
   const [reviewFilter, setReviewFilter] = useState<ReviewFilter>("all");
   const [remoteProductCoupons, setRemoteProductCoupons] = useState<ApiCouponListItem[]>(
-    () => getCachedAvailableCoupons({ salesChannel: "line_liff" })
+    () => getCachedAvailableCoupons(getProductCouponParams(product))
   );
   const [productCouponsLoaded, setProductCouponsLoaded] = useState(
-    () => getCachedAvailableCoupons({ salesChannel: "line_liff" }).length > 0
+    () => getCachedAvailableCoupons(getProductCouponParams(product)).length > 0
   );
   const [claimingProductCouponIds, setClaimingProductCouponIds] = useState<string[]>([]);
   const [activeReviewMedia, setActiveReviewMedia] = useState<ReviewMedia | null>(null);
@@ -276,32 +290,6 @@ export function ProductDetailClient({
   const displayProductCoupons = productCouponsLoaded ? visibleProductCoupons : [];
   const showProductCouponSection =
     !productCouponsLoaded || displayProductCoupons.length > 0;
-
-  useEffect(() => {
-    let cancelled = false;
-    const params = { salesChannel: "line_liff" };
-
-    fetchAvailableCoupons(params)
-      .then((items) => {
-        if (!cancelled) {
-          setRemoteProductCoupons(items);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setRemoteProductCoupons([]);
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setProductCouponsLoaded(true);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   const claimProductCoupon = (coupon: ProductCoupon) => {
     if (coupon.isClaimed || !coupon.canClaim) return;
@@ -429,6 +417,43 @@ export function ProductDetailClient({
       : hasVariantStock && !hasSelectedAllOptions
         ? "สินค้าพร้อมส่ง"
         : `มีสินค้าทั้งหมด ${effectiveStock.toLocaleString("th-TH")} ชิ้น`;
+
+  useEffect(() => {
+    let cancelled = false;
+    const params = getProductCouponParams(product, selectedVariant);
+    const cachedCoupons = getCachedAvailableCoupons(params);
+
+    void Promise.resolve().then(() => {
+      if (cancelled) return;
+      if (cachedCoupons.length > 0) {
+        setRemoteProductCoupons(cachedCoupons);
+        setProductCouponsLoaded(true);
+      } else {
+        setProductCouponsLoaded(false);
+      }
+    });
+
+    fetchAvailableCoupons(params)
+      .then((items) => {
+        if (!cancelled) {
+          setRemoteProductCoupons(items);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setRemoteProductCoupons([]);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setProductCouponsLoaded(true);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [product, selectedVariant]);
 
   const getPriorSelections = (optionName: string) => {
     const optionIndex =
@@ -875,7 +900,7 @@ export function ProductDetailClient({
           {/* ── Coupons ── */}
 
           {showProductCouponSection && (
-            <div className="product-detail-wide app-panel-shadow mt-2 bg-white px-4 pb-4 pt-3.5">
+            <div className="product-detail-wide app-panel-shadow mt-2 bg-[var(--background)] px-4 pb-4 pt-3.5">
               <div className="mb-3 flex items-center justify-between">
                 <h2 className="flex items-center gap-1.5 text-sm font-bold text-ink">
                   <TicketPercent className="h-4 w-4 text-brand" />
@@ -901,7 +926,7 @@ export function ProductDetailClient({
                           </div>
                           <div className="h-9 w-14 shrink-0 animate-pulse rounded-full bg-surface-muted" />
                         </div>
-                        <span className="absolute -left-2 top-1/2 h-4 w-4 -translate-y-1/2 rounded-full bg-surface-muted" />
+                        <span className="absolute -left-2 top-1/2 h-4 w-4 -translate-y-1/2 rounded-full bg-[var(--background)]" />
                       </div>
                     ))
                   : displayProductCoupons.map((coupon) => {
@@ -946,7 +971,7 @@ export function ProductDetailClient({
                           {isClaiming ? "..." : isClaimed ? "ใช้เลย" : "เก็บ"}
                         </button>
                       </div>
-                      <span className="absolute -left-2 top-1/2 h-4 w-4 -translate-y-1/2 rounded-full bg-surface-muted" />
+                      <span className="absolute -left-2 top-1/2 h-4 w-4 -translate-y-1/2 rounded-full bg-[var(--background)]" />
                     </article>
                   );
                 })}

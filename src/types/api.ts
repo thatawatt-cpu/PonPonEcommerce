@@ -13,6 +13,7 @@ export interface ApiProductListItem {
   isActiveFromZort: boolean;
   isVisibleOnLiff: boolean;
   variantCount: number;
+  soldCount: number;
   source: string;
   status: string;
 }

@@ -14,6 +14,17 @@ interface CachedCoupons {
   items: ApiCouponListItem[];
 }
 
+interface AvailableCouponParams {
+  salesChannel?: string;
+  paymentMethod?: string;
+  shippingChannel?: string;
+  productId?: string;
+  variantId?: string;
+  sku?: string;
+  zortCategoryId?: number | string | null;
+  categoryName?: string;
+}
+
 function extractCouponItems(payload: unknown): ApiCouponListItem[] {
   if (Array.isArray(payload)) return payload as ApiCouponListItem[];
 
@@ -41,15 +52,25 @@ function canUseStorage(): boolean {
   return typeof window !== "undefined" && typeof window.sessionStorage !== "undefined";
 }
 
-function getAvailableCouponsCacheKey(params?: {
-  salesChannel?: string;
-  paymentMethod?: string;
-  shippingChannel?: string;
-}): string {
-  const qs = new URLSearchParams();
+function appendAvailableCouponParams(
+  qs: URLSearchParams,
+  params?: AvailableCouponParams
+): void {
   qs.set("salesChannel", params?.salesChannel ?? "line_liff");
   if (params?.paymentMethod) qs.set("paymentMethod", params.paymentMethod);
   if (params?.shippingChannel) qs.set("shippingChannel", params.shippingChannel);
+  if (params?.productId) qs.set("productId", params.productId);
+  if (params?.variantId) qs.set("variantId", params.variantId);
+  if (params?.sku) qs.set("sku", params.sku);
+  if (params?.zortCategoryId != null) {
+    qs.set("zortCategoryId", String(params.zortCategoryId));
+  }
+  if (params?.categoryName) qs.set("categoryName", params.categoryName);
+}
+
+function getAvailableCouponsCacheKey(params?: AvailableCouponParams): string {
+  const qs = new URLSearchParams();
+  appendAvailableCouponParams(qs, params);
   return `${AVAILABLE_COUPONS_CACHE_PREFIX}:${getTokenCacheSegment()}:${qs.toString()}`;
 }
 
@@ -93,11 +114,7 @@ function writeCachedCoupons(key: string, items: ApiCouponListItem[]): void {
   }
 }
 
-export function getCachedAvailableCoupons(params?: {
-  salesChannel?: string;
-  paymentMethod?: string;
-  shippingChannel?: string;
-}): ApiCouponListItem[] {
+export function getCachedAvailableCoupons(params?: AvailableCouponParams): ApiCouponListItem[] {
   const cached = readCachedCoupons(getAvailableCouponsCacheKey(params));
   if (
     !cached ||
@@ -134,15 +151,11 @@ export async function fetchCoupons(): Promise<ApiCouponListItem[]> {
   return fetchAvailableCoupons();
 }
 
-export async function fetchAvailableCoupons(params?: {
-  salesChannel?: string;
-  paymentMethod?: string;
-  shippingChannel?: string;
-}): Promise<ApiCouponListItem[]> {
+export async function fetchAvailableCoupons(
+  params?: AvailableCouponParams
+): Promise<ApiCouponListItem[]> {
   const qs = new URLSearchParams();
-  qs.set("salesChannel", params?.salesChannel ?? "line_liff");
-  if (params?.paymentMethod) qs.set("paymentMethod", params.paymentMethod);
-  if (params?.shippingChannel) qs.set("shippingChannel", params.shippingChannel);
+  appendAvailableCouponParams(qs, params);
   const cacheKey = getAvailableCouponsCacheKey(params);
 
   const response = await ponponFetch(

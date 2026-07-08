@@ -20,9 +20,14 @@ function deriveBadges(
   return badges;
 }
 
+function getSoldCount(product: ApiProductListItem | ApiProductDetail): number | undefined {
+  return product.soldCount > 0 ? product.soldCount : undefined;
+}
+
 export function mapApiProductToProduct(api: ApiProductListItem): Product {
   return {
     id: api.id,
+    sku: api.sku || api.baseSku,
     name: api.name,
     slug: api.slug ?? api.baseSku.toLowerCase().replace(/\s+/g, "-"),
     description: "",
@@ -33,6 +38,7 @@ export function mapApiProductToProduct(api: ApiProductListItem): Product {
     categoryName: api.categoryName ?? "",
     badges: deriveBadges(api),
     stock: api.availableStock,
+    soldCount: getSoldCount(api),
     isFeatured: false,
     isBestSeller: false,
   };
@@ -51,6 +57,8 @@ export function mapApiProductDetailToProduct(api: ApiProductDetail): Product {
 
   return {
     id: api.id,
+    sku: api.sku || api.baseSku,
+    zortCategoryId: api.zortCategoryId,
     name: api.name,
     slug: api.slug ?? api.baseSku.toLowerCase().replace(/\s+/g, "-"),
     description: api.description ?? "",
@@ -66,6 +74,7 @@ export function mapApiProductDetailToProduct(api: ApiProductDetail): Product {
     categoryName: api.categoryName ?? "",
     badges: deriveBadges(api),
     stock: api.availableStock,
+    soldCount: getSoldCount(api),
     isFeatured: api.isFeatured,
     isBestSeller: api.isBestSeller,
     detailContent: {
@@ -123,6 +132,8 @@ export function mapApiProductDetailToProduct(api: ApiProductDetail): Product {
       activeVariants.length > 0
         ? activeVariants.map((v) => ({
             id: v.id,
+            sku: v.sku,
+            variantCode: v.variantCode,
             options:
               v.options && v.options.length > 0
                 ? Object.fromEntries(v.options.map((o) => [o.name, o.value]))

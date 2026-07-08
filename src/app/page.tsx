@@ -36,19 +36,12 @@ export default async function HomePage() {
   const flashSaleProductMap = new Map(
     flashSale?.products.map((p) => [p.productId, p]) ?? []
   );
-  const flashSaleProducts = flashSaleProductMap.size > 0
-    ? products
-        .filter((p) => flashSaleProductMap.has(p.id))
-        .map((p) => {
-          const fsp = flashSaleProductMap.get(p.id)!;
-          return { ...p, price: fsp.salePrice, compareAtPrice: fsp.originalPrice };
-        })
-    : [...displayBestSellers, ...displayFeatured]
-        .filter(
-          (product, index, items) =>
-            items.findIndex((item) => item.id === product.id) === index
-        )
-        .slice(0, 4);
+  const flashSaleProducts = products
+    .filter((p) => flashSaleProductMap.has(p.id))
+    .map((p) => {
+      const fsp = flashSaleProductMap.get(p.id)!;
+      return { ...p, price: fsp.salePrice, compareAtPrice: fsp.originalPrice };
+    });
 
   const reorderProducts = products.slice(0, 3);
 
@@ -80,10 +73,12 @@ export default async function HomePage() {
           </div>
         </section>
 
-        <FlashSaleSection
-          products={flashSaleProducts}
-          slots={flashSale?.slots}
-        />
+        {flashSale && flashSaleProducts.length > 0 && (
+          <FlashSaleSection
+            products={flashSaleProducts}
+            slots={flashSale.slots}
+          />
+        )}
         <CouponSectionLazy />
         <ShopBenefits />
 

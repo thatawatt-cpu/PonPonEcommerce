@@ -5,7 +5,7 @@ import type { ApiFlashSale } from "@/types/api";
 export async function getActiveFlashSaleServer(): Promise<ApiFlashSale | null> {
   try {
     const res = await fetch(`${PONPON_BACKEND_BASE_URL}/api/flash-sales/active`, {
-      next: { revalidate: 60 },
+      cache: "no-store",
     });
     if (res.status === 204) return null;
     if (!res.ok) return null;

@@ -8,16 +8,75 @@ import { getDiscountPercent } from "@/features/products/product-utils";
 import { formatBaht } from "@/lib/format";
 import type { Product } from "@/types/product";
 
+type SlotRange = {
+  startSec: number;
+  endSec: number;
+  crossesMidnight: boolean;
+};
+
+const bangkokTimeFormatter = new Intl.DateTimeFormat("en-US", {
+  timeZone: "Asia/Bangkok",
+  hour12: false,
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+});
+
+function getBangkokNowSeconds(): number {
+  const parts = Object.fromEntries(
+    bangkokTimeFormatter
+      .formatToParts(new Date())
+      .map((part) => [part.type, part.value])
+  );
+  const hours = Number(parts.hour);
+  const minutes = Number(parts.minute);
+  const seconds = Number(parts.second);
+  const normalizedHours = hours === 24 ? 0 : hours;
+
+  return normalizedHours * 3600 + minutes * 60 + seconds;
+}
+
+function parseSlotTime(value: string): number | null {
+  const [hours, minutes = "0"] = value.trim().split(":");
+  const h = Number(hours);
+  const m = Number(minutes);
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return null;
+  if (h < 0 || h > 23 || m < 0 || m > 59) return null;
+  return h * 3600 + m * 60;
+}
+
+function parseSlot(slot: string): SlotRange | null {
+  const [startRaw, endRaw] = slot.split("-", 2);
+  const startSec = parseSlotTime(startRaw);
+  if (startSec === null) return null;
+
+  const endSec = endRaw ? parseSlotTime(endRaw) : null;
+  return {
+    startSec,
+    endSec: endSec ?? 24 * 3600 - 1,
+    crossesMidnight: endSec !== null && startSec > endSec,
+  };
+}
+
+function isNowInSlot(slot: SlotRange, nowSec: number): boolean {
+  return slot.crossesMidnight
+    ? nowSec >= slot.startSec || nowSec < slot.endSec
+    : slot.startSec <= nowSec && nowSec < slot.endSec;
+}
+
 function secondsUntilSlotEnd(slots: string[]): number {
-  const now = new Date();
-  const nowSec = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
-  for (const slot of slots) {
-    const [h, m] = slot.split(":").map(Number);
-    const slotSec = h * 3600 + (m ?? 0) * 60;
-    if (slotSec > nowSec) return slotSec - nowSec;
+  const nowSec = getBangkokNowSeconds();
+  const parsedSlots = slots.map(parseSlot).filter((slot): slot is SlotRange => slot !== null);
+  const activeSlot = parsedSlots.find((slot) => isNowInSlot(slot, nowSec));
+  if (activeSlot) {
+    if (activeSlot.crossesMidnight && nowSec >= activeSlot.startSec) {
+      return 24 * 3600 - nowSec + activeSlot.endSec;
+    }
+
+    return Math.max(0, activeSlot.endSec - nowSec);
   }
-  // last slot active — count down to midnight
-  return 24 * 3600 - nowSec;
+
+  return 0;
 }
 
 function Countdown({ slots }: { slots: string[] }) {
@@ -98,14 +157,12 @@ function FlashSaleItem({ product, priority = false }: { product: Product; priori
 
 function activeSlotIndex(slots: string[]): number {
   if (slots.length === 0) return 0;
-  const now = new Date();
-  const nowMinutes = now.getHours() * 60 + now.getMinutes();
-  let active = 0;
-  for (let i = 0; i < slots.length; i++) {
-    const [h, m] = slots[i].split(":").map(Number);
-    if (nowMinutes >= h * 60 + (m ?? 0)) active = i;
-  }
-  return active;
+  const nowSec = getBangkokNowSeconds();
+  const active = slots.findIndex((slot) => {
+    const parsed = parseSlot(slot);
+    return parsed ? isNowInSlot(parsed, nowSec) : false;
+  });
+  return active >= 0 ? active : 0;
 }
 
 export function FlashSaleSection({
