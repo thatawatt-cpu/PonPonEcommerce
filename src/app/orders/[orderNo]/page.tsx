@@ -491,16 +491,12 @@ function getExistingReview(item: ApiOrderDetailItem): ProductReview | null {
 
 function isOrderDetailItemReviewed(item: ApiOrderDetailItem): boolean {
   const source = item as ApiOrderDetailItem & {
-    review?: ProductReview | null;
     reviewId?: string | null;
     isReviewed?: boolean | null;
   };
 
-  return Boolean(
-    source.review?.id ||
-      source.reviewId ||
-      source.isReviewed === true
-  );
+  if (source.isReviewed === false) return false;
+  return Boolean(source.isReviewed === true || source.reviewId?.trim());
 }
 
 function hasPendingOrderReview(order: ApiOrderDetail): boolean {

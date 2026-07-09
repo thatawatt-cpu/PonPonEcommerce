@@ -371,28 +371,22 @@ function formatVariantOptions(
 
 function isOrderPreviewItemReviewed(item: ApiOrderPreviewItem): boolean {
   const source = item as ApiOrderPreviewItem & {
-    review?: { id?: string | null } | null;
     reviewId?: string | null;
     isReviewed?: boolean | null;
   };
 
-  return Boolean(
-    source.review?.id ||
-      source.reviewId ||
-      source.isReviewed === true
-  );
+  if (source.isReviewed === false) return false;
+  return Boolean(source.isReviewed === true || source.reviewId?.trim());
 }
 
 function isOrderReviewed(order: ApiOrderListItem): boolean {
   const source = order as ApiOrderListItem & {
-    review?: { id?: string | null } | null;
     reviewId?: string | null;
     isReviewed?: boolean | null;
   };
 
   return Boolean(
-    source.review?.id ||
-      source.reviewId ||
+    source.reviewId?.trim() ||
       source.isReviewed === true ||
       (order.itemsPreview ?? []).some(isOrderPreviewItemReviewed)
   );
