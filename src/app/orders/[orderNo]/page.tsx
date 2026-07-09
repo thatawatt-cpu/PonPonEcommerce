@@ -926,6 +926,9 @@ export default function OrderTrackingPage({
     setReviewFiles([]);
     setReviewError(null);
     setReviewInfo(null);
+    if (forceReview) {
+      router.replace("/orders");
+    }
   };
 
   const handleReviewFilesChange = async (
