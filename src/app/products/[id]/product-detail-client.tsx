@@ -6,6 +6,7 @@ import {
   Check,
   X,
   Heart,
+  Loader2,
   PackageCheck,
   ShieldCheck,
   ShoppingCart,
@@ -35,10 +36,19 @@ import {
   fetchAvailableCoupons,
   getCachedAvailableCoupons,
 } from "@/features/coupons/coupon-api";
+import {
+  fetchProductReviews,
+  fetchProductReviewSummary,
+} from "@/features/reviews/review-api";
 import { storePendingCouponCode } from "@/features/coupons/pending-coupon";
 import { cn } from "@/lib/utils";
 import type { ApiCouponListItem } from "@/types/api";
 import type { Product, ProductVariantStock } from "@/types/product";
+import type {
+  ProductReview,
+  ProductReviewMedia,
+  ProductReviewSummary,
+} from "@/types/review";
 
 type ReviewMedia =
   | { type: "image"; imageUrl: string }
@@ -160,6 +170,45 @@ function canShowAvailableCoupon(coupon: ProductCoupon): boolean {
   }
 
   return coupon.isClaimed || coupon.canClaim;
+}
+
+function formatReviewDate(value?: string | null): string {
+  if (!value) return "";
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) return value;
+
+  return new Intl.DateTimeFormat("th-TH", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(timestamp));
+}
+
+function getReviewMediaPreview(media: ProductReviewMedia): ReviewMedia | null {
+  if (!media.url) return null;
+
+  if (media.type === "video") {
+    return {
+      type: "video",
+      imageUrl: media.thumbnailUrl || media.url,
+      videoUrl: media.url,
+    };
+  }
+
+  return {
+    type: "image",
+    imageUrl: media.thumbnailUrl || media.url,
+  };
+}
+
+function getReviewName(review: ProductReview): string {
+  return (
+    review.userName?.trim() ||
+    review.customerName?.trim() ||
+    "ลูกค้า PonPon"
+  );
 }
 
 function getProductCouponParams(
@@ -290,6 +339,13 @@ export function ProductDetailClient({
   );
   const [claimingProductCouponIds, setClaimingProductCouponIds] = useState<string[]>([]);
   const [activeReviewMedia, setActiveReviewMedia] = useState<ReviewMedia | null>(null);
+  const [remoteReviews, setRemoteReviews] = useState<ProductReview[]>([]);
+  const [reviewSummary, setReviewSummary] = useState<ProductReviewSummary>({
+    averageRating: product.rating ?? 0,
+    totalReviews: product.reviewCount ?? 0,
+  });
+  const [reviewsLoading, setReviewsLoading] = useState(true);
+  const [reviewsError, setReviewsError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<DetailTab>("detail");
   const apiProductCoupons = remoteProductCoupons
     .map(mapApiCoupon)
@@ -470,6 +526,42 @@ export function ProductDetailClient({
     };
   }, [initialCoupons, product, selectedVariant]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    Promise.resolve()
+      .then(() => {
+        if (cancelled) return null;
+        setReviewsLoading(true);
+        setReviewsError(null);
+        return Promise.all([
+          fetchProductReviews(product.id, { page: 1, limit: 50, sort: "latest" }),
+          fetchProductReviewSummary(product.id),
+        ]);
+      })
+      .then((result) => {
+        if (!result) return;
+        const [reviewItems, summary] = result;
+        if (cancelled) return;
+        setRemoteReviews(reviewItems);
+        setReviewSummary(summary);
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        setRemoteReviews([]);
+        setReviewsError(
+          error instanceof Error ? error.message : "โหลดรีวิวไม่สำเร็จ"
+        );
+      })
+      .finally(() => {
+        if (!cancelled) setReviewsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [product.id]);
+
   const getPriorSelections = (optionName: string) => {
     const optionIndex =
       product.options?.findIndex((option) => option.name === optionName) ?? -1;
@@ -569,7 +661,7 @@ export function ProductDetailClient({
     { value: "latest", label: "ล่าสุด" },
   ];
 
-  const reviews: {
+  const mockReviews: {
     name: string;
     rating: number;
     text: string;
@@ -622,12 +714,39 @@ export function ProductDetailClient({
     },
   ];
 
+  void mockReviews;
+
+  const reviews: {
+    id: string;
+    name: string;
+    rating: number;
+    text: string;
+    tag: string;
+    date: string;
+    media: ReviewMedia[];
+  }[] = remoteReviews.map((review) => ({
+    id: review.id,
+    name: getReviewName(review),
+    rating: Math.max(1, Math.min(5, Math.round(Number(review.rating) || 0))),
+    text: review.comment,
+    tag: review.editedAt ? "แก้ไขแล้ว · ผู้ซื้อจริง" : "ผู้ซื้อจริง",
+    date: formatReviewDate(review.editedAt ?? review.createdAt),
+    media: (review.media ?? [])
+      .map(getReviewMediaPreview)
+      .filter((media): media is ReviewMedia => Boolean(media)),
+  }));
+
   const filteredReviews =
     reviewFilter === "all" || reviewFilter === "latest"
       ? reviews
       : reviewFilter === "media"
         ? reviews.filter((r) => r.media.length > 0)
         : reviews.filter((r) => r.rating === Number(reviewFilter));
+  const averageRatingLabel =
+    reviewSummary.totalReviews > 0
+      ? reviewSummary.averageRating.toFixed(1)
+      : "0.0";
+  const totalReviewsLabel = reviewSummary.totalReviews.toLocaleString("th-TH");
 
   const mainImageUrl =
     !userPickedGallery && selectedProductImageUrl
@@ -755,9 +874,9 @@ export function ProductDetailClient({
             <div className="mt-1.5 flex items-center gap-2 text-xs">
               <span className="flex items-center gap-0.5 font-bold text-amber-500">
                 <Star className="h-3.5 w-3.5 fill-amber-400" />
-                4.9
+                {averageRatingLabel}
               </span>
-              <span className="text-ink-soft">(128 รีวิว)</span>
+              <span className="text-ink-soft">({totalReviewsLabel} รีวิว)</span>
               {(product.soldCount ?? 0) > 0 && (
                 <>
                   <span className="text-ink-soft/40">|</span>
@@ -902,7 +1021,7 @@ export function ProductDetailClient({
                 { icon: ShieldCheck, label: "Official", amber: false },
                 { icon: Truck, label: "ส่งไว", amber: false },
                 { icon: PackageCheck, label: "แพ็กดี", amber: false },
-                { icon: Star, label: "4.9 ★", amber: true },
+                { icon: Star, label: `${averageRatingLabel} ★`, amber: true },
               ].map(({ icon: Icon, label, amber }) => (
                 <div key={label} className="flex flex-col items-center gap-1 rounded-xl bg-[#faf9f8] py-2.5">
                   <Icon className={cn("h-4 w-4", amber ? "fill-amber-400 text-amber-500" : "text-brand")} />
@@ -1010,7 +1129,7 @@ export function ProductDetailClient({
                       : "text-ink-soft"
                   )}
                 >
-                  {tab === "detail" ? "รายละเอียดสินค้า" : tab === "shipping" ? "การจัดส่ง" : "รีวิว (128)"}
+                  {tab === "detail" ? "รายละเอียดสินค้า" : tab === "shipping" ? "การจัดส่ง" : `รีวิว (${totalReviewsLabel})`}
                 </button>
               ))}
             </div>
@@ -1108,7 +1227,7 @@ export function ProductDetailClient({
                 <div>
                   <div className="mb-4 flex items-center gap-4 rounded-2xl bg-brand px-4 py-3.5 text-white">
                     <div>
-                      <p className="text-3xl font-extrabold leading-none">4.9</p>
+                      <p className="text-3xl font-extrabold leading-none">{averageRatingLabel}</p>
                       <div className="mt-1 flex gap-0.5">
                         {Array.from({ length: 5 }).map((_, i) => (
                           <Star key={i} className="h-3 w-3 fill-amber-300 text-amber-300" />
@@ -1116,7 +1235,7 @@ export function ProductDetailClient({
                       </div>
                     </div>
                     <div>
-                      <p className="text-sm font-bold">128 รีวิว</p>
+                      <p className="text-sm font-bold">{totalReviewsLabel} รีวิว</p>
                       <p className="text-xs text-white/70">จากลูกค้าที่ซื้อจริง</p>
                     </div>
                   </div>
@@ -1139,9 +1258,21 @@ export function ProductDetailClient({
                     ))}
                   </div>
 
+                  {reviewsLoading && (
+                    <div className="mb-3 flex items-center justify-center gap-2 rounded-2xl bg-[#faf9f8] px-4 py-6 text-sm font-bold text-ink-soft">
+                      <Loader2 className="h-4 w-4 animate-spin text-brand" />
+                      กำลังโหลดรีวิว
+                    </div>
+                  )}
+                  {reviewsError && !reviewsLoading && (
+                    <div className="mb-3 rounded-2xl bg-red-50 px-4 py-3 text-sm font-bold text-red-600">
+                      {reviewsError}
+                    </div>
+                  )}
+
                   <div className="space-y-3">
                     {filteredReviews.slice(0, 3).map((review) => (
-                      <article key={review.name} className="rounded-2xl bg-[#faf9f8] p-3.5">
+                      <article key={review.id} className="rounded-2xl bg-[#faf9f8] p-3.5">
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex items-center gap-2">
                             <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-xs font-extrabold text-brand shadow-sm">
@@ -1164,7 +1295,7 @@ export function ProductDetailClient({
                           <div className="mt-2.5 flex gap-2">
                             {review.media.map((media, idx) => (
                               <button
-                                key={`${review.name}-${idx}`}
+                                key={`${review.id}-${idx}`}
                                 type="button"
                                 onClick={() => setActiveReviewMedia(media as ReviewMedia)}
                                 className="relative h-14 w-14 overflow-hidden rounded-xl ring-1 ring-black/[0.04]"
@@ -1196,7 +1327,7 @@ export function ProductDetailClient({
                         ดูรีวิวทั้งหมด {filteredReviews.length} รายการ →
                       </button>
                     )}
-                    {filteredReviews.length === 0 && (
+                    {filteredReviews.length === 0 && !reviewsLoading && (
                       <div className="rounded-2xl bg-[#faf9f8] px-4 py-8 text-center">
                         <Star className="mx-auto h-6 w-6 text-ink-soft/30" />
                         <p className="mt-2 text-sm font-bold text-ink">ยังไม่มีรีวิวในหมวดนี้</p>
@@ -1316,10 +1447,10 @@ export function ProductDetailClient({
                     <p className="text-xs font-semibold text-white/75">คะแนนรวม</p>
                     <div className="mt-1 flex items-center gap-2">
                       <Star className="h-6 w-6 fill-amber-300 text-amber-300" />
-                      <span className="text-3xl font-extrabold">4.9</span>
+                      <span className="text-3xl font-extrabold">{averageRatingLabel}</span>
                     </div>
                   </div>
-                  <p className="text-sm font-bold text-white/85">128 รีวิว</p>
+                  <p className="text-sm font-bold text-white/85">{totalReviewsLabel} รีวิว</p>
                 </div>
               </div>
               <div className="no-scrollbar mb-4 flex gap-2 overflow-x-auto">
@@ -1340,7 +1471,7 @@ export function ProductDetailClient({
               </div>
               <div className="space-y-3">
                 {filteredReviews.map((review) => (
-                  <article key={review.name} className="rounded-3xl bg-[#fff8f6] p-3.5 ring-1 ring-black/[0.03]">
+                  <article key={review.id} className="rounded-3xl bg-[#fff8f6] p-3.5 ring-1 ring-black/[0.03]">
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-2">
                         <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-sm font-extrabold text-brand shadow-sm">
@@ -1372,7 +1503,7 @@ export function ProductDetailClient({
                       <div className="mt-3 flex gap-2 overflow-x-auto">
                         {review.media.map((media, index) => (
                           <button
-                            key={`${review.name}-${media.type}-${index}`}
+                            key={`${review.id}-${media.type}-${index}`}
                             type="button"
                             onClick={() => setActiveReviewMedia(media as ReviewMedia)}
                             className="relative h-16 w-16 shrink-0 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-black/[0.04]"
@@ -1401,7 +1532,7 @@ export function ProductDetailClient({
                     )}
                   </article>
                 ))}
-                {filteredReviews.length === 0 && (
+                {filteredReviews.length === 0 && !reviewsLoading && (
                   <div className="rounded-3xl bg-surface-muted px-4 py-10 text-center">
                     <Star className="mx-auto h-7 w-7 text-ink-soft/35" />
                     <p className="mt-2 text-sm font-extrabold text-ink">ยังไม่มีรีวิวในหมวดนี้</p>

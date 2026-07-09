@@ -16,6 +16,7 @@ import {
   PackageCheck,
   QrCode,
   RotateCcw,
+  Star,
   Store,
   Truck,
   X,
@@ -32,6 +33,11 @@ import {
   cancelOrder,
   createReturnRequest,
 } from "@/features/orders/order-api";
+import {
+  createOrderItemReview,
+  updateReview,
+  uploadReviewFile,
+} from "@/features/reviews/review-api";
 import { isStoredOrderPaid } from "@/features/payments/payment-api";
 import {
   formatShippingLine,
@@ -54,6 +60,7 @@ import type {
 } from "@/types/api";
 import type { Order, OrderStatus, PaymentStatus } from "@/types/order";
 import type { CartItem } from "@/types/cart";
+import type { ProductReview, ReviewMediaPayload } from "@/types/review";
 
 const CANCELLABLE_STATUSES: OrderStatus[] = ["pending", "waiting"];
 const RETURN_REQUEST_STATUSES: OrderStatus[] = ["success"];
@@ -78,11 +85,36 @@ const RETURN_REASON_OPTIONS = [
 const MAX_RETURN_IMAGES = 5;
 const MAX_RETURN_IMAGE_SIZE = 10 * 1024 * 1024;
 const ALLOWED_RETURN_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const REVIEW_MEDIA_SLOTS = 5;
+const MAX_REVIEW_IMAGES = 5;
+const MAX_REVIEW_VIDEOS = 3;
+const MAX_REVIEW_VIDEO_DURATION_SEC = 60;
+const ALLOWED_REVIEW_MEDIA_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "video/mp4",
+  "video/quicktime",
+  "video/webm",
+];
 
 interface ReturnImage {
   id: string;
   file: File;
   previewUrl: string;
+}
+
+interface ReviewFile {
+  id: string;
+  file: File;
+  previewUrl: string;
+  type: "image" | "video";
+  durationSec: number | null;
+}
+
+interface ReviewTarget {
+  item: ApiOrderDetailItem;
+  existingReview?: ProductReview | null;
 }
 
 function mapStatus(status: string): OrderStatus {
@@ -415,7 +447,55 @@ function formatOptions(options: Record<string, string> | undefined): string {
     .join(" · ");
 }
 
-function OrderProductCard({ order }: { order: Order }) {
+function getExistingReview(item: ApiOrderDetailItem): ProductReview | null {
+  const source = item as ApiOrderDetailItem & {
+    review?: ProductReview | null;
+    reviewId?: string | null;
+    reviewRating?: number | null;
+    reviewComment?: string | null;
+  };
+
+  if (source.review?.id) return source.review;
+  if (!source.reviewId) return null;
+
+  return {
+    id: source.reviewId,
+    orderItemId: item.id,
+    productId: item.productId,
+    variantId: item.variantId,
+    rating: Number(source.reviewRating ?? 5),
+    comment: source.reviewComment ?? "",
+    media: [],
+    createdAt: new Date().toISOString(),
+  };
+}
+
+function readVideoDuration(file: File): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const video = document.createElement("video");
+    video.preload = "metadata";
+    video.onloadedmetadata = () => {
+      URL.revokeObjectURL(url);
+      resolve(Number.isFinite(video.duration) ? video.duration : 0);
+    };
+    video.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("อ่านความยาววิดีโอไม่สำเร็จ"));
+    };
+    video.src = url;
+  });
+}
+
+function OrderProductCard({
+  apiOrder,
+  order,
+  onReviewItem,
+}: {
+  apiOrder: ApiOrderDetail;
+  order: Order;
+  onReviewItem: (target: ReviewTarget) => void;
+}) {
   return (
     <Card className="overflow-hidden bg-white">
       <div className="flex items-center gap-2 border-b border-black/[0.05] px-4 py-3">
@@ -425,7 +505,10 @@ function OrderProductCard({ order }: { order: Order }) {
       </div>
 
       <div className="divide-y divide-black/[0.05]">
-        {order.items.map((item) => {
+        {order.items.map((item, index) => {
+          const apiItem = apiOrder.items[index];
+          const existingReview = apiItem ? getExistingReview(apiItem) : null;
+          const canReview = order.orderStatus === "success" && Boolean(apiItem);
           const optionText = formatOptions(item.selectedOptions);
           return (
             <div key={`${item.productId}-${optionText}`} className="flex gap-3 px-4 py-3">
@@ -452,6 +535,23 @@ function OrderProductCard({ order }: { order: Order }) {
                 <p className="mt-3 text-right text-sm font-extrabold text-brand">
                   {formatBaht(item.price * item.quantity)}
                 </p>
+                {canReview && (
+                  <div className="mt-3 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onReviewItem({
+                          item: apiItem!,
+                          existingReview,
+                        })
+                      }
+                      className="inline-flex items-center gap-1.5 rounded-full bg-brand-soft px-3 py-1.5 text-xs font-extrabold text-brand transition active:scale-95"
+                    >
+                      <Star className="h-3.5 w-3.5" />
+                      {existingReview ? "แก้ไขรีวิว" : "เขียนรีวิว"}
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           );
@@ -623,6 +723,13 @@ export default function OrderTrackingPage({
   const [returnError, setReturnError] = useState<string | null>(null);
   const [returnInfo, setReturnInfo] = useState<string | null>(null);
   const [returnSubmitting, setReturnSubmitting] = useState(false);
+  const [reviewTarget, setReviewTarget] = useState<ReviewTarget | null>(null);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState("");
+  const [reviewFiles, setReviewFiles] = useState<ReviewFile[]>([]);
+  const [reviewError, setReviewError] = useState<string | null>(null);
+  const [reviewInfo, setReviewInfo] = useState<string | null>(null);
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
 
   useEffect(() => {
     fetchOrderById(id)
@@ -725,6 +832,176 @@ export default function OrderTrackingPage({
     setReturnError(null);
     setReturnInfo(null);
     setShowReturnDialog(true);
+  };
+
+  const handleOpenReview = (target: ReviewTarget) => {
+    setReviewTarget(target);
+    setReviewRating(target.existingReview?.rating ?? 5);
+    setReviewComment(target.existingReview?.comment ?? "");
+    setReviewFiles([]);
+    setReviewError(null);
+    setReviewInfo(null);
+  };
+
+  const handleCloseReview = () => {
+    if (reviewSubmitting) return;
+    reviewFiles.forEach((file) => URL.revokeObjectURL(file.previewUrl));
+    setReviewTarget(null);
+    setReviewFiles([]);
+    setReviewError(null);
+    setReviewInfo(null);
+  };
+
+  const handleReviewFilesChange = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const selectedFiles = Array.from(event.target.files ?? []);
+    event.target.value = "";
+    setReviewError(null);
+    setReviewInfo(null);
+
+    if (selectedFiles.length === 0) return;
+    const existingMediaCount = reviewTarget?.existingReview?.media?.length ?? 0;
+    if (existingMediaCount + reviewFiles.length >= REVIEW_MEDIA_SLOTS) {
+      setReviewError(`แนบสื่อได้สูงสุด ${REVIEW_MEDIA_SLOTS} ไฟล์`);
+      return;
+    }
+
+    const unsupportedFile = selectedFiles.find(
+      (file) => !ALLOWED_REVIEW_MEDIA_TYPES.includes(file.type)
+    );
+    if (unsupportedFile) {
+      setReviewError("รองรับเฉพาะ JPEG, PNG, WebP, MP4, MOV และ WebM");
+      return;
+    }
+
+    const existingImages =
+      reviewTarget?.existingReview?.media?.filter((media) => media.type === "image")
+        .length ?? 0;
+    const existingVideos =
+      reviewTarget?.existingReview?.media?.filter((media) => media.type === "video")
+        .length ?? 0;
+    const currentImages =
+      existingImages + reviewFiles.filter((file) => file.type === "image").length;
+    const currentVideos =
+      existingVideos + reviewFiles.filter((file) => file.type === "video").length;
+    const nextFiles: ReviewFile[] = [];
+
+    for (const file of selectedFiles) {
+      if (existingMediaCount + reviewFiles.length + nextFiles.length >= REVIEW_MEDIA_SLOTS) break;
+
+      const type = file.type.startsWith("video/") ? "video" : "image";
+      const nextImageCount =
+        currentImages + nextFiles.filter((item) => item.type === "image").length;
+      const nextVideoCount =
+        currentVideos + nextFiles.filter((item) => item.type === "video").length;
+
+      if (type === "image" && nextImageCount >= MAX_REVIEW_IMAGES) {
+        setReviewInfo(`รูปภาพสูงสุด ${MAX_REVIEW_IMAGES} รูป`);
+        continue;
+      }
+      if (type === "video" && nextVideoCount >= MAX_REVIEW_VIDEOS) {
+        setReviewInfo(`วิดีโอสูงสุด ${MAX_REVIEW_VIDEOS} คลิป`);
+        continue;
+      }
+
+      const durationSec = type === "video" ? await readVideoDuration(file) : null;
+      if (
+        durationSec != null &&
+        durationSec > MAX_REVIEW_VIDEO_DURATION_SEC
+      ) {
+        setReviewError(
+          `วิดีโอต้องยาวไม่เกิน ${MAX_REVIEW_VIDEO_DURATION_SEC} วินาที`
+        );
+        continue;
+      }
+
+      nextFiles.push({
+        id: `${file.name}-${file.lastModified}-${crypto.randomUUID()}`,
+        file,
+        previewUrl: URL.createObjectURL(file),
+        type,
+        durationSec,
+      });
+    }
+
+    setReviewFiles((current) => [...current, ...nextFiles]);
+  };
+
+  const handleSubmitReview = async () => {
+    if (!reviewTarget || reviewSubmitting) return;
+
+    const comment = reviewComment.trim();
+    if (reviewRating < 1 || reviewRating > 5) {
+      setReviewError("กรุณาเลือกคะแนน 1-5 ดาว");
+      return;
+    }
+    if (comment.length < 10 || comment.length > 1000) {
+      setReviewError("รีวิวต้องมีความยาว 10-1000 ตัวอักษร");
+      return;
+    }
+
+    setReviewSubmitting(true);
+    setReviewError(null);
+    setReviewInfo(null);
+
+    try {
+      const uploadedMedia = await Promise.all(
+        reviewFiles.map(async (reviewFile, index): Promise<ReviewMediaPayload> => {
+          const media = await uploadReviewFile(reviewFile.file);
+          return {
+            ...media,
+            durationSec: reviewFile.durationSec,
+            sortOrder: index,
+          };
+        })
+      );
+
+      const existingMedia =
+        reviewTarget.existingReview?.media?.map((media, index) => ({
+          type: media.type,
+          url: media.url,
+          thumbnailUrl: media.thumbnailUrl ?? null,
+          durationSec: media.durationSec ?? null,
+          fileSizeBytes: media.fileSizeBytes ?? 0,
+          mimeType: media.mimeType ?? "",
+          sortOrder: index,
+        })) ?? [];
+      const payload = {
+        rating: reviewRating,
+        comment,
+        media: [...existingMedia, ...uploadedMedia].map((media, index) => ({
+          ...media,
+          sortOrder: index,
+        })),
+      };
+
+      if (reviewTarget.existingReview?.id) {
+        await updateReview(reviewTarget.existingReview.id, payload);
+      } else {
+        await createOrderItemReview(reviewTarget.item.id, payload);
+      }
+
+      setReviewInfo("ส่งรีวิวเรียบร้อยแล้ว");
+      const refreshedOrder = await fetchOrderById(id).catch(() => null);
+      if (refreshedOrder) {
+        const fallbackLookup = await buildOrderItemFallbacks(refreshedOrder.items);
+        setApiOrder(refreshedOrder);
+        setOrder(mapApiOrderToOrder(refreshedOrder, fallbackLookup));
+      }
+      reviewFiles.forEach((file) => URL.revokeObjectURL(file.previewUrl));
+      setReviewTarget(null);
+      setReviewFiles([]);
+      setReviewError(null);
+    } catch (error) {
+      setReviewError(
+        error instanceof Error
+          ? error.message
+          : "ส่งรีวิวไม่สำเร็จ กรุณาลองใหม่"
+      );
+    } finally {
+      setReviewSubmitting(false);
+    }
   };
 
   const handleReturnImagesChange = async (
@@ -986,7 +1263,11 @@ export default function OrderTrackingPage({
           </div>
         </section>
 
-        <OrderProductCard order={order} />
+        <OrderProductCard
+          apiOrder={apiOrder}
+          order={order}
+          onReviewItem={handleOpenReview}
+        />
 
         <Card className="overflow-hidden bg-white">
           <h2 className="px-4 pt-4 text-sm font-extrabold text-ink">
@@ -1073,6 +1354,216 @@ export default function OrderTrackingPage({
           )}
         </div>
       </div>
+
+      {/* Review bottom sheet */}
+      {reviewTarget && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 backdrop-blur-sm"
+          onClick={handleCloseReview}
+        >
+          <div
+            className="max-h-[92vh] w-full max-w-md overflow-y-auto rounded-t-[2rem] bg-white px-5 pb-8 pt-5 shadow-[0_-20px_60px_rgba(0,0,0,0.18)]"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="mx-auto mb-5 h-1 w-10 rounded-full bg-black/10" />
+            <div className="mb-5 flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-extrabold text-ink">
+                  {reviewTarget.existingReview ? "แก้ไขรีวิว" : "เขียนรีวิว"}
+                </h2>
+                <p className="mt-1 line-clamp-1 text-sm font-semibold text-ink-soft">
+                  {reviewTarget.item.name}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleCloseReview}
+                disabled={reviewSubmitting}
+                aria-label="ปิด"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-muted text-ink-soft transition active:scale-95"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="mb-4">
+              <p className="mb-2 text-sm font-extrabold text-ink">ให้คะแนนสินค้า</p>
+              <div className="flex gap-1.5">
+                {Array.from({ length: 5 }).map((_, index) => {
+                  const value = index + 1;
+                  return (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => {
+                        setReviewRating(value);
+                        setReviewError(null);
+                      }}
+                      className="flex h-11 w-11 items-center justify-center rounded-full bg-brand-soft text-amber-500 transition active:scale-95"
+                      aria-label={`${value} ดาว`}
+                    >
+                      <Star
+                        className={`h-6 w-6 ${
+                          value <= reviewRating
+                            ? "fill-amber-400 text-amber-500"
+                            : "fill-white text-ink-soft/40"
+                        }`}
+                      />
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <label className="block">
+              <span className="mb-2 block text-sm font-extrabold text-ink">
+                รีวิวสินค้า
+              </span>
+              <textarea
+                value={reviewComment}
+                onChange={(event) => {
+                  setReviewComment(event.target.value);
+                  setReviewError(null);
+                }}
+                maxLength={1000}
+                rows={5}
+                placeholder="บอกความรู้สึกหลังได้รับสินค้า"
+                className="w-full resize-none rounded-2xl border border-black/10 bg-surface-muted/50 px-4 py-3 text-sm font-semibold text-ink outline-none transition placeholder:text-ink-soft/70 focus:border-brand focus:bg-white"
+              />
+              <span className="mt-1 block text-right text-xs font-semibold text-ink-soft">
+                {reviewComment.trim().length}/1000
+              </span>
+            </label>
+
+            <div className="mt-4">
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <p className="text-sm font-extrabold text-ink">รูป/วิดีโอ</p>
+                <span className="text-xs font-semibold text-ink-soft">
+                  {(reviewTarget.existingReview?.media?.length ?? 0) + reviewFiles.length}/
+                  {REVIEW_MEDIA_SLOTS}
+                </span>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {reviewTarget.existingReview?.media?.map((media, index) => (
+                  <div
+                    key={`${media.url}-${index}`}
+                    className="relative aspect-square overflow-hidden rounded-2xl bg-surface-muted ring-1 ring-black/[0.06]"
+                  >
+                    {media.type === "video" ? (
+                      <video
+                        src={media.url}
+                        poster={media.thumbnailUrl ?? undefined}
+                        muted
+                        playsInline
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <img
+                        src={media.thumbnailUrl ?? media.url}
+                        alt="สื่อรีวิวเดิม"
+                        className="h-full w-full object-cover"
+                      />
+                    )}
+                  </div>
+                ))}
+                {reviewFiles.map((file) => (
+                  <div
+                    key={file.id}
+                    className="relative aspect-square overflow-hidden rounded-2xl bg-surface-muted ring-1 ring-black/[0.06]"
+                  >
+                    {file.type === "video" ? (
+                      <video
+                        src={file.previewUrl}
+                        muted
+                        playsInline
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <img
+                        src={file.previewUrl}
+                        alt={file.file.name}
+                        className="h-full w-full object-cover"
+                      />
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        URL.revokeObjectURL(file.previewUrl);
+                        setReviewFiles((current) =>
+                          current.filter((item) => item.id !== file.id)
+                        );
+                      }}
+                      aria-label={`ลบ ${file.file.name}`}
+                      className="absolute right-1.5 top-1.5 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                ))}
+                {(reviewTarget.existingReview?.media?.length ?? 0) +
+                  reviewFiles.length <
+                  REVIEW_MEDIA_SLOTS && (
+                  <label className="flex aspect-square cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-brand/40 bg-brand-soft/60 text-brand transition active:scale-95">
+                    <ImagePlus className="h-6 w-6" />
+                    <span className="mt-1 text-xs font-bold">เพิ่มสื่อ</span>
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime,video/webm"
+                      multiple
+                      onChange={handleReviewFilesChange}
+                      className="sr-only"
+                    />
+                  </label>
+                )}
+              </div>
+              <p className="mt-2 text-xs font-semibold leading-relaxed text-ink-soft">
+                รวมสูงสุด 5 ช่อง, รูปไม่เกิน 5, วิดีโอไม่เกิน 3 คลิป และแต่ละคลิปไม่เกิน 60 วินาที
+              </p>
+            </div>
+
+            {reviewError && (
+              <p className="mt-4 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-semibold text-red-600">
+                {reviewError}
+              </p>
+            )}
+            {reviewInfo && (
+              <p className="mt-4 rounded-2xl border border-brand/15 bg-brand-soft px-4 py-3 text-sm font-semibold text-brand">
+                {reviewInfo}
+              </p>
+            )}
+
+            <div className="mt-5 flex gap-3">
+              <Button
+                variant="secondary"
+                size="lg"
+                fullWidth
+                onClick={handleCloseReview}
+                disabled={reviewSubmitting}
+              >
+                ยกเลิก
+              </Button>
+              <button
+                type="button"
+                onClick={handleSubmitReview}
+                disabled={reviewSubmitting}
+                className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-brand px-4 text-sm font-extrabold text-white transition active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {reviewSubmitting ? (
+                  <>
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    กำลังส่ง...
+                  </>
+                ) : (
+                  <>
+                    <Star className="h-4 w-4" />
+                    ส่งรีวิว
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Cancel confirmation bottom sheet */}
       {showCancelDialog && (
