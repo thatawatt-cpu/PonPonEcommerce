@@ -276,6 +276,28 @@ async function fetchOrdersWithClientFallback(
       : filterParams.paymentstatus ?? undefined,
   });
 
+  if (filterParams.apiFilter && (response.items.length > 0 || nextPage !== 1)) {
+    return response;
+  }
+
+  if (filterParams.apiFilter && nextPage === 1 && response.items.length === 0) {
+    const fallbackResponse = await fetchOrders({
+      page: 1,
+      pageSize: FALLBACK_ORDER_PAGE_SIZE,
+    });
+    const fallbackItems = fallbackResponse.items.filter((order) =>
+      matchesOrderFilter(order, filter, filterParams)
+    );
+
+    return {
+      items: fallbackItems.slice(0, pageSize),
+      page: 1,
+      pageSize,
+      total: fallbackItems.length,
+      hasMore: fallbackItems.length > pageSize,
+    };
+  }
+
   if (["awaiting_receive", "completed", "awaiting_review"].includes(filter)) {
     const filteredItems = response.items.filter((order) =>
       matchesOrderFilter(order, filter, filterParams)
