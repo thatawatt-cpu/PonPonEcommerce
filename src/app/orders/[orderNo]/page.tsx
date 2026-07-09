@@ -1263,7 +1263,19 @@ export default function OrderTrackingPage({
 
   return (
     <>
-      <AppHeader title="รายละเอียดคำสั่งซื้อ" showBack />
+      <AppHeader title={forceReview ? "เขียนรีวิว" : "รายละเอียดคำสั่งซื้อ"} showBack />
+      {forceReview ? (
+        <PageContainer className="space-y-3 pt-4 pb-36 md:max-w-md">
+          {!reviewTarget && (
+            <Card className="flex min-h-64 items-center justify-center bg-white p-6 text-center">
+              <div className="flex flex-col items-center gap-3 text-ink-soft">
+                <Loader2 className="h-8 w-8 animate-spin text-brand" />
+                <p className="text-sm font-bold">กำลังเปิดหน้ารีวิว...</p>
+              </div>
+            </Card>
+          )}
+        </PageContainer>
+      ) : (
       <PageContainer className="space-y-3 pt-4 pb-36 md:max-w-5xl md:px-8 xl:max-w-6xl">
         {cancelSuccess && (
           <div
@@ -1424,7 +1436,9 @@ export default function OrderTrackingPage({
           </button>
         )}
       </PageContainer>
+      )}
 
+      {!forceReview && (
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-black/[0.06] bg-white/95 px-4 py-3 shadow-[0_-12px_35px_rgba(0,0,0,0.08)] backdrop-blur">
         <div className="mx-auto grid w-full max-w-md grid-cols-2 gap-3 md:max-w-5xl md:px-8 xl:max-w-6xl">
           <Link
@@ -1468,6 +1482,7 @@ export default function OrderTrackingPage({
           )}
         </div>
       </div>
+      )}
 
       {/* Review bottom sheet */}
       {reviewTarget && (
