@@ -661,60 +661,6 @@ export function ProductDetailClient({
     { value: "latest", label: "ล่าสุด" },
   ];
 
-  const mockReviews: {
-    name: string;
-    rating: number;
-    text: string;
-    tag: string;
-    date: string;
-    media: ReviewMedia[];
-  }[] = [
-    {
-      name: "Mint",
-      rating: 5,
-      text: "แพ็กสินค้าดีมาก ส่งไว ของตรงปก เหมาะซื้อเป็นของฝากสุด ๆ",
-      tag: "ซื้อซ้ำแล้ว",
-      date: "วันนี้ 14:32",
-      media: [
-        { type: "image", imageUrl: product.imageUrl },
-        { type: "video", imageUrl: "/images/products/cookies.png", videoUrl: "/videos/review-sample.mp4" },
-      ],
-    },
-    {
-      name: "Ploy",
-      rating: 4,
-      text: "กล่องน่ารัก รสชาติดี ราคาโอเค กดสั่งง่ายมาก",
-      tag: "มีรูปสินค้า",
-      date: "เมื่อวาน 19:08",
-      media: [{ type: "image", imageUrl: "/images/products/milk-tea.png" }],
-    },
-    {
-      name: "Bank",
-      rating: 3,
-      text: "ส่งถึงไวกว่าเดิม แพ็กมาดี ไม่มีเสียหาย",
-      tag: "รีวิวจากผู้ซื้อจริง",
-      date: "10 มิ.ย. 2569 09:41",
-      media: [],
-    },
-    {
-      name: "Ning",
-      rating: 2,
-      text: "รสชาติดี แต่รอบนี้ขนส่งช้ากว่าปกตินิดหน่อย",
-      tag: "รอจัดส่งนาน",
-      date: "8 มิ.ย. 2569 16:20",
-      media: [{ type: "image", imageUrl: "/images/products/teddy.png" }],
-    },
-    {
-      name: "Art",
-      rating: 1,
-      text: "กล่องมีบุบเล็กน้อย อยากให้แพ็กหนากว่านี้",
-      tag: "แจ้งร้านแล้ว",
-      date: "5 มิ.ย. 2569 11:05",
-      media: [],
-    },
-  ];
-
-  void mockReviews;
 
   const reviews: {
     id: string;
