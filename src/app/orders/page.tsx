@@ -19,6 +19,7 @@ import {
   PackageSearch,
   Search,
   ShoppingBag,
+  Star,
   X,
 } from "lucide-react";
 import { AppHeader } from "@/components/layout/app-header";
@@ -41,15 +42,17 @@ type OrderFilter =
   | "all"
   | "payment"
   | "preparing"
-  | "shipped"
+  | "awaiting_receive"
+  | "awaiting_review"
   | "completed"
-  | "cancelled";
+  | "return_refund";
 
 const orderTabs: {
   value: OrderFilter;
   label: string;
   status: string[] | null;
   paymentstatus: string[] | null;
+  apiFilter?: string;
 }[] = [
   {
     value: "all",
@@ -70,22 +73,32 @@ const orderTabs: {
     paymentstatus: ["1"],
   },
   {
-    value: "shipped",
-    label: "จัดส่งแล้ว",
+    value: "awaiting_receive",
+    label: "ที่ต้องได้รับ",
     status: ["6"],
     paymentstatus: ["1"],
+    apiFilter: "awaiting_receive",
+  },
+  {
+    value: "awaiting_review",
+    label: "รอรีวิว",
+    status: ["1"],
+    paymentstatus: ["1"],
+    apiFilter: "awaiting_review",
   },
   {
     value: "completed",
     label: "สำเร็จ",
     status: ["1"],
     paymentstatus: ["1"],
+    apiFilter: "completed",
   },
   {
-    value: "cancelled",
-    label: "ยกเลิก/คืน",
+    value: "return_refund",
+    label: "คืนเงิน/คืนสินค้า",
     status: ["2", "4", "7"],
     paymentstatus: null,
+    apiFilter: "return_refund",
   },
 ];
 
@@ -122,12 +135,13 @@ const orderFilterParams = orderTabs.reduce(
     params[filter.value] = {
       status: filter.status,
       paymentstatus: filter.paymentstatus,
+      apiFilter: filter.apiFilter,
     };
     return params;
   },
   {} as Record<
     OrderFilter,
-    { status: string[] | null; paymentstatus: string[] | null }
+    { status: string[] | null; paymentstatus: string[] | null; apiFilter?: string }
   >
 );
 
@@ -139,6 +153,7 @@ interface OrderPreviewItem {
   totalPrice: number;
   imageUrl?: string | null;
   optionLabels: string[];
+  isReviewed: boolean;
 }
 
 function mapStatus(status: string): OrderStatus {
@@ -230,14 +245,18 @@ function getOrderPaymentStatusValue(order: ApiOrderListItem): unknown {
 
 function matchesOrderFilter(
   order: ApiOrderListItem,
-  filter: { status: string[] | null; paymentstatus: string[] | null }
+  filterName: OrderFilter,
+  filter: { status: string[] | null; paymentstatus: string[] | null; apiFilter?: string }
 ): boolean {
   const orderStatus = getOrderStatusCode(order.status);
   const paymentStatus = getPaymentStatusCode(getOrderPaymentStatusValue(order));
 
   return (
     (!filter.status || filter.status.includes(orderStatus)) &&
-    (!filter.paymentstatus || filter.paymentstatus.includes(paymentStatus))
+    (!filter.paymentstatus || filter.paymentstatus.includes(paymentStatus)) &&
+    (filterName !== "awaiting_receive" || isAwaitingReceive(order)) &&
+    (filterName !== "completed" || Boolean(order.receivedAtUtc)) &&
+    (filterName !== "awaiting_review" || hasPendingReview(order))
   );
 }
 
@@ -248,11 +267,26 @@ async function fetchOrdersWithClientFallback(
 ) {
   const filterParams = orderFilterParams[filter];
   const response = await fetchOrders({
+    filter: filterParams.apiFilter,
     page: nextPage,
     pageSize,
-    status: filterParams.status ?? undefined,
-    paymentstatus: filterParams.paymentstatus ?? undefined,
+    status: filterParams.apiFilter ? undefined : filterParams.status ?? undefined,
+    paymentstatus: filterParams.apiFilter
+      ? undefined
+      : filterParams.paymentstatus ?? undefined,
   });
+
+  if (["awaiting_receive", "completed", "awaiting_review"].includes(filter)) {
+    const filteredItems = response.items.filter((order) =>
+      matchesOrderFilter(order, filter, filterParams)
+    );
+    return {
+      ...response,
+      items: filteredItems,
+      total: filteredItems.length,
+      hasMore: response.hasMore,
+    };
+  }
 
   if (filter === "all" || response.items.length > 0 || nextPage !== 1) {
     return response;
@@ -263,7 +297,7 @@ async function fetchOrdersWithClientFallback(
     pageSize: FALLBACK_ORDER_PAGE_SIZE,
   });
   const fallbackItems = fallbackResponse.items.filter((order) =>
-    matchesOrderFilter(order, filterParams)
+    matchesOrderFilter(order, filter, filterParams)
   );
 
   return {
@@ -296,6 +330,36 @@ function formatVariantOptions(
   );
 }
 
+function isOrderPreviewItemReviewed(item: ApiOrderPreviewItem): boolean {
+  const source = item as ApiOrderPreviewItem & {
+    review?: { id?: string | null } | null;
+    reviewId?: string | null;
+    reviewedAt?: string | null;
+    isReviewed?: boolean | null;
+    hasReview?: boolean | null;
+  };
+
+  return Boolean(
+    source.review?.id ||
+      source.reviewId ||
+      source.reviewedAt ||
+      source.isReviewed === true ||
+      source.hasReview === true
+  );
+}
+
+function hasPendingReview(order: ApiOrderListItem): boolean {
+  if (!order.receivedAtUtc) return false;
+  const items = order.itemsPreview ?? [];
+  if (items.length === 0) return (order.itemsCount ?? 0) > 0;
+  return items.some((item) => !isOrderPreviewItemReviewed(item));
+}
+
+function isAwaitingReceive(order: ApiOrderListItem): boolean {
+  const status = getOrderStatusCode(order.status);
+  return ["6", "1"].includes(status) && !order.receivedAtUtc;
+}
+
 function mapOrderItemToPreview(item: ApiOrderPreviewItem): OrderPreviewItem {
   return {
     id: item.id,
@@ -305,6 +369,7 @@ function mapOrderItemToPreview(item: ApiOrderPreviewItem): OrderPreviewItem {
     totalPrice: item.totalPrice,
     imageUrl: item.imageUrl,
     optionLabels: formatVariantOptions(item.options),
+    isReviewed: isOrderPreviewItemReviewed(item),
   };
 }
 
@@ -364,13 +429,24 @@ function OrderCard({
   const [itemsExpanded, setItemsExpanded] = useState(false);
   const orderStatus = mapStatus(order.status);
   const manualRefundLabel = getManualRefundLabel(order.omiseRefundStatus);
-  const orderHref = `/orders/${order.id}`;
   const progress = progressByStatus[orderStatus];
   const isShipped = orderStatus === "shipping";
   const visiblePreviewItems = itemsExpanded ? previewItems : previewItems.slice(0, 1);
   const hiddenPreviewCount = Math.max(itemsCount - visiblePreviewItems.length, 0);
   const previewHiddenCount = Math.max(previewItems.length - visiblePreviewItems.length, 0);
   const hasMoreItems = Math.max(itemsCount, previewItems.length) > 1;
+  const awaitingReceive = isAwaitingReceive(order);
+  const isAwaitingReview = hasPendingReview(order);
+  const orderHref = isAwaitingReview
+    ? `/orders/${order.id}?review=1`
+    : `/orders/${order.id}`;
+  const actionLabel = isAwaitingReview
+    ? "เขียนรีวิว"
+    : awaitingReceive
+      ? "ได้รับสินค้าแล้ว"
+    : order.receivedAtUtc
+      ? "ดูรายละเอียด"
+      : "ติดตามออเดอร์";
   const handleCardClick = (event: MouseEvent<HTMLDivElement>) => {
     const target = event.target;
     if (target instanceof Element && target.closest("a, button")) return;
@@ -536,9 +612,14 @@ function OrderCard({
           </div>
           <Link
             href={orderHref}
-            className="flex shrink-0 items-center gap-1 rounded-full border border-brand bg-white px-4 py-2 text-xs font-extrabold text-brand transition active:scale-95"
+            className={`flex shrink-0 items-center gap-1 rounded-full px-4 py-2 text-xs font-extrabold transition active:scale-95 ${
+              isAwaitingReview || awaitingReceive
+                ? "border border-brand bg-brand text-white shadow-[0_8px_18px_rgba(237,23,28,0.18)]"
+                : "border border-brand bg-white text-brand"
+            }`}
           >
-            ติดตามออเดอร์
+            {isAwaitingReview && <Star className="h-3.5 w-3.5" />}
+            {actionLabel}
             <ChevronRight className="h-4 w-4" />
           </Link>
         </div>

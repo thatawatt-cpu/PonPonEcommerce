@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
 
   const { searchParams } = request.nextUrl;
   const forwardedParams = new URLSearchParams();
-  for (const key of ["page", "pageSize"]) {
+  for (const key of ["page", "pageSize", "filter"]) {
     const value = searchParams.get(key);
     if (value !== null) forwardedParams.set(key, value);
   }

@@ -1,10 +1,10 @@
 "use client";
 
 import type React from "react";
-import { use, useEffect, useState } from "react";
+import { use, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   AlertTriangle,
   ChevronRight,
@@ -30,6 +30,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { ProductImage } from "@/components/product/product-image";
 import {
   fetchOrderById,
+  confirmOrderReceived,
   cancelOrder,
   createReturnRequest,
 } from "@/features/orders/order-api";
@@ -222,6 +223,23 @@ function resolvePaymentStatus(api: ApiOrderDetail): PaymentStatus {
   return status;
 }
 
+function resolveOrderStatus(
+  api: ApiOrderDetail,
+  paymentStatus: PaymentStatus
+): OrderStatus {
+  const orderStatus = mapStatus(api.status);
+  const hasReceivedPayment =
+    paymentStatus === "paid" ||
+    paymentStatus === "partial_payment" ||
+    paymentStatus === "excess_payment";
+
+  if (orderStatus === "pending" && hasReceivedPayment) {
+    return "waiting";
+  }
+
+  return orderStatus;
+}
+
 interface OrderItemFallback {
   imageUrl: string | null;
   options: ApiProductVariantOption[];
@@ -364,7 +382,8 @@ function mapApiOrderToOrder(
   api: ApiOrderDetail,
   fallbackLookup = new Map<string, OrderItemFallback>()
 ): Order {
-  const orderStatus = mapStatus(api.status);
+  const paymentStatus = resolvePaymentStatus(api);
+  const orderStatus = resolveOrderStatus(api, paymentStatus);
   const items: CartItem[] = api.items.map((item) => {
     const fallback = getOrderItemFallback(item, fallbackLookup);
     const options =
@@ -398,7 +417,7 @@ function mapApiOrderToOrder(
     discountAmount: api.discountAmount,
     total: api.amount,
     paymentMethod: api.isCod ? "cod" : "promptpay",
-    paymentStatus: resolvePaymentStatus(api),
+    paymentStatus,
     orderStatus,
     timeline: buildTimeline(orderStatus),
     createdAt: api.orderDate ?? new Date().toISOString(),
@@ -453,6 +472,9 @@ function getExistingReview(item: ApiOrderDetailItem): ProductReview | null {
     reviewId?: string | null;
     reviewRating?: number | null;
     reviewComment?: string | null;
+    reviewedAt?: string | null;
+    isReviewed?: boolean | null;
+    hasReview?: boolean | null;
   };
 
   if (source.review?.id) return source.review;
@@ -463,11 +485,29 @@ function getExistingReview(item: ApiOrderDetailItem): ProductReview | null {
     orderItemId: item.id,
     productId: item.productId,
     variantId: item.variantId,
-    rating: Number(source.reviewRating ?? 5),
+    rating: Number(source.reviewRating ?? 0),
     comment: source.reviewComment ?? "",
     media: [],
     createdAt: new Date().toISOString(),
   };
+}
+
+function isOrderDetailItemReviewed(item: ApiOrderDetailItem): boolean {
+  const source = item as ApiOrderDetailItem & {
+    review?: ProductReview | null;
+    reviewId?: string | null;
+    reviewedAt?: string | null;
+    isReviewed?: boolean | null;
+    hasReview?: boolean | null;
+  };
+
+  return Boolean(
+    source.review?.id ||
+      source.reviewId ||
+      source.reviewedAt ||
+      source.isReviewed === true ||
+      source.hasReview === true
+  );
 }
 
 function readVideoDuration(file: File): Promise<number> {
@@ -508,7 +548,7 @@ function OrderProductCard({
         {order.items.map((item, index) => {
           const apiItem = apiOrder.items[index];
           const existingReview = apiItem ? getExistingReview(apiItem) : null;
-          const canReview = order.orderStatus === "success" && Boolean(apiItem);
+          const canReview = Boolean(apiOrder.receivedAtUtc) && Boolean(apiItem);
           const optionText = formatOptions(item.selectedOptions);
           return (
             <div key={`${item.productId}-${optionText}`} className="flex gap-3 px-4 py-3">
@@ -704,6 +744,9 @@ export default function OrderTrackingPage({
 }) {
   const { orderNo: id } = use(params);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const shouldOpenReview = searchParams.get("review") === "1";
+  const autoReviewOpenedRef = useRef(false);
 
   const [order, setOrder] = useState<Order | null>(null);
   const [apiOrder, setApiOrder] = useState<ApiOrderDetail | null>(null);
@@ -716,6 +759,8 @@ export default function OrderTrackingPage({
   const [cancelReasonDetail, setCancelReasonDetail] = useState("");
   const [cancelError, setCancelError] = useState<string | null>(null);
   const [cancelSuccess, setCancelSuccess] = useState<string | null>(null);
+  const [confirmingReceived, setConfirmingReceived] = useState(false);
+  const [confirmReceivedError, setConfirmReceivedError] = useState<string | null>(null);
   const [showReturnDialog, setShowReturnDialog] = useState(false);
   const [returnReason, setReturnReason] = useState("");
   const [returnReasonDetail, setReturnReasonDetail] = useState("");
@@ -724,7 +769,7 @@ export default function OrderTrackingPage({
   const [returnInfo, setReturnInfo] = useState<string | null>(null);
   const [returnSubmitting, setReturnSubmitting] = useState(false);
   const [reviewTarget, setReviewTarget] = useState<ReviewTarget | null>(null);
-  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewRating, setReviewRating] = useState(0);
   const [reviewComment, setReviewComment] = useState("");
   const [reviewFiles, setReviewFiles] = useState<ReviewFile[]>([]);
   const [reviewError, setReviewError] = useState<string | null>(null);
@@ -825,6 +870,47 @@ export default function OrderTrackingPage({
     setShowCancelDialog(true);
   };
 
+  const handleConfirmReceived = async () => {
+    if (confirmingReceived || !apiOrder) return;
+
+    setConfirmingReceived(true);
+    setConfirmReceivedError(null);
+
+    try {
+      const confirmed = await confirmOrderReceived(apiOrder.id);
+      const receivedAtUtc =
+        confirmed.receivedAtUtc ?? new Date().toISOString();
+      setApiOrder((current) =>
+        current
+          ? {
+              ...current,
+              status: confirmed.status ?? current.status,
+              receivedAtUtc,
+            }
+          : current
+      );
+      setOrder((current) =>
+        current
+          ? {
+              ...current,
+              orderStatus: mapStatus(confirmed.status ?? current.orderStatus),
+              timeline: buildTimeline(
+                mapStatus(confirmed.status ?? current.orderStatus)
+              ),
+            }
+          : current
+      );
+    } catch (error) {
+      setConfirmReceivedError(
+        error instanceof Error
+          ? error.message
+          : "ยืนยันรับสินค้าไม่สำเร็จ กรุณาลองใหม่"
+      );
+    } finally {
+      setConfirmingReceived(false);
+    }
+  };
+
   const handleOpenReturn = () => {
     setReturnReason("");
     setReturnReasonDetail("");
@@ -836,12 +922,32 @@ export default function OrderTrackingPage({
 
   const handleOpenReview = (target: ReviewTarget) => {
     setReviewTarget(target);
-    setReviewRating(target.existingReview?.rating ?? 5);
+    setReviewRating(target.existingReview?.rating ?? 0);
     setReviewComment(target.existingReview?.comment ?? "");
     setReviewFiles([]);
     setReviewError(null);
     setReviewInfo(null);
   };
+
+  useEffect(() => {
+    if (!shouldOpenReview || autoReviewOpenedRef.current || !apiOrder || !order) {
+      return;
+    }
+    if (!apiOrder.receivedAtUtc) return;
+
+    const targetItem =
+      apiOrder.items.find((item) => !isOrderDetailItemReviewed(item)) ??
+      apiOrder.items[0];
+    if (!targetItem) return;
+
+    autoReviewOpenedRef.current = true;
+    void Promise.resolve().then(() => {
+      handleOpenReview({
+        item: targetItem,
+        existingReview: getExistingReview(targetItem),
+      });
+    });
+  }, [apiOrder, order, shouldOpenReview]);
 
   const handleCloseReview = () => {
     if (reviewSubmitting) return;
@@ -1155,6 +1261,14 @@ export default function OrderTrackingPage({
   const canPayNow =
     order.paymentStatus === "pending" && order.paymentMethod !== "cod";
   const hasShippingAddress = Boolean(order.address.trim());
+  const canConfirmReceived =
+    !apiOrder.receivedAtUtc &&
+    (order.orderStatus === "shipping" || order.orderStatus === "success");
+  const pendingReviewItem =
+    apiOrder.receivedAtUtc
+      ? apiOrder.items.find((item) => !isOrderDetailItemReviewed(item))
+      : undefined;
+  const canReviewOrder = Boolean(pendingReviewItem);
   const paymentHref = `/payment?orderId=${encodeURIComponent(
     order.id
   )}&orderNo=${encodeURIComponent(order.orderNo)}&amount=${encodeURIComponent(
@@ -1171,6 +1285,11 @@ export default function OrderTrackingPage({
             className="rounded-2xl border border-warning/20 bg-warning-soft px-4 py-3 text-sm font-bold leading-relaxed text-warning"
           >
             {cancelSuccess}
+          </div>
+        )}
+        {confirmReceivedError && (
+          <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-bold leading-relaxed text-red-600">
+            {confirmReceivedError}
           </div>
         )}
         <section className="overflow-hidden rounded-card bg-white app-panel-shadow ring-1 ring-black/[0.04]">
@@ -1269,6 +1388,27 @@ export default function OrderTrackingPage({
           onReviewItem={handleOpenReview}
         />
 
+        {canConfirmReceived && (
+          <button
+            type="button"
+            onClick={handleConfirmReceived}
+            disabled={confirmingReceived}
+            className="flex w-full items-center justify-center gap-2 rounded-full border border-brand bg-white py-3 text-sm font-extrabold text-brand transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {confirmingReceived ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                กำลังยืนยัน...
+              </>
+            ) : (
+              <>
+                <PackageCheck className="h-4 w-4" />
+                ได้รับสินค้าแล้ว
+              </>
+            )}
+          </button>
+        )}
+
         <Card className="overflow-hidden bg-white">
           <h2 className="px-4 pt-4 text-sm font-extrabold text-ink">
             บริการหลังการขาย
@@ -1342,6 +1482,34 @@ export default function OrderTrackingPage({
               <QrCode className="h-4 w-4" />
               ชำระเงิน
             </Link>
+          ) : canConfirmReceived ? (
+            <button
+              type="button"
+              onClick={handleConfirmReceived}
+              disabled={confirmingReceived}
+              className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-brand text-sm font-extrabold text-white shadow-[0_10px_24px_rgba(237,23,28,0.22)] transition active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {confirmingReceived ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <PackageCheck className="h-4 w-4" />
+              )}
+              ได้รับสินค้าแล้ว
+            </button>
+          ) : canReviewOrder && pendingReviewItem ? (
+            <button
+              type="button"
+              onClick={() =>
+                handleOpenReview({
+                  item: pendingReviewItem,
+                  existingReview: getExistingReview(pendingReviewItem),
+                })
+              }
+              className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-brand text-sm font-extrabold text-white shadow-[0_10px_24px_rgba(237,23,28,0.22)] transition active:scale-[0.97]"
+            >
+              <Star className="h-4 w-4" />
+              เขียนรีวิว
+            </button>
           ) : (
             <button
               type="button"

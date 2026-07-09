@@ -341,8 +341,8 @@ export function ProductDetailClient({
   const [activeReviewMedia, setActiveReviewMedia] = useState<ReviewMedia | null>(null);
   const [remoteReviews, setRemoteReviews] = useState<ProductReview[]>([]);
   const [reviewSummary, setReviewSummary] = useState<ProductReviewSummary>({
-    averageRating: product.rating ?? 0,
-    totalReviews: product.reviewCount ?? 0,
+    averageRating: 0,
+    totalReviews: 0,
   });
   const [reviewsLoading, setReviewsLoading] = useState(true);
   const [reviewsError, setReviewsError] = useState<string | null>(null);
@@ -817,19 +817,11 @@ export function ProductDetailClient({
               หมวดหมู่: {product.categoryName} · คงเหลือ {product.stock.toLocaleString("th-TH")} ชิ้น
             </p>
 
-            <div className="mt-1.5 flex items-center gap-2 text-xs">
-              <span className="flex items-center gap-0.5 font-bold text-amber-500">
-                <Star className="h-3.5 w-3.5 fill-amber-400" />
-                {averageRatingLabel}
-              </span>
-              <span className="text-ink-soft">({totalReviewsLabel} รีวิว)</span>
-              {(product.soldCount ?? 0) > 0 && (
-                <>
-                  <span className="text-ink-soft/40">|</span>
-                  <span className="text-ink-soft">ขายแล้ว {(product.soldCount ?? 0).toLocaleString("th-TH")} ชิ้น</span>
-                </>
-              )}
-            </div>
+            {(product.soldCount ?? 0) > 0 && (
+              <p className="mt-1.5 text-xs font-semibold text-ink-soft">
+                ขายแล้ว {(product.soldCount ?? 0).toLocaleString("th-TH")} ชิ้น
+              </p>
+            )}
 
             <div className="mt-2.5">
               <Price value={product.price} compareAt={product.compareAtPrice} size="lg" />
@@ -962,12 +954,11 @@ export function ProductDetailClient({
 
           {/* ── Trust badges ── */}
           <div className="product-detail-trust app-panel-shadow mt-2 bg-white px-4 py-3">
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               {[
                 { icon: ShieldCheck, label: "Official", amber: false },
                 { icon: Truck, label: "ส่งไว", amber: false },
                 { icon: PackageCheck, label: "แพ็กดี", amber: false },
-                { icon: Star, label: `${averageRatingLabel} ★`, amber: true },
               ].map(({ icon: Icon, label, amber }) => (
                 <div key={label} className="flex flex-col items-center gap-1 rounded-xl bg-[#faf9f8] py-2.5">
                   <Icon className={cn("h-4 w-4", amber ? "fill-amber-400 text-amber-500" : "text-brand")} />

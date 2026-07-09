@@ -92,6 +92,7 @@ export async function fetchPricingPreview(
 }
 
 export async function fetchOrders(params?: {
+  filter?: string;
   status?: string[];
   paymentstatus?: string | string[];
   paymentStatus?: string | string[];
@@ -99,6 +100,7 @@ export async function fetchOrders(params?: {
   pageSize?: number;
 }): Promise<ApiOrderListResponse> {
   const qs = new URLSearchParams();
+  if (params?.filter) qs.set("filter", params.filter);
   if (params?.status) {
     for (const s of params.status) qs.append("status", s);
   }
@@ -134,6 +136,25 @@ export async function fetchOrders(params?: {
   }
 
   return data;
+}
+
+export async function confirmOrderReceived(
+  id: string
+): Promise<Pick<ApiOrderDetail, "id" | "status" | "receivedAtUtc">> {
+  const response = await ponponFetch(`/api/orders/${id}/confirm-received`, {
+    method: "POST",
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => null);
+    throw new Error(
+      (err as { message?: string; error?: string } | null)?.message ??
+        (err as { message?: string; error?: string } | null)?.error ??
+        `ยืนยันรับสินค้าไม่สำเร็จ (${response.status})`
+    );
+  }
+
+  return response.json();
 }
 
 export async function fetchOrderById(id: string): Promise<ApiOrderDetail> {
