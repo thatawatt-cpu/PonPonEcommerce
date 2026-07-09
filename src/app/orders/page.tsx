@@ -373,17 +373,13 @@ function isOrderPreviewItemReviewed(item: ApiOrderPreviewItem): boolean {
   const source = item as ApiOrderPreviewItem & {
     review?: { id?: string | null } | null;
     reviewId?: string | null;
-    reviewedAt?: string | null;
     isReviewed?: boolean | null;
-    hasReview?: boolean | null;
   };
 
   return Boolean(
     source.review?.id ||
       source.reviewId ||
-      source.reviewedAt ||
-      source.isReviewed === true ||
-      source.hasReview === true
+      source.isReviewed === true
   );
 }
 
@@ -391,17 +387,13 @@ function isOrderReviewed(order: ApiOrderListItem): boolean {
   const source = order as ApiOrderListItem & {
     review?: { id?: string | null } | null;
     reviewId?: string | null;
-    reviewedAt?: string | null;
     isReviewed?: boolean | null;
-    hasReview?: boolean | null;
   };
 
   return Boolean(
     source.review?.id ||
       source.reviewId ||
-      source.reviewedAt ||
       source.isReviewed === true ||
-      source.hasReview === true ||
       (order.itemsPreview ?? []).some(isOrderPreviewItemReviewed)
   );
 }
@@ -646,6 +638,10 @@ function OrderCard({
     );
     router.push("/checkout?mode=cart-selection");
   };
+  const handleWriteReview = (event: MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    router.push(`/orders/${order.id}/review`);
+  };
 
   return (
     <>
@@ -843,16 +839,21 @@ function OrderCard({
                 <ChevronRight className="h-4 w-4" />
               </button>
             </div>
+          ) : isAwaitingReview ? (
+            <button
+              type="button"
+              onClick={handleWriteReview}
+              className="flex shrink-0 items-center gap-1 rounded-full border border-brand bg-brand px-4 py-2 text-xs font-extrabold text-white shadow-[0_8px_18px_rgba(237,23,28,0.18)] transition active:scale-95"
+            >
+              <Star className="h-3.5 w-3.5" />
+              {actionLabel}
+              <ChevronRight className="h-4 w-4" />
+            </button>
           ) : (
             <Link
               href={orderHref}
-              className={`flex shrink-0 items-center gap-1 rounded-full px-4 py-2 text-xs font-extrabold transition active:scale-95 ${
-                isAwaitingReview
-                  ? "border border-brand bg-brand text-white shadow-[0_8px_18px_rgba(237,23,28,0.18)]"
-                  : "border border-brand bg-white text-brand"
-              }`}
+              className="flex shrink-0 items-center gap-1 rounded-full border border-brand bg-white px-4 py-2 text-xs font-extrabold text-brand transition active:scale-95"
             >
-              {isAwaitingReview && <Star className="h-3.5 w-3.5" />}
               {actionLabel}
               <ChevronRight className="h-4 w-4" />
             </Link>

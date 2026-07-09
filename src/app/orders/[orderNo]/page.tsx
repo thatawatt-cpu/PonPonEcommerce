@@ -471,9 +471,7 @@ function getExistingReview(item: ApiOrderDetailItem): ProductReview | null {
     reviewId?: string | null;
     reviewRating?: number | null;
     reviewComment?: string | null;
-    reviewedAt?: string | null;
     isReviewed?: boolean | null;
-    hasReview?: boolean | null;
   };
 
   if (source.review?.id) return source.review;
@@ -495,17 +493,13 @@ function isOrderDetailItemReviewed(item: ApiOrderDetailItem): boolean {
   const source = item as ApiOrderDetailItem & {
     review?: ProductReview | null;
     reviewId?: string | null;
-    reviewedAt?: string | null;
     isReviewed?: boolean | null;
-    hasReview?: boolean | null;
   };
 
   return Boolean(
     source.review?.id ||
       source.reviewId ||
-      source.reviewedAt ||
-      source.isReviewed === true ||
-      source.hasReview === true
+      source.isReviewed === true
   );
 }
 
