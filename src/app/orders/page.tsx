@@ -549,7 +549,7 @@ function OrderCard({
   const awaitingReceive = isAwaitingReceive(order);
   const isAwaitingReview = hasPendingReview(order);
   const orderHref = isAwaitingReview
-    ? `/orders/${order.id}?review=1`
+    ? `/orders/${order.id}/review`
     : `/orders/${order.id}`;
   const actionLabel = isAwaitingReview
     ? "เขียนรีวิว"
@@ -589,7 +589,7 @@ function OrderCard({
 
     setSelectedPromptRating(rating);
     ratingPromptTimerRef.current = window.setTimeout(() => {
-      router.push(`/orders/${order.id}?review=1&rating=${rating}`);
+      router.push(`/orders/${order.id}/review?rating=${rating}`);
     }, 650);
   };
   const handleCloseRatingPrompt = () => {

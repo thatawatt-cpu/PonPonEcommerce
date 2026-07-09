@@ -759,13 +759,15 @@ function OrderMetaCard({ apiOrder, order }: { apiOrder: ApiOrderDetail; order: O
 
 export default function OrderTrackingPage({
   params,
+  forceReview = false,
 }: {
   params: Promise<{ orderNo: string }>;
+  forceReview?: boolean;
 }) {
   const { orderNo: id } = use(params);
   const router = useRouter();
   const searchParams = useSearchParams();
-  const shouldOpenReview = searchParams.get("review") === "1";
+  const shouldOpenReview = forceReview || searchParams.get("review") === "1";
   const requestedReviewRating = Number(searchParams.get("rating"));
   const initialReviewRating =
     Number.isInteger(requestedReviewRating) &&

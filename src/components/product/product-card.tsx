@@ -24,19 +24,6 @@ function getDiscountPercent(product: Product) {
   );
 }
 
-function getMockReview(product: Product): string {
-  const seed = product.id
-    .split("")
-    .reduce((sum, char) => sum + char.charCodeAt(0), 0);
-  return (4.7 + (seed % 3) / 10).toFixed(1);
-}
-
-function getReviewLabel(product: Product): string {
-  return typeof product.rating === "number"
-    ? product.rating.toFixed(1)
-    : getMockReview(product);
-}
-
 export function ProductCard({
   product,
   index = 0,
@@ -50,7 +37,8 @@ export function ProductCard({
 }) {
   const discountPercent = getDiscountPercent(product);
   const soldCountLabel = formatSoldCount(product.soldCount);
-  const reviewLabel = getReviewLabel(product);
+  const reviewLabel =
+    typeof product.rating === "number" ? product.rating.toFixed(1) : null;
   const visibleBadges = product.badges
     .filter((badge) => badge !== "ลดราคา" || discountPercent === null)
     .slice(0, discountPercent === null ? 2 : 1);
@@ -109,13 +97,17 @@ export function ProductCard({
             </div>
           </div>
           <div className="mt-1.5 flex min-h-5 items-center gap-1.5 text-[11px] font-bold text-ink-soft">
-            <span className="inline-flex items-center gap-0.5 text-amber-500">
-              <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
-              {reviewLabel}
-            </span>
+            {reviewLabel ? (
+              <span className="inline-flex items-center gap-0.5 text-amber-500">
+                <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                {reviewLabel}
+              </span>
+            ) : null}
             {soldCountLabel ? (
               <>
-                <span className="h-1 w-1 rounded-full bg-ink-soft/35" />
+                {reviewLabel ? (
+                  <span className="h-1 w-1 rounded-full bg-ink-soft/35" />
+                ) : null}
                 <span className="min-w-0 truncate">{soldCountLabel}</span>
               </>
             ) : null}
