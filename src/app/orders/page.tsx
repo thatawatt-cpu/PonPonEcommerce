@@ -19,6 +19,7 @@ import {
   PackageSearch,
   Search,
   ShoppingBag,
+  ShoppingCart,
   Star,
   X,
 } from "lucide-react";
@@ -29,13 +30,17 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
 import { OrderStatusBadge } from "@/components/ui/status-badge";
 import { ProductImage } from "@/components/product/product-image";
-import { fetchOrders } from "@/features/orders/order-api";
+import { confirmOrderReceived, fetchOrders } from "@/features/orders/order-api";
+import { storeCartSelectionCheckout } from "@/features/checkout/cart-selection-checkout";
 import { getManualRefundLabel } from "@/features/orders/refund-status";
 import { formatBaht, formatDate } from "@/lib/format";
+import { getCartItemKey, useCartStore } from "@/store/cart-store";
 import type {
   ApiOrderListItem,
   ApiOrderPreviewItem,
 } from "@/types/api";
+import type { CartItem } from "@/types/cart";
+import type { Product } from "@/types/product";
 import type { OrderStatus } from "@/types/order";
 
 type OrderFilter =
@@ -129,6 +134,12 @@ const ORDER_PAGE_SIZE = 10;
 const EMPTY_ORDERS: ApiOrderListItem[] = [];
 const FALLBACK_ORDER_PAGE_SIZE = 100;
 const ACTIVE_ORDER_STATUS_CODES = ["0", "3", "5", "6"];
+const LIVE_ORDER_FILTERS: OrderFilter[] = [
+  "awaiting_receive",
+  "completed",
+  "return_refund",
+  "awaiting_review",
+];
 
 const orderFilterParams = orderTabs.reduce(
   (params, filter) => {
@@ -145,8 +156,14 @@ const orderFilterParams = orderTabs.reduce(
   >
 );
 
+function shouldReloadOrderFilter(filter: OrderFilter): boolean {
+  return LIVE_ORDER_FILTERS.includes(filter);
+}
+
 interface OrderPreviewItem {
   id: string;
+  productId: string | null;
+  variantId: string | null;
   sku: string;
   name: string;
   quantity: number;
@@ -373,6 +390,7 @@ function isOrderPreviewItemReviewed(item: ApiOrderPreviewItem): boolean {
 function hasPendingReview(order: ApiOrderListItem): boolean {
   if (!order.receivedAtUtc) return false;
   const items = order.itemsPreview ?? [];
+  if (items.some(isOrderPreviewItemReviewed)) return false;
   if (items.length === 0) return (order.itemsCount ?? 0) > 0;
   return items.some((item) => !isOrderPreviewItemReviewed(item));
 }
@@ -385,6 +403,8 @@ function isAwaitingReceive(order: ApiOrderListItem): boolean {
 function mapOrderItemToPreview(item: ApiOrderPreviewItem): OrderPreviewItem {
   return {
     id: item.id,
+    productId: item.productId,
+    variantId: item.variantId,
     sku: item.sku,
     name: item.name,
     quantity: Math.round(item.quantity),
@@ -395,6 +415,50 @@ function mapOrderItemToPreview(item: ApiOrderPreviewItem): OrderPreviewItem {
   };
 }
 
+function mapPreviewItemToCartItem(item: OrderPreviewItem): CartItem | null {
+  if (!item.productId || !item.name) return null;
+
+  const quantity = Math.max(1, Math.round(item.quantity || 1));
+  const selectedOptions =
+    item.optionLabels.length > 0
+      ? Object.fromEntries(
+          item.optionLabels.map((label) => {
+            const [name, ...valueParts] = label.split(":");
+            return [name.trim(), valueParts.join(":").trim()];
+          })
+        )
+      : undefined;
+
+  return {
+    productId: item.productId,
+    variantId: item.variantId,
+    productSlug: null,
+    name: item.name,
+    price: item.totalPrice / quantity,
+    imageUrl: item.imageUrl ?? "",
+    emoji: "📦",
+    quantity,
+    selectedOptions,
+  };
+}
+
+function cartItemToProduct(item: CartItem): Product {
+  return {
+    id: item.productId,
+    slug: item.productSlug ?? "",
+    name: item.name,
+    description: "",
+    price: item.price,
+    imageUrl: item.imageUrl,
+    emoji: item.emoji,
+    categoryId: "",
+    categoryName: "",
+    badges: [],
+    stock: 0,
+    isFeatured: false,
+    isBestSeller: false,
+  };
+}
 
 function OrderCardSkeleton() {
   return (
@@ -448,7 +512,12 @@ function OrderCard({
   itemsCount: number;
 }) {
   const router = useRouter();
+  const addItem = useCartStore((state) => state.addItem);
   const [itemsExpanded, setItemsExpanded] = useState(false);
+  const [confirmingReceived, setConfirmingReceived] = useState(false);
+  const [confirmReceiveError, setConfirmReceiveError] = useState<string | null>(null);
+  const [showRatingPrompt, setShowRatingPrompt] = useState(false);
+  const [cartActionMessage, setCartActionMessage] = useState<string | null>(null);
   const orderStatus = mapStatus(order.status);
   const manualRefundLabel = getManualRefundLabel(order.omiseRefundStatus);
   const progress = progressByStatus[orderStatus];
@@ -474,8 +543,76 @@ function OrderCard({
     if (target instanceof Element && target.closest("a, button")) return;
     router.push(orderHref);
   };
+  const handleConfirmReceived = async (event: MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    if (confirmingReceived) return;
+
+    setConfirmingReceived(true);
+    setConfirmReceiveError(null);
+
+    try {
+      await confirmOrderReceived(order.id);
+      setShowRatingPrompt(true);
+    } catch (error) {
+      setConfirmReceiveError(
+        error instanceof Error
+          ? error.message
+          : "ยืนยันรับสินค้าไม่สำเร็จ กรุณาลองใหม่"
+      );
+    } finally {
+      setConfirmingReceived(false);
+    }
+  };
+  const handleReviewRatingSelect = (rating: number) => {
+    router.push(`/orders/${order.id}?review=1&rating=${rating}`);
+  };
+  const getReorderItems = () =>
+    previewItems
+      .map(mapPreviewItemToCartItem)
+      .filter((item): item is CartItem => Boolean(item));
+  const addReorderItemsToCart = () => {
+    const cartItems = getReorderItems();
+    if (cartItems.length === 0) {
+      setCartActionMessage("ไม่พบสินค้าที่เพิ่มลงตะกร้าได้");
+      return [];
+    }
+
+    cartItems.forEach((item) => {
+      addItem({
+        product: cartItemToProduct(item),
+        quantity: item.quantity,
+        selectedOptions: item.selectedOptions,
+        variantId: item.variantId,
+        imageUrl: item.imageUrl,
+      });
+    });
+
+    return cartItems;
+  };
+  const handleAddReorderToCart = (event: MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    const cartItems = addReorderItemsToCart();
+    if (cartItems.length === 0) return;
+
+    setCartActionMessage("เพิ่มลงตะกร้าแล้ว");
+    window.setTimeout(() => setCartActionMessage(null), 1800);
+  };
+  const handleBuyAgain = (event: MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    const cartItems = addReorderItemsToCart();
+    if (cartItems.length === 0) return;
+
+    storeCartSelectionCheckout(
+      cartItems.map((item) => ({
+        key: getCartItemKey(item),
+        item,
+      }))
+    );
+    router.push("/checkout?mode=cart-selection");
+  };
 
   return (
+    <>
       <Card
         onClick={handleCardClick}
         className="group relative touch-pan-y cursor-pointer overflow-hidden bg-white transition hover:-translate-y-0.5 hover:shadow-card"
@@ -631,21 +768,104 @@ function OrderCard({
             <p className="text-base font-extrabold text-ink">
               รวม {formatBaht(order.amount)}
             </p>
+            {confirmReceiveError && (
+              <p className="mt-1 text-xs font-bold text-red-600">
+                {confirmReceiveError}
+              </p>
+            )}
+            {cartActionMessage && (
+              <p className="mt-1 text-xs font-bold text-brand">
+                {cartActionMessage}
+              </p>
+            )}
           </div>
-          <Link
-            href={orderHref}
-            className={`flex shrink-0 items-center gap-1 rounded-full px-4 py-2 text-xs font-extrabold transition active:scale-95 ${
-              isAwaitingReview || awaitingReceive
-                ? "border border-brand bg-brand text-white shadow-[0_8px_18px_rgba(237,23,28,0.18)]"
-                : "border border-brand bg-white text-brand"
-            }`}
-          >
-            {isAwaitingReview && <Star className="h-3.5 w-3.5" />}
-            {actionLabel}
-            <ChevronRight className="h-4 w-4" />
-          </Link>
+          {awaitingReceive ? (
+            <button
+              type="button"
+              onClick={handleConfirmReceived}
+              disabled={confirmingReceived}
+              className="flex shrink-0 items-center gap-1 rounded-full border border-brand bg-brand px-4 py-2 text-xs font-extrabold text-white shadow-[0_8px_18px_rgba(237,23,28,0.18)] transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {confirmingReceived ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <PackageCheck className="h-3.5 w-3.5" />
+              )}
+              {confirmingReceived ? "กำลังยืนยัน..." : actionLabel}
+            </button>
+          ) : order.receivedAtUtc && !isAwaitingReview ? (
+            <div className="flex shrink-0 items-center gap-2">
+              <button
+                type="button"
+                onClick={handleAddReorderToCart}
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-brand bg-white text-brand transition active:scale-95"
+                aria-label="เพิ่มลงตะกร้า"
+              >
+                <ShoppingCart className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={handleBuyAgain}
+                className="flex items-center gap-1 rounded-full border border-brand bg-brand px-4 py-2 text-xs font-extrabold text-white shadow-[0_8px_18px_rgba(237,23,28,0.18)] transition active:scale-95"
+              >
+                ซื้ออีกครั้ง
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          ) : (
+            <Link
+              href={orderHref}
+              className={`flex shrink-0 items-center gap-1 rounded-full px-4 py-2 text-xs font-extrabold transition active:scale-95 ${
+                isAwaitingReview
+                  ? "border border-brand bg-brand text-white shadow-[0_8px_18px_rgba(237,23,28,0.18)]"
+                  : "border border-brand bg-white text-brand"
+              }`}
+            >
+              {isAwaitingReview && <Star className="h-3.5 w-3.5" />}
+              {actionLabel}
+              <ChevronRight className="h-4 w-4" />
+            </Link>
+          )}
         </div>
       </Card>
+      {showRatingPrompt && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 px-4 pb-5 backdrop-blur-sm sm:items-center sm:pb-0"
+          onClick={() => setShowRatingPrompt(false)}
+        >
+          <div
+            className="w-full max-w-sm rounded-[1.75rem] bg-white px-5 pb-6 pt-5 text-center shadow-[0_18px_60px_rgba(0,0,0,0.2)]"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-brand-soft text-brand">
+              <PackageCheck className="h-7 w-7" />
+            </div>
+            <h2 className="text-lg font-extrabold text-ink">
+              ได้รับสินค้าแล้ว
+            </h2>
+            <p className="mt-1 text-sm font-semibold leading-relaxed text-ink-soft">
+              ให้คะแนนสินค้าเพื่อเริ่มเขียนรีวิว
+            </p>
+            <div className="mt-5 flex justify-center gap-1.5">
+              {Array.from({ length: 5 }).map((_, index) => {
+                const rating = index + 1;
+                return (
+                  <button
+                    key={rating}
+                    type="button"
+                    onClick={() => handleReviewRatingSelect(rating)}
+                    className="flex h-11 w-11 items-center justify-center rounded-full bg-brand-soft text-amber-500 transition hover:scale-105 active:scale-95"
+                    aria-label={`${rating} ดาว`}
+                  >
+                    <Star className="h-7 w-7 fill-amber-400 text-amber-500" />
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -778,6 +998,21 @@ export default function OrdersPage() {
   const handleFilterChange = (filter: OrderFilter) => {
     const filterLoaded = loadedTabs.has(filter);
     setActiveFilter(filter);
+    if (shouldReloadOrderFilter(filter)) {
+      setLoadingTab(filter);
+      setOrdersCache((prev) => ({ ...prev, [filter]: [] }));
+      setPaginationCache((prev) => ({
+        ...prev,
+        [filter]: { page: 0, hasMore: true },
+      }));
+      loadedTabsRef.current.delete(filter);
+      setLoadedTabs((prev) => {
+        const next = new Set(prev);
+        next.delete(filter);
+        return next;
+      });
+      return;
+    }
     if (!filterLoaded && (ordersCache[filter]?.length ?? 0) === 0) {
       setLoadingTab(filter);
     }
