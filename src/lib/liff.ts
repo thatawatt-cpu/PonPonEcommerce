@@ -157,7 +157,7 @@ export async function loginWithLine({
 /** Read the LINE idToken/accessToken pair. */
 export async function getLiffTokens(): Promise<{
   idToken: string;
-  accessToken: string;
+  accessToken?: string;
 }> {
   if (!shouldUseMockLiff()) {
     const runtime = typeof window !== "undefined" ? window.liff ?? null : null;
@@ -166,11 +166,11 @@ export async function getLiffTokens(): Promise<{
       const idToken = runtime.getIDToken();
       const accessToken = runtime.getAccessToken();
 
-      if (!idToken || !accessToken) {
-        throw new Error("LINE tokens are not available.");
+      if (!idToken) {
+        throw new Error("LINE idToken is not available.");
       }
 
-      return { idToken, accessToken };
+      return { idToken, accessToken: accessToken ?? undefined };
     }
 
     throw new Error("LIFF tokens are unavailable because the SDK is missing.");
