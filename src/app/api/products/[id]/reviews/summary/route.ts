@@ -3,12 +3,11 @@ import { proxyBackendJson } from "@/lib/server/backend-proxy";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ productId: string }> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const { productId } = await params;
-  const url = new URL(request.url);
+  const { id } = await params;
   return proxyBackendJson(
     request,
-    `/api/products/${encodeURIComponent(productId)}/reviews${url.search}`
+    `/api/products/${encodeURIComponent(id)}/reviews/summary`
   );
 }
