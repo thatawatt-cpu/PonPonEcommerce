@@ -509,23 +509,9 @@ function isOrderDetailItemReviewed(item: ApiOrderDetailItem): boolean {
   );
 }
 
-function hasOrderReview(order: ApiOrderDetail): boolean {
-  const source = order as ApiOrderDetail & {
-    review?: ProductReview | null;
-    reviewId?: string | null;
-    reviewedAt?: string | null;
-    isReviewed?: boolean | null;
-    hasReview?: boolean | null;
-  };
-
-  return Boolean(
-    source.review?.id ||
-      source.reviewId ||
-      source.reviewedAt ||
-      source.isReviewed === true ||
-      source.hasReview === true ||
-      order.items.some(isOrderDetailItemReviewed)
-  );
+function hasPendingOrderReview(order: ApiOrderDetail): boolean {
+  if (!order.receivedAtUtc) return false;
+  return order.items.some((item) => !isOrderDetailItemReviewed(item));
 }
 
 function readVideoDuration(file: File): Promise<number> {
@@ -554,7 +540,6 @@ function OrderProductCard({
   order: Order;
   onReviewItem: (target: ReviewTarget) => void;
 }) {
-  const orderReviewed = hasOrderReview(apiOrder);
   return (
     <Card className="overflow-hidden bg-white">
       <div className="flex items-center gap-2 border-b border-black/[0.05] px-4 py-3">
@@ -568,7 +553,9 @@ function OrderProductCard({
           const apiItem = apiOrder.items[index];
           const existingReview = apiItem ? getExistingReview(apiItem) : null;
           const canReview =
-            Boolean(apiOrder.receivedAtUtc) && Boolean(apiItem) && !orderReviewed;
+            Boolean(apiOrder.receivedAtUtc) &&
+            Boolean(apiItem) &&
+            !isOrderDetailItemReviewed(apiItem!);
           const optionText = formatOptions(item.selectedOptions);
           return (
             <div key={`${item.productId}-${optionText}`} className="flex gap-3 px-4 py-3">
@@ -923,7 +910,7 @@ export default function OrderTrackingPage({
       return;
     }
     if (!apiOrder.receivedAtUtc) return;
-    if (hasOrderReview(apiOrder)) return;
+    if (!hasPendingOrderReview(apiOrder)) return;
 
     const targetItem =
       apiOrder.items.find((item) => !isOrderDetailItemReviewed(item)) ??
@@ -1249,12 +1236,21 @@ export default function OrderTrackingPage({
   const canPayNow =
     order.paymentStatus === "pending" && order.paymentMethod !== "cod";
   const hasShippingAddress = Boolean(order.address.trim());
-  const orderReviewed = hasOrderReview(apiOrder);
   const pendingReviewItem =
-    apiOrder.receivedAtUtc && !orderReviewed
+    apiOrder.receivedAtUtc
       ? apiOrder.items.find((item) => !isOrderDetailItemReviewed(item))
       : undefined;
   const canReviewOrder = Boolean(pendingReviewItem);
+  const orderReviewed = Boolean(
+    apiOrder.receivedAtUtc && apiOrder.items.length > 0 && !pendingReviewItem
+  );
+  const reviewRouteBlockedMessage = orderReviewed
+    ? "ออเดอร์นี้รีวิวแล้ว"
+    : !apiOrder.receivedAtUtc
+      ? "ออเดอร์นี้ยังไม่พร้อมให้รีวิว"
+    : apiOrder.items.length === 0
+      ? "ไม่พบสินค้าที่สามารถรีวิวได้"
+      : null;
   const paymentHref = `/payment?orderId=${encodeURIComponent(
     order.id
   )}&orderNo=${encodeURIComponent(order.orderNo)}&amount=${encodeURIComponent(
@@ -1266,14 +1262,25 @@ export default function OrderTrackingPage({
       <AppHeader title={forceReview ? "เขียนรีวิว" : "รายละเอียดคำสั่งซื้อ"} showBack />
       {forceReview ? (
         <PageContainer className="space-y-3 pt-4 pb-36 md:max-w-md">
-          {!reviewTarget && (
+          {!reviewTarget && reviewRouteBlockedMessage ? (
+            <EmptyState
+              emoji="⭐"
+              title={reviewRouteBlockedMessage}
+              description="กลับไปดูรายการออเดอร์ทั้งหมดได้เลย"
+              action={
+                <Link href="/orders">
+                  <Button>ดูออเดอร์ทั้งหมด</Button>
+                </Link>
+              }
+            />
+          ) : !reviewTarget ? (
             <Card className="flex min-h-64 items-center justify-center bg-white p-6 text-center">
               <div className="flex flex-col items-center gap-3 text-ink-soft">
                 <Loader2 className="h-8 w-8 animate-spin text-brand" />
                 <p className="text-sm font-bold">กำลังเปิดหน้ารีวิว...</p>
               </div>
             </Card>
-          )}
+          ) : null}
         </PageContainer>
       ) : (
       <PageContainer className="space-y-3 pt-4 pb-36 md:max-w-5xl md:px-8 xl:max-w-6xl">

@@ -409,9 +409,11 @@ function isOrderReviewed(order: ApiOrderListItem): boolean {
 function hasPendingReview(order: ApiOrderListItem): boolean {
   if (!order.receivedAtUtc) return false;
   const items = order.itemsPreview ?? [];
+  if (items.length > 0) {
+    return items.some((item) => !isOrderPreviewItemReviewed(item));
+  }
   if (isOrderReviewed(order)) return false;
-  if (items.length === 0) return (order.itemsCount ?? 0) > 0;
-  return items.some((item) => !isOrderPreviewItemReviewed(item));
+  return (order.itemsCount ?? 0) > 0;
 }
 
 function isAwaitingReceive(order: ApiOrderListItem): boolean {
