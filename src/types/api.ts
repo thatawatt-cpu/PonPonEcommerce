@@ -276,6 +276,8 @@ export interface ApiOrderPreviewItem {
   id: string;
   productId: string | null;
   variantId: string | null;
+  reviewId?: string | null;
+  isReviewed?: boolean;
   sku: string;
   name: string;
   quantity: number;
@@ -312,6 +314,8 @@ export interface ApiOrderDetailItem {
   id: string;
   productId: string | null;
   variantId: string | null;
+  reviewId?: string | null;
+  isReviewed?: boolean;
   sku: string;
   name: string;
   quantity: number;

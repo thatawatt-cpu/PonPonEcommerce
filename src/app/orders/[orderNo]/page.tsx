@@ -510,7 +510,22 @@ function isOrderDetailItemReviewed(item: ApiOrderDetailItem): boolean {
 }
 
 function hasOrderReview(order: ApiOrderDetail): boolean {
-  return order.items.some(isOrderDetailItemReviewed);
+  const source = order as ApiOrderDetail & {
+    review?: ProductReview | null;
+    reviewId?: string | null;
+    reviewedAt?: string | null;
+    isReviewed?: boolean | null;
+    hasReview?: boolean | null;
+  };
+
+  return Boolean(
+    source.review?.id ||
+      source.reviewId ||
+      source.reviewedAt ||
+      source.isReviewed === true ||
+      source.hasReview === true ||
+      order.items.some(isOrderDetailItemReviewed)
+  );
 }
 
 function readVideoDuration(file: File): Promise<number> {

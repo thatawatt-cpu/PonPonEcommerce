@@ -387,10 +387,29 @@ function isOrderPreviewItemReviewed(item: ApiOrderPreviewItem): boolean {
   );
 }
 
+function isOrderReviewed(order: ApiOrderListItem): boolean {
+  const source = order as ApiOrderListItem & {
+    review?: { id?: string | null } | null;
+    reviewId?: string | null;
+    reviewedAt?: string | null;
+    isReviewed?: boolean | null;
+    hasReview?: boolean | null;
+  };
+
+  return Boolean(
+    source.review?.id ||
+      source.reviewId ||
+      source.reviewedAt ||
+      source.isReviewed === true ||
+      source.hasReview === true ||
+      (order.itemsPreview ?? []).some(isOrderPreviewItemReviewed)
+  );
+}
+
 function hasPendingReview(order: ApiOrderListItem): boolean {
   if (!order.receivedAtUtc) return false;
   const items = order.itemsPreview ?? [];
-  if (items.some(isOrderPreviewItemReviewed)) return false;
+  if (isOrderReviewed(order)) return false;
   if (items.length === 0) return (order.itemsCount ?? 0) > 0;
   return items.some((item) => !isOrderPreviewItemReviewed(item));
 }
