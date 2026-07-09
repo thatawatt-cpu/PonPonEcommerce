@@ -536,6 +536,8 @@ function OrderCard({
   const [confirmingReceived, setConfirmingReceived] = useState(false);
   const [confirmReceiveError, setConfirmReceiveError] = useState<string | null>(null);
   const [showRatingPrompt, setShowRatingPrompt] = useState(false);
+  const [selectedPromptRating, setSelectedPromptRating] = useState(0);
+  const ratingPromptTimerRef = useRef<number | null>(null);
   const orderStatus = mapStatus(order.status);
   const manualRefundLabel = getManualRefundLabel(order.omiseRefundStatus);
   const progress = progressByStatus[orderStatus];
@@ -570,6 +572,7 @@ function OrderCard({
 
     try {
       await confirmOrderReceived(order.id);
+      setSelectedPromptRating(0);
       setShowRatingPrompt(true);
     } catch (error) {
       setConfirmReceiveError(
@@ -582,8 +585,29 @@ function OrderCard({
     }
   };
   const handleReviewRatingSelect = (rating: number) => {
-    router.push(`/orders/${order.id}?review=1&rating=${rating}`);
+    if (ratingPromptTimerRef.current) return;
+
+    setSelectedPromptRating(rating);
+    ratingPromptTimerRef.current = window.setTimeout(() => {
+      router.push(`/orders/${order.id}?review=1&rating=${rating}`);
+    }, 650);
   };
+  const handleCloseRatingPrompt = () => {
+    if (ratingPromptTimerRef.current) {
+      window.clearTimeout(ratingPromptTimerRef.current);
+      ratingPromptTimerRef.current = null;
+    }
+    setSelectedPromptRating(0);
+    setShowRatingPrompt(false);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (ratingPromptTimerRef.current) {
+        window.clearTimeout(ratingPromptTimerRef.current);
+      }
+    };
+  }, []);
   const getReorderItems = () =>
     previewItems
       .map(mapPreviewItemToCartItem)
@@ -836,12 +860,20 @@ function OrderCard({
       {showRatingPrompt && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 backdrop-blur-sm"
-          onClick={() => setShowRatingPrompt(false)}
+          onClick={handleCloseRatingPrompt}
         >
           <div
-            className="w-full max-w-sm rounded-[1.75rem] bg-white px-5 pb-6 pt-5 text-center shadow-[0_18px_60px_rgba(0,0,0,0.2)]"
+            className="relative w-full max-w-sm rounded-[1.75rem] bg-white px-5 pb-6 pt-5 text-center shadow-[0_18px_60px_rgba(0,0,0,0.2)]"
             onClick={(event) => event.stopPropagation()}
           >
+            <button
+              type="button"
+              onClick={handleCloseRatingPrompt}
+              aria-label="ปิด"
+              className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-surface-muted text-ink-soft transition active:scale-95"
+            >
+              <X className="h-5 w-5" />
+            </button>
             <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-brand-soft text-brand">
               <PackageCheck className="h-7 w-7" />
             </div>
@@ -859,10 +891,17 @@ function OrderCard({
                     key={rating}
                     type="button"
                     onClick={() => handleReviewRatingSelect(rating)}
-                    className="flex h-11 w-11 items-center justify-center rounded-full bg-brand-soft text-ink-soft/45 transition hover:scale-105 hover:text-amber-500 active:scale-95"
+                    disabled={selectedPromptRating > 0}
+                    className="flex h-11 w-11 items-center justify-center rounded-full bg-brand-soft transition hover:scale-105 active:scale-95 disabled:cursor-wait"
                     aria-label={`${rating} ดาว`}
                   >
-                    <Star className="h-7 w-7 fill-white" />
+                    <Star
+                      className={`h-7 w-7 ${
+                        rating <= selectedPromptRating
+                          ? "fill-amber-400 text-amber-500"
+                          : "fill-white text-ink-soft/45"
+                      }`}
+                    />
                   </button>
                 );
               })}
