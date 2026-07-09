@@ -19,7 +19,6 @@ import {
   PackageSearch,
   Search,
   ShoppingBag,
-  ShoppingCart,
   Star,
   X,
 } from "lucide-react";
@@ -34,13 +33,12 @@ import { confirmOrderReceived, fetchOrders } from "@/features/orders/order-api";
 import { storeCartSelectionCheckout } from "@/features/checkout/cart-selection-checkout";
 import { getManualRefundLabel } from "@/features/orders/refund-status";
 import { formatBaht, formatDate } from "@/lib/format";
-import { getCartItemKey, useCartStore } from "@/store/cart-store";
+import { getCartItemKey } from "@/store/cart-store";
 import type {
   ApiOrderListItem,
   ApiOrderPreviewItem,
 } from "@/types/api";
 import type { CartItem } from "@/types/cart";
-import type { Product } from "@/types/product";
 import type { OrderStatus } from "@/types/order";
 
 type OrderFilter =
@@ -461,24 +459,6 @@ function mapPreviewItemToCartItem(item: OrderPreviewItem): CartItem | null {
   };
 }
 
-function cartItemToProduct(item: CartItem): Product {
-  return {
-    id: item.productId,
-    slug: item.productSlug ?? "",
-    name: item.name,
-    description: "",
-    price: item.price,
-    imageUrl: item.imageUrl,
-    emoji: item.emoji,
-    categoryId: "",
-    categoryName: "",
-    badges: [],
-    stock: 0,
-    isFeatured: false,
-    isBestSeller: false,
-  };
-}
-
 function OrderCardSkeleton() {
   return (
     <Card className="overflow-hidden bg-white">
@@ -531,12 +511,10 @@ function OrderCard({
   itemsCount: number;
 }) {
   const router = useRouter();
-  const addItem = useCartStore((state) => state.addItem);
   const [itemsExpanded, setItemsExpanded] = useState(false);
   const [confirmingReceived, setConfirmingReceived] = useState(false);
   const [confirmReceiveError, setConfirmReceiveError] = useState<string | null>(null);
   const [showRatingPrompt, setShowRatingPrompt] = useState(false);
-  const [cartActionMessage, setCartActionMessage] = useState<string | null>(null);
   const orderStatus = mapStatus(order.status);
   const manualRefundLabel = getManualRefundLabel(order.omiseRefundStatus);
   const progress = progressByStatus[orderStatus];
@@ -589,36 +567,9 @@ function OrderCard({
     previewItems
       .map(mapPreviewItemToCartItem)
       .filter((item): item is CartItem => Boolean(item));
-  const addReorderItemsToCart = () => {
-    const cartItems = getReorderItems();
-    if (cartItems.length === 0) {
-      setCartActionMessage("ไม่พบสินค้าที่เพิ่มลงตะกร้าได้");
-      return [];
-    }
-
-    cartItems.forEach((item) => {
-      addItem({
-        product: cartItemToProduct(item),
-        quantity: item.quantity,
-        selectedOptions: item.selectedOptions,
-        variantId: item.variantId,
-        imageUrl: item.imageUrl,
-      });
-    });
-
-    return cartItems;
-  };
-  const handleAddReorderToCart = (event: MouseEvent<HTMLButtonElement>) => {
-    event.stopPropagation();
-    const cartItems = addReorderItemsToCart();
-    if (cartItems.length === 0) return;
-
-    setCartActionMessage("เพิ่มลงตะกร้าแล้ว");
-    window.setTimeout(() => setCartActionMessage(null), 1800);
-  };
   const handleBuyAgain = (event: MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
-    const cartItems = addReorderItemsToCart();
+    const cartItems = getReorderItems();
     if (cartItems.length === 0) return;
 
     storeCartSelectionCheckout(
@@ -792,11 +743,6 @@ function OrderCard({
                 {confirmReceiveError}
               </p>
             )}
-            {cartActionMessage && (
-              <p className="mt-1 text-xs font-bold text-brand">
-                {cartActionMessage}
-              </p>
-            )}
           </div>
           {awaitingReceive ? (
             <button
@@ -813,24 +759,14 @@ function OrderCard({
               {confirmingReceived ? "กำลังยืนยัน..." : actionLabel}
             </button>
           ) : order.receivedAtUtc && !isAwaitingReview ? (
-            <div className="flex shrink-0 items-center gap-2">
-              <button
-                type="button"
-                onClick={handleAddReorderToCart}
-                className="flex h-9 w-9 items-center justify-center rounded-full border border-brand bg-white text-brand transition active:scale-95"
-                aria-label="เพิ่มลงตะกร้า"
-              >
-                <ShoppingCart className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                onClick={handleBuyAgain}
-                className="flex items-center gap-1 rounded-full border border-brand bg-brand px-4 py-2 text-xs font-extrabold text-white shadow-[0_8px_18px_rgba(237,23,28,0.18)] transition active:scale-95"
-              >
-                ซื้ออีกครั้ง
-                <ChevronRight className="h-4 w-4" />
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={handleBuyAgain}
+              className="flex shrink-0 items-center gap-1 rounded-full border border-brand bg-brand px-4 py-2 text-xs font-extrabold text-white shadow-[0_8px_18px_rgba(237,23,28,0.18)] transition active:scale-95"
+            >
+              ซื้ออีกครั้ง
+              <ChevronRight className="h-4 w-4" />
+            </button>
           ) : (
             <Link
               href={orderHref}
