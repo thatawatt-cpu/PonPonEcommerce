@@ -112,6 +112,14 @@ interface ReviewFile {
   durationSec: number | null;
 }
 
+interface ReviewUploadStatus {
+  phase: "uploading" | "saving";
+  current: number;
+  total: number;
+  fileName?: string;
+  fileType?: "image" | "video";
+}
+
 interface ReviewTarget {
   item: ApiOrderDetailItem;
   existingReview?: ProductReview | null;
@@ -779,6 +787,8 @@ export default function OrderTrackingPage({
   const [reviewError, setReviewError] = useState<string | null>(null);
   const [reviewInfo, setReviewInfo] = useState<string | null>(null);
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [reviewUploadStatus, setReviewUploadStatus] =
+    useState<ReviewUploadStatus | null>(null);
 
   useEffect(() => {
     fetchOrderById(id)
@@ -893,6 +903,7 @@ export default function OrderTrackingPage({
     setReviewFiles([]);
     setReviewError(null);
     setReviewInfo(null);
+    setReviewUploadStatus(null);
   };
 
   useEffect(() => {
@@ -926,6 +937,7 @@ export default function OrderTrackingPage({
     setReviewFiles([]);
     setReviewError(null);
     setReviewInfo(null);
+    setReviewUploadStatus(null);
     if (forceReview) {
       router.replace("/orders");
     }
@@ -1023,18 +1035,45 @@ export default function OrderTrackingPage({
     setReviewSubmitting(true);
     setReviewError(null);
     setReviewInfo(null);
+    setReviewUploadStatus(
+      reviewFiles.length > 0
+        ? {
+            phase: "uploading",
+            current: 0,
+            total: reviewFiles.length,
+          }
+        : {
+            phase: "saving",
+            current: 0,
+            total: 0,
+          }
+    );
 
     try {
-      const uploadedMedia = await Promise.all(
-        reviewFiles.map(async (reviewFile, index): Promise<ReviewMediaPayload> => {
-          const media = await uploadReviewFile(reviewFile.file);
-          return {
-            ...media,
-            durationSec: reviewFile.durationSec,
-            sortOrder: index,
-          };
-        })
-      );
+      const uploadedMedia: ReviewMediaPayload[] = [];
+
+      for (const [index, reviewFile] of reviewFiles.entries()) {
+        setReviewUploadStatus({
+          phase: "uploading",
+          current: index + 1,
+          total: reviewFiles.length,
+          fileName: reviewFile.file.name,
+          fileType: reviewFile.type,
+        });
+
+        const media = await uploadReviewFile(reviewFile.file);
+        uploadedMedia.push({
+          ...media,
+          durationSec: reviewFile.durationSec,
+          sortOrder: index,
+        });
+      }
+
+      setReviewUploadStatus({
+        phase: "saving",
+        current: reviewFiles.length,
+        total: reviewFiles.length,
+      });
 
       const existingMedia =
         reviewTarget.existingReview?.media?.map((media, index) => ({
@@ -1066,6 +1105,7 @@ export default function OrderTrackingPage({
       setReviewTarget(null);
       setReviewFiles([]);
       setReviewError(null);
+      setReviewUploadStatus(null);
       router.push("/orders");
     } catch (error) {
       setReviewError(
@@ -1075,6 +1115,7 @@ export default function OrderTrackingPage({
       );
     } finally {
       setReviewSubmitting(false);
+      setReviewUploadStatus(null);
     }
   };
 
@@ -1244,6 +1285,12 @@ export default function OrderTrackingPage({
     : apiOrder.items.length === 0
       ? "ไม่พบสินค้าที่สามารถรีวิวได้"
       : null;
+  const reviewUploadText =
+    reviewUploadStatus?.phase === "uploading"
+      ? `${reviewUploadStatus.fileType === "video" ? "กำลังอัปโหลดวิดีโอ" : "กำลังอัปโหลดรูป"} ${reviewUploadStatus.current}/${reviewUploadStatus.total}`
+      : reviewUploadStatus?.phase === "saving"
+        ? "กำลังบันทึกรีวิว..."
+        : null;
   const paymentHref = `/payment?orderId=${encodeURIComponent(
     order.id
   )}&orderNo=${encodeURIComponent(order.orderNo)}&amount=${encodeURIComponent(
@@ -1614,8 +1661,17 @@ export default function OrderTrackingPage({
                         className="h-full w-full object-cover"
                       />
                     )}
+                    {reviewSubmitting && (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/55 px-2 text-center text-white">
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                        <span className="text-[11px] font-extrabold leading-tight">
+                          {file.type === "video" ? "กำลังอัปโหลดวิดีโอ" : "กำลังอัปโหลดรูป"}
+                        </span>
+                      </div>
+                    )}
                     <button
                       type="button"
+                      disabled={reviewSubmitting}
                       onClick={() => {
                         URL.revokeObjectURL(file.previewUrl);
                         setReviewFiles((current) =>
@@ -1629,7 +1685,8 @@ export default function OrderTrackingPage({
                     </button>
                   </div>
                 ))}
-                {(reviewTarget.existingReview?.media?.length ?? 0) +
+                {!reviewSubmitting &&
+                  (reviewTarget.existingReview?.media?.length ?? 0) +
                   reviewFiles.length <
                   REVIEW_MEDIA_SLOTS && (
                   <label className="flex aspect-square cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-brand/40 bg-brand-soft/60 text-brand transition active:scale-95">
@@ -1648,6 +1705,15 @@ export default function OrderTrackingPage({
               <p className="mt-2 text-xs font-semibold leading-relaxed text-ink-soft">
                 รวมสูงสุด 5 ช่อง, รูปไม่เกิน 5, วิดีโอไม่เกิน 3 คลิป และแต่ละคลิปไม่เกิน 60 วินาที
               </p>
+              {reviewUploadText && (
+                <div className="mt-3 flex items-center gap-2 rounded-2xl border border-brand/15 bg-brand-soft px-3 py-2 text-xs font-extrabold text-brand">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span className="min-w-0 flex-1 truncate">
+                    {reviewUploadText}
+                    {reviewUploadStatus?.fileName ? `: ${reviewUploadStatus.fileName}` : ""}
+                  </span>
+                </div>
+              )}
             </div>
 
             {reviewError && (
@@ -1680,7 +1746,7 @@ export default function OrderTrackingPage({
                 {reviewSubmitting ? (
                   <>
                     <Loader2 className="h-5 w-5 animate-spin" />
-                    กำลังส่ง...
+                    {reviewUploadText ?? "กำลังส่ง..."}
                   </>
                 ) : (
                   <>
