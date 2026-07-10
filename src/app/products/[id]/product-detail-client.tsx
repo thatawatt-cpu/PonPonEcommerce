@@ -327,15 +327,10 @@ export function ProductDetailClient({
   const [reviewsOpen, setReviewsOpen] = useState(false);
   const [reviewFilter, setReviewFilter] = useState<ReviewFilter>("all");
   const [remoteProductCoupons, setRemoteProductCoupons] = useState<ApiCouponListItem[]>(
-    () =>
-      initialCoupons.length > 0
-        ? initialCoupons
-        : getCachedAvailableCoupons(getProductCouponParams(product))
+    () => initialCoupons
   );
   const [productCouponsLoaded, setProductCouponsLoaded] = useState(
-    () =>
-      initialCoupons.length > 0 ||
-      getCachedAvailableCoupons(getProductCouponParams(product)).length > 0
+    true
   );
   const [claimingProductCouponIds, setClaimingProductCouponIds] = useState<string[]>([]);
   const [activeReviewMedia, setActiveReviewMedia] = useState<ReviewMedia | null>(null);
@@ -487,15 +482,16 @@ export function ProductDetailClient({
   useEffect(() => {
     let cancelled = false;
     const params = getProductCouponParams(product, selectedVariant);
-    const cachedCoupons = getCachedAvailableCoupons(params);
 
     void Promise.resolve().then(() => {
       if (cancelled) return;
-      if (initialCoupons.length > 0 && !selectedVariant) {
+      if (!selectedVariant) {
         setRemoteProductCoupons(initialCoupons);
         setProductCouponsLoaded(true);
         return;
       }
+
+      const cachedCoupons = getCachedAvailableCoupons(params);
       if (cachedCoupons.length > 0) {
         setRemoteProductCoupons(cachedCoupons);
         setProductCouponsLoaded(true);
@@ -503,6 +499,19 @@ export function ProductDetailClient({
         setProductCouponsLoaded(false);
       }
     });
+
+    if (!selectedVariant) {
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const cachedCoupons = getCachedAvailableCoupons(params);
+    if (cachedCoupons.length > 0) {
+      return () => {
+        cancelled = true;
+      };
+    }
 
     fetchAvailableCoupons(params)
       .then((items) => {

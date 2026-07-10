@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ArrowUpRight, Star } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -35,6 +38,7 @@ export function ProductCard({
   /** Optional contextual label shown over the product image. */
   metaLabel?: string;
 }) {
+  const router = useRouter();
   const discountPercent = getDiscountPercent(product);
   const soldCountLabel = formatSoldCount(product.soldCount);
   const reviewLabel =
@@ -48,7 +52,12 @@ export function ProductCard({
       className="cv-auto group flex h-full animate-fade-up flex-col overflow-hidden transition active:scale-[0.98] motion-reduce:active:scale-100"
       style={{ animationDelay: `${Math.min(index, 9) * 55}ms` }}
     >
-      <Link href={`/products/${product.slug}`} className="flex flex-1 flex-col">
+      <Link
+        href={`/products/${product.slug}`}
+        onFocus={() => router.prefetch(`/products/${product.slug}`)}
+        onMouseEnter={() => router.prefetch(`/products/${product.slug}`)}
+        className="flex flex-1 flex-col"
+      >
         <div className="relative overflow-hidden">
           <ProductImage
             imageUrl={product.imageUrl}

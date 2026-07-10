@@ -787,6 +787,7 @@ export default function CheckoutPage({
     }
 
     let cancelled = false;
+    const controller = new AbortController();
     const requestSignature = currentPricingPreviewSignature;
     const timer = window.setTimeout(() => {
       setPricingPreviewLoading(true);
@@ -804,7 +805,7 @@ export default function CheckoutPage({
           variantId: item.variantId ?? null,
           quantity: item.quantity,
         })),
-      })
+      }, { signal: controller.signal })
         .then((preview) => {
           if (cancelled) return;
           setPricingPreview(preview);
@@ -828,6 +829,7 @@ export default function CheckoutPage({
         })
         .catch((err) => {
           if (cancelled) return;
+          if (err instanceof DOMException && err.name === "AbortError") return;
           setPricingPreview(null);
           setPromoError(true);
           setPromoMessage(getCouponErrorMessage(err));
@@ -837,10 +839,11 @@ export default function CheckoutPage({
             setPricingPreviewLoading(false);
           }
         });
-    }, 250);
+    }, 400);
 
     return () => {
       cancelled = true;
+      controller.abort();
       window.clearTimeout(timer);
     };
   }, [

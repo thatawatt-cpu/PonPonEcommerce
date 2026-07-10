@@ -73,10 +73,12 @@ export async function createOrder(
 }
 
 export async function fetchPricingPreview(
-  body: ApiPricingPreviewRequest
+  body: ApiPricingPreviewRequest,
+  init: Pick<RequestInit, "signal"> = {}
 ): Promise<ApiPricingPreviewResponse> {
   const response = await ponponFetch("/api/orders/pricing-preview", {
     method: "POST",
+    signal: init.signal,
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
