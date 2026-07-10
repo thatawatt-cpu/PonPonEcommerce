@@ -33,6 +33,12 @@ async function readError(response: Response, fallback: string): Promise<Error> {
   return new Error(message);
 }
 
+function toUploadDuration(durationSec: number | null | undefined) {
+  return typeof durationSec === "number" && Number.isFinite(durationSec)
+    ? { durationSec: Math.ceil(durationSec) }
+    : {};
+}
+
 function unwrapItems<T>(data: unknown): T[] {
   if (Array.isArray(data)) return data as T[];
   if (data && typeof data === "object") {
@@ -175,8 +181,8 @@ export async function uploadReviewFile(
     fileName: file.name,
     fileSizeBytes: file.size,
     mimeType: file.type,
-    durationSec: input.durationSec ?? null,
     sortOrder: input.sortOrder ?? 0,
+    ...toUploadDuration(input.durationSec),
   });
 
   const uploadResponse = await fetch(upload.uploadUrl, {
@@ -215,8 +221,8 @@ export async function uploadOrderItemReviewFile(
     fileName: file.name,
     fileSizeBytes: file.size,
     mimeType: file.type,
-    durationSec: input.durationSec ?? null,
     sortOrder: input.sortOrder ?? 0,
+    ...toUploadDuration(input.durationSec),
   });
 
   const uploadResponse = await fetch(upload.uploadUrl, {

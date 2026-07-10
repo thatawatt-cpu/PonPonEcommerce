@@ -522,7 +522,7 @@ function readVideoDuration(file: File): Promise<number> {
     video.preload = "metadata";
     video.onloadedmetadata = () => {
       URL.revokeObjectURL(url);
-      resolve(Number.isFinite(video.duration) ? video.duration : 0);
+      resolve(Number.isFinite(video.duration) ? Math.ceil(video.duration) : 0);
     };
     video.onerror = () => {
       URL.revokeObjectURL(url);
