@@ -110,6 +110,9 @@ interface ReviewFile {
   previewUrl: string;
   type: "image" | "video";
   durationSec: number | null;
+  uploadStatus: "pending" | "uploading" | "ready" | "error";
+  uploadedMedia?: ReviewMediaPayload;
+  uploadError?: string;
 }
 
 interface ReviewUploadStatus {
@@ -789,6 +792,8 @@ export default function OrderTrackingPage({
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
   const [reviewUploadStatus, setReviewUploadStatus] =
     useState<ReviewUploadStatus | null>(null);
+  const [reviewPreparingMediaText, setReviewPreparingMediaText] =
+    useState<string | null>(null);
 
   useEffect(() => {
     fetchOrderById(id)
@@ -904,6 +909,7 @@ export default function OrderTrackingPage({
     setReviewError(null);
     setReviewInfo(null);
     setReviewUploadStatus(null);
+    setReviewPreparingMediaText(null);
   };
 
   useEffect(() => {
@@ -938,6 +944,7 @@ export default function OrderTrackingPage({
     setReviewError(null);
     setReviewInfo(null);
     setReviewUploadStatus(null);
+    setReviewPreparingMediaText(null);
     if (forceReview) {
       router.replace("/orders");
     }
@@ -952,8 +959,15 @@ export default function OrderTrackingPage({
     setReviewInfo(null);
 
     if (selectedFiles.length === 0) return;
+    const selectedHasVideo = selectedFiles.some((file) =>
+      file.type.startsWith("video/")
+    );
+    setReviewPreparingMediaText(
+      selectedHasVideo ? "กำลังตรวจสอบวิดีโอ..." : "กำลังเตรียมรูป..."
+    );
     const existingMediaCount = reviewTarget?.existingReview?.media?.length ?? 0;
     if (existingMediaCount + reviewFiles.length >= REVIEW_MEDIA_SLOTS) {
+      setReviewPreparingMediaText(null);
       setReviewError(`แนบสื่อได้สูงสุด ${REVIEW_MEDIA_SLOTS} ไฟล์`);
       return;
     }
@@ -962,6 +976,7 @@ export default function OrderTrackingPage({
       (file) => !ALLOWED_REVIEW_MEDIA_TYPES.includes(file.type)
     );
     if (unsupportedFile) {
+      setReviewPreparingMediaText(null);
       setReviewError("รองรับเฉพาะ JPEG, PNG, WebP, MP4, MOV และ WebM");
       return;
     }
@@ -996,7 +1011,15 @@ export default function OrderTrackingPage({
         continue;
       }
 
-      const durationSec = type === "video" ? await readVideoDuration(file) : null;
+      let durationSec: number | null = null;
+      if (type === "video") {
+        try {
+          durationSec = await readVideoDuration(file);
+        } catch {
+          setReviewError("อ่านความยาววิดีโอไม่สำเร็จ กรุณาลองเลือกใหม่");
+          continue;
+        }
+      }
       if (
         durationSec != null &&
         durationSec > MAX_REVIEW_VIDEO_DURATION_SEC
@@ -1013,10 +1036,59 @@ export default function OrderTrackingPage({
         previewUrl: URL.createObjectURL(file),
         type,
         durationSec,
+        uploadStatus: "pending",
       });
     }
 
     setReviewFiles((current) => [...current, ...nextFiles]);
+    setReviewPreparingMediaText(null);
+    void uploadSelectedReviewFiles(nextFiles);
+  };
+
+  const uploadSelectedReviewFiles = async (files: ReviewFile[]) => {
+    for (const reviewFile of files) {
+      setReviewFiles((current) =>
+        current.map((item) =>
+          item.id === reviewFile.id
+            ? { ...item, uploadStatus: "uploading", uploadError: undefined }
+            : item
+        )
+      );
+
+      try {
+        const media = await uploadReviewFile(reviewFile.file);
+        setReviewFiles((current) =>
+          current.map((item) =>
+            item.id === reviewFile.id
+              ? {
+                  ...item,
+                  uploadStatus: "ready",
+                  uploadedMedia: {
+                    ...media,
+                    durationSec: reviewFile.durationSec,
+                  },
+                  uploadError: undefined,
+                }
+              : item
+          )
+        );
+      } catch (error) {
+        setReviewFiles((current) =>
+          current.map((item) =>
+            item.id === reviewFile.id
+              ? {
+                  ...item,
+                  uploadStatus: "error",
+                  uploadError:
+                    error instanceof Error
+                      ? error.message
+                      : "อัปโหลดไฟล์ไม่สำเร็จ",
+                }
+              : item
+          )
+        );
+      }
+    }
   };
 
   const handleSubmitReview = async () => {
@@ -1031,49 +1103,30 @@ export default function OrderTrackingPage({
       setReviewError("รีวิวต้องมีความยาว 10-1000 ตัวอักษร");
       return;
     }
+    if (reviewFiles.some((file) => file.uploadStatus === "uploading" || file.uploadStatus === "pending")) {
+      setReviewError("รอให้อัปโหลดรูป/วิดีโอเสร็จก่อนส่งรีวิว");
+      return;
+    }
+    if (reviewFiles.some((file) => file.uploadStatus === "error" || !file.uploadedMedia)) {
+      setReviewError("มีไฟล์ที่อัปโหลดไม่สำเร็จ กรุณาลบแล้วอัปโหลดใหม่");
+      return;
+    }
 
     setReviewSubmitting(true);
     setReviewError(null);
     setReviewInfo(null);
-    setReviewUploadStatus(
-      reviewFiles.length > 0
-        ? {
-            phase: "uploading",
-            current: 0,
-            total: reviewFiles.length,
-          }
-        : {
-            phase: "saving",
-            current: 0,
-            total: 0,
-          }
-    );
+    setReviewUploadStatus({
+      phase: "saving",
+      current: reviewFiles.length,
+      total: reviewFiles.length,
+    });
 
     try {
-      const uploadedMedia: ReviewMediaPayload[] = [];
-
-      for (const [index, reviewFile] of reviewFiles.entries()) {
-        setReviewUploadStatus({
-          phase: "uploading",
-          current: index + 1,
-          total: reviewFiles.length,
-          fileName: reviewFile.file.name,
-          fileType: reviewFile.type,
-        });
-
-        const media = await uploadReviewFile(reviewFile.file);
-        uploadedMedia.push({
-          ...media,
-          durationSec: reviewFile.durationSec,
-          sortOrder: index,
-        });
-      }
-
-      setReviewUploadStatus({
-        phase: "saving",
-        current: reviewFiles.length,
-        total: reviewFiles.length,
-      });
+      const uploadedMedia = reviewFiles.map((reviewFile, index) => ({
+        ...reviewFile.uploadedMedia!,
+        durationSec: reviewFile.durationSec,
+        sortOrder: index,
+      }));
 
       const existingMedia =
         reviewTarget.existingReview?.media?.map((media, index) => ({
@@ -1285,9 +1338,25 @@ export default function OrderTrackingPage({
     : apiOrder.items.length === 0
       ? "ไม่พบสินค้าที่สามารถรีวิวได้"
       : null;
+  const activeReviewUploadFile = reviewFiles.find(
+    (file) => file.uploadStatus === "uploading" || file.uploadStatus === "pending"
+  );
+  const failedReviewUploadFile = reviewFiles.find(
+    (file) => file.uploadStatus === "error"
+  );
+  const reviewMediaUploadPending = Boolean(activeReviewUploadFile);
+  const canSubmitReview =
+    !reviewSubmitting &&
+    !reviewPreparingMediaText &&
+    !reviewMediaUploadPending &&
+    !failedReviewUploadFile;
   const reviewUploadText =
-    reviewUploadStatus?.phase === "uploading"
-      ? `${reviewUploadStatus.fileType === "video" ? "กำลังอัปโหลดวิดีโอ" : "กำลังอัปโหลดรูป"} ${reviewUploadStatus.current}/${reviewUploadStatus.total}`
+    reviewPreparingMediaText
+      ? reviewPreparingMediaText
+      : activeReviewUploadFile
+      ? `${activeReviewUploadFile.type === "video" ? "กำลังอัปโหลดวิดีโอ" : "กำลังอัปโหลดรูป"} ${reviewFiles.findIndex((file) => file.id === activeReviewUploadFile.id) + 1}/${reviewFiles.length}`
+      : failedReviewUploadFile
+        ? "อัปโหลดไม่สำเร็จ กรุณาลบแล้วอัปโหลดใหม่"
       : reviewUploadStatus?.phase === "saving"
         ? "กำลังบันทึกรีวิว..."
         : null;
@@ -1661,7 +1730,8 @@ export default function OrderTrackingPage({
                         className="h-full w-full object-cover"
                       />
                     )}
-                    {reviewSubmitting && (
+                    {(file.uploadStatus === "pending" ||
+                      file.uploadStatus === "uploading") && (
                       <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/55 px-2 text-center text-white">
                         <Loader2 className="h-5 w-5 animate-spin" />
                         <span className="text-[11px] font-extrabold leading-tight">
@@ -1669,9 +1739,26 @@ export default function OrderTrackingPage({
                         </span>
                       </div>
                     )}
+                    {file.uploadStatus === "ready" && (
+                      <span className="absolute bottom-1.5 left-1.5 rounded-full bg-emerald-600 px-2 py-1 text-[10px] font-extrabold text-white shadow-sm">
+                        อัปโหลดแล้ว
+                      </span>
+                    )}
+                    {file.uploadStatus === "error" && (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-red-600/75 px-2 text-center text-white">
+                        <span className="text-[11px] font-extrabold leading-tight">
+                          อัปโหลดไม่สำเร็จ
+                        </span>
+                        {file.uploadError && (
+                          <span className="line-clamp-2 text-[10px] font-semibold leading-tight">
+                            {file.uploadError}
+                          </span>
+                        )}
+                      </div>
+                    )}
                     <button
                       type="button"
-                      disabled={reviewSubmitting}
+                      disabled={reviewSubmitting || file.uploadStatus === "uploading"}
                       onClick={() => {
                         URL.revokeObjectURL(file.previewUrl);
                         setReviewFiles((current) =>
@@ -1685,7 +1772,16 @@ export default function OrderTrackingPage({
                     </button>
                   </div>
                 ))}
+                {reviewPreparingMediaText && (
+                  <div className="flex aspect-square flex-col items-center justify-center gap-2 rounded-2xl border border-brand/20 bg-brand-soft/70 px-2 text-center text-brand ring-1 ring-brand/10">
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    <span className="text-[11px] font-extrabold leading-tight">
+                      {reviewPreparingMediaText}
+                    </span>
+                  </div>
+                )}
                 {!reviewSubmitting &&
+                  !reviewPreparingMediaText &&
                   (reviewTarget.existingReview?.media?.length ?? 0) +
                   reviewFiles.length <
                   REVIEW_MEDIA_SLOTS && (
@@ -1710,7 +1806,11 @@ export default function OrderTrackingPage({
                   <Loader2 className="h-4 w-4 animate-spin" />
                   <span className="min-w-0 flex-1 truncate">
                     {reviewUploadText}
-                    {reviewUploadStatus?.fileName ? `: ${reviewUploadStatus.fileName}` : ""}
+                    {activeReviewUploadFile?.file.name
+                      ? `: ${activeReviewUploadFile.file.name}`
+                      : failedReviewUploadFile?.file.name
+                        ? `: ${failedReviewUploadFile.file.name}`
+                        : ""}
                   </span>
                 </div>
               )}
@@ -1740,7 +1840,7 @@ export default function OrderTrackingPage({
               <button
                 type="button"
                 onClick={handleSubmitReview}
-                disabled={reviewSubmitting}
+                disabled={!canSubmitReview}
                 className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-brand px-4 text-sm font-extrabold text-white transition active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {reviewSubmitting ? (
