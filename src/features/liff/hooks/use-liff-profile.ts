@@ -12,6 +12,8 @@ import { mockCustomerProfile } from "@/lib/mock-data";
 import type { LiffProfile } from "@/types/liff";
 
 const LOGIN_FLOW_KEY = "ponpon.line_login_inflight";
+const LOGIN_FLOW_STARTED_AT_KEY = "ponpon.line_login_started_at";
+const LOGIN_FLOW_STALE_MS = 90_000;
 const PROFILE_LIFF_INIT_TIMEOUT_MS = 5000;
 const PROFILE_ME_BOOTSTRAP_DELAY_MS = 500;
 const PROFILE_ME_TIMEOUT_MS = 5000;
@@ -40,6 +42,28 @@ function withTimeout<T>(
   ]);
 }
 
+function clearLoginFlow(): void {
+  sessionStorage.removeItem(LOGIN_FLOW_KEY);
+  sessionStorage.removeItem(LOGIN_FLOW_STARTED_AT_KEY);
+}
+
+function markLoginFlowStarted(): void {
+  sessionStorage.setItem(LOGIN_FLOW_KEY, "1");
+  sessionStorage.setItem(LOGIN_FLOW_STARTED_AT_KEY, String(Date.now()));
+}
+
+function isLoginFlowFresh(): boolean {
+  if (sessionStorage.getItem(LOGIN_FLOW_KEY) !== "1") return false;
+  const startedAt = Number(sessionStorage.getItem(LOGIN_FLOW_STARTED_AT_KEY) ?? 0);
+
+  if (!startedAt || Date.now() - startedAt > LOGIN_FLOW_STALE_MS) {
+    clearLoginFlow();
+    return false;
+  }
+
+  return true;
+}
+
 /**
  * Loads the authenticated PonPon profile on mount.
  */
@@ -63,13 +87,13 @@ export function useLiffProfile(): UseLiffProfileResult {
       setError("กำลังเข้าสู่ระบบใหม่ผ่าน LINE");
       setLoading(false);
 
-      if (sessionStorage.getItem(LOGIN_FLOW_KEY) === "1") {
+      if (isLoginFlowFresh()) {
         return;
       }
 
-      sessionStorage.setItem(LOGIN_FLOW_KEY, "1");
+      markLoginFlowStarted();
       void loginWithLine({ force: true }).catch((loginError) => {
-        sessionStorage.removeItem(LOGIN_FLOW_KEY);
+        clearLoginFlow();
         if (cancelled) return;
 
         const message =

@@ -18,6 +18,8 @@ import {
 const REAUTH_KEY = "ponpon.reauth_at";
 const REAUTH_DEBOUNCE_MS = 60_000;
 const LOGIN_FLOW_KEY = "ponpon.line_login_inflight";
+const LOGIN_FLOW_STARTED_AT_KEY = "ponpon.line_login_started_at";
+const LOGIN_FLOW_STALE_MS = 90_000;
 const LIFF_INIT_TIMEOUT_MS = 5000;
 
 function withTimeout<T>(
@@ -48,6 +50,28 @@ function isIdTokenExpired(token: string): boolean {
   return Date.now() >= (exp - 30) * 1000;
 }
 
+function clearLoginFlow(): void {
+  sessionStorage.removeItem(LOGIN_FLOW_KEY);
+  sessionStorage.removeItem(LOGIN_FLOW_STARTED_AT_KEY);
+}
+
+function markLoginFlowStarted(): void {
+  sessionStorage.setItem(LOGIN_FLOW_KEY, "1");
+  sessionStorage.setItem(LOGIN_FLOW_STARTED_AT_KEY, String(Date.now()));
+}
+
+function isLoginFlowFresh(): boolean {
+  if (sessionStorage.getItem(LOGIN_FLOW_KEY) !== "1") return false;
+  const startedAt = Number(sessionStorage.getItem(LOGIN_FLOW_STARTED_AT_KEY) ?? 0);
+
+  if (!startedAt || Date.now() - startedAt > LOGIN_FLOW_STALE_MS) {
+    clearLoginFlow();
+    return false;
+  }
+
+  return true;
+}
+
 let bootstrapPromise: Promise<void> | null = null;
 
 export async function bootstrapLineSession({
@@ -55,7 +79,7 @@ export async function bootstrapLineSession({
 }: { allowLogin?: boolean } = {}): Promise<void> {
   const lastReauthAt = Number(localStorage.getItem(REAUTH_KEY) ?? 0);
   const recentlyAttempted = Date.now() - lastReauthAt < REAUTH_DEBOUNCE_MS;
-  const loginInFlight = sessionStorage.getItem(LOGIN_FLOW_KEY) === "1";
+  const loginInFlight = isLoginFlowFresh();
 
   console.info("[ponpon-auth] bootstrap start", {
     skipLiff: PONPON_SKIP_LINE_LIFF,
@@ -77,7 +101,7 @@ export async function bootstrapLineSession({
   if (storedRefreshToken) {
     try {
       const session = await refreshPonPonSession();
-      sessionStorage.removeItem(LOGIN_FLOW_KEY);
+      clearLoginFlow();
       console.info("[ponpon-auth] jwt refreshed", {
         hasJwt: Boolean(session.jwt),
         hasRefreshToken: Boolean(session.refreshToken),
@@ -87,7 +111,7 @@ export async function bootstrapLineSession({
       console.info("[ponpon-auth] refresh token unusable; checking LIFF session");
     }
   } else if (isStoredJwtValid()) {
-    sessionStorage.removeItem(LOGIN_FLOW_KEY);
+    clearLoginFlow();
     console.info("[ponpon-auth] stored JWT still valid — skipping exchange");
     return;
   }
@@ -104,7 +128,7 @@ export async function bootstrapLineSession({
     }
 
     console.info("[ponpon-auth] no LINE session, starting login flow");
-    sessionStorage.setItem(LOGIN_FLOW_KEY, "1");
+    markLoginFlowStarted();
     await loginWithLine();
     return;
   }
@@ -124,7 +148,7 @@ export async function bootstrapLineSession({
     hasAccessToken: Boolean(accessToken),
   });
 
-  if (expired && !recentlyAttempted) {
+  if (expired) {
     if (!allowLogin) {
       console.info("[ponpon-auth] idToken expired; login deferred");
       return;
@@ -132,22 +156,15 @@ export async function bootstrapLineSession({
 
     console.info("[ponpon-auth] idToken expired — starting re-login flow");
     localStorage.setItem(REAUTH_KEY, String(Date.now()));
-    sessionStorage.setItem(LOGIN_FLOW_KEY, "1");
+    markLoginFlowStarted();
     await loginWithLine({ force: true });
-    return;
-  }
-
-  if (expired) {
-    console.warn(
-      "[ponpon-auth] idToken expired and already retried — continuing unauthenticated"
-    );
     return;
   }
 
   try {
     const session = await exchangeLineIdToken({ idToken, accessToken });
     localStorage.removeItem(REAUTH_KEY);
-    sessionStorage.removeItem(LOGIN_FLOW_KEY);
+    clearLoginFlow();
     console.info("[ponpon-auth] jwt received", {
       hasJwt: Boolean(session.jwt),
       hasRefreshToken: Boolean(session.refreshToken),
@@ -166,7 +183,7 @@ export async function bootstrapLineSession({
         "[ponpon-auth] token rejected by backend — starting re-login flow"
       );
       localStorage.setItem(REAUTH_KEY, String(Date.now()));
-      sessionStorage.setItem(LOGIN_FLOW_KEY, "1");
+      markLoginFlowStarted();
       await loginWithLine({ force: true });
       return;
     }
