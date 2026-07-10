@@ -4,6 +4,7 @@ import { ponponFetch } from "@/features/auth/ponpon-auth";
 import type {
   ProductReview,
   ProductReviewSummary,
+  OrderItemReviewUploadUrlRequest,
   ReviewMediaPayload,
   ReviewMutationPayload,
   ReviewUploadUrlRequest,
@@ -119,6 +120,24 @@ export async function requestReviewUploadUrl(
   return response.json();
 }
 
+export async function requestOrderItemReviewUploadUrl(
+  orderItemId: string,
+  payload: OrderItemReviewUploadUrlRequest
+): Promise<ReviewUploadUrlResponse> {
+  const response = await ponponFetch(
+    `/api/order-items/${encodeURIComponent(orderItemId)}/review/media/upload-url`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }
+  );
+  if (!response.ok) {
+    throw await readError(response, "ขอ URL สำหรับอัปโหลดไม่สำเร็จ");
+  }
+  return response.json();
+}
+
 export async function completeReviewMediaUpload(mediaId: string): Promise<void> {
   const response = await ponponFetch(
     `/api/reviews/media/${encodeURIComponent(mediaId)}/complete`,
@@ -129,13 +148,23 @@ export async function completeReviewMediaUpload(mediaId: string): Promise<void> 
   }
 }
 
-export async function uploadReviewFile(file: File): Promise<ReviewMediaPayload> {
+export async function uploadReviewFile(
+  file: File,
+  input: {
+    reviewId: string;
+    durationSec?: number | null;
+    sortOrder?: number;
+  }
+): Promise<ReviewMediaPayload> {
   const type = file.type.startsWith("video/") ? "video" : "image";
   const upload = await requestReviewUploadUrl({
+    reviewId: input.reviewId,
     type,
     fileName: file.name,
     fileSizeBytes: file.size,
     mimeType: file.type,
+    durationSec: input.durationSec ?? null,
+    sortOrder: input.sortOrder ?? 0,
   });
 
   const uploadResponse = await fetch(upload.uploadUrl, {
@@ -153,9 +182,49 @@ export async function uploadReviewFile(file: File): Promise<ReviewMediaPayload> 
     type,
     url: upload.publicUrl ?? upload.url ?? upload.uploadUrl.split("?")[0],
     thumbnailUrl: upload.thumbnailUrl ?? null,
-    durationSec: null,
+    durationSec: input.durationSec ?? null,
     fileSizeBytes: file.size,
     mimeType: file.type,
-    sortOrder: 0,
+    sortOrder: input.sortOrder ?? 0,
+  };
+}
+
+export async function uploadOrderItemReviewFile(
+  orderItemId: string,
+  file: File,
+  input: {
+    durationSec?: number | null;
+    sortOrder?: number;
+  }
+): Promise<ReviewMediaPayload> {
+  const type = file.type.startsWith("video/") ? "video" : "image";
+  const upload = await requestOrderItemReviewUploadUrl(orderItemId, {
+    type,
+    fileName: file.name,
+    fileSizeBytes: file.size,
+    mimeType: file.type,
+    durationSec: input.durationSec ?? null,
+    sortOrder: input.sortOrder ?? 0,
+  });
+
+  const uploadResponse = await fetch(upload.uploadUrl, {
+    method: "PUT",
+    headers: { "Content-Type": file.type },
+    body: file,
+  });
+  if (!uploadResponse.ok) {
+    throw new Error("อัปโหลดไฟล์รีวิวไม่สำเร็จ");
+  }
+
+  await completeReviewMediaUpload(upload.mediaId);
+
+  return {
+    type,
+    url: upload.publicUrl ?? upload.url ?? upload.uploadUrl.split("?")[0],
+    thumbnailUrl: upload.thumbnailUrl ?? null,
+    durationSec: input.durationSec ?? null,
+    fileSizeBytes: file.size,
+    mimeType: file.type,
+    sortOrder: input.sortOrder ?? 0,
   };
 }

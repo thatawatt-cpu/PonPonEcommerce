@@ -49,11 +49,22 @@ export interface ReviewMutationPayload {
 }
 
 export interface ReviewUploadUrlRequest {
-  reviewDraftId?: string;
+  reviewId: string;
   type: ReviewMediaType;
   fileName: string;
   fileSizeBytes: number;
   mimeType: string;
+  durationSec?: number | null;
+  sortOrder?: number;
+}
+
+export interface OrderItemReviewUploadUrlRequest {
+  type: ReviewMediaType;
+  fileName: string;
+  fileSizeBytes: number;
+  mimeType: string;
+  durationSec?: number | null;
+  sortOrder?: number;
 }
 
 export interface ReviewUploadUrlResponse {

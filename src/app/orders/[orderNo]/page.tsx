@@ -36,7 +36,7 @@ import {
 import {
   createOrderItemReview,
   updateReview,
-  uploadReviewFile,
+  uploadOrderItemReviewFile,
 } from "@/features/reviews/review-api";
 import { isStoredOrderPaid } from "@/features/payments/payment-api";
 import {
@@ -959,6 +959,10 @@ export default function OrderTrackingPage({
     setReviewInfo(null);
 
     if (selectedFiles.length === 0) return;
+    if (!reviewTarget?.item.id) {
+      setReviewError("ไม่พบรายการสินค้าที่ต้องการรีวิว");
+      return;
+    }
     const selectedHasVideo = selectedFiles.some((file) =>
       file.type.startsWith("video/")
     );
@@ -1036,17 +1040,29 @@ export default function OrderTrackingPage({
         previewUrl: URL.createObjectURL(file),
         type,
         durationSec,
-        uploadStatus: "pending",
+        uploadStatus: "ready",
       });
     }
 
     setReviewFiles((current) => [...current, ...nextFiles]);
     setReviewPreparingMediaText(null);
-    void uploadSelectedReviewFiles(nextFiles);
+    if (nextFiles.length > 0) {
+      void uploadSelectedReviewFiles(
+        nextFiles,
+        reviewTarget.item.id,
+        existingMediaCount + reviewFiles.length
+      ).catch(() => undefined);
+    }
   };
 
-  const uploadSelectedReviewFiles = async (files: ReviewFile[]) => {
-    for (const reviewFile of files) {
+  const uploadSelectedReviewFiles = async (
+    files: ReviewFile[],
+    orderItemId: string,
+    startSortOrder: number
+  ): Promise<ReviewMediaPayload[]> => {
+    const uploadedMedia: ReviewMediaPayload[] = [];
+
+    for (const [index, reviewFile] of files.entries()) {
       setReviewFiles((current) =>
         current.map((item) =>
           item.id === reviewFile.id
@@ -1056,17 +1072,32 @@ export default function OrderTrackingPage({
       );
 
       try {
-        const media = await uploadReviewFile(reviewFile.file);
+        setReviewUploadStatus({
+          phase: "uploading",
+          current: index + 1,
+          total: files.length,
+          fileName: reviewFile.file.name,
+          fileType: reviewFile.type,
+        });
+
+        const sortOrder = startSortOrder + index;
+        const media = await uploadOrderItemReviewFile(orderItemId, reviewFile.file, {
+          durationSec: reviewFile.durationSec,
+          sortOrder,
+        });
+        const mediaPayload = {
+          ...media,
+          durationSec: reviewFile.durationSec,
+          sortOrder,
+        };
+        uploadedMedia.push(mediaPayload);
         setReviewFiles((current) =>
           current.map((item) =>
             item.id === reviewFile.id
               ? {
                   ...item,
                   uploadStatus: "ready",
-                  uploadedMedia: {
-                    ...media,
-                    durationSec: reviewFile.durationSec,
-                  },
+                  uploadedMedia: mediaPayload,
                   uploadError: undefined,
                 }
               : item
@@ -1087,8 +1118,12 @@ export default function OrderTrackingPage({
               : item
           )
         );
+        throw error;
       }
     }
+
+    setReviewUploadStatus(null);
+    return uploadedMedia;
   };
 
   const handleSubmitReview = async () => {
@@ -1741,7 +1776,7 @@ export default function OrderTrackingPage({
                     )}
                     {file.uploadStatus === "ready" && (
                       <span className="absolute bottom-1.5 left-1.5 rounded-full bg-emerald-600 px-2 py-1 text-[10px] font-extrabold text-white shadow-sm">
-                        อัปโหลดแล้ว
+                        {file.uploadedMedia ? "อัปโหลดแล้ว" : "พร้อมอัปโหลด"}
                       </span>
                     )}
                     {file.uploadStatus === "error" && (
