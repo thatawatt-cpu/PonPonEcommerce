@@ -1582,16 +1582,16 @@ export default function OrderTrackingPage({
           onClick={handleCloseReview}
         >
           <div
-            className="max-h-[92vh] w-full max-w-md overflow-y-auto rounded-t-[2rem] bg-white px-5 pb-8 pt-5 shadow-[0_-20px_60px_rgba(0,0,0,0.18)]"
+            className="flex max-h-[calc(100dvh-10px)] w-full max-w-md flex-col overflow-hidden rounded-t-[1.5rem] bg-white px-4 pt-3 shadow-[0_-20px_60px_rgba(0,0,0,0.18)]"
             onClick={(event) => event.stopPropagation()}
           >
-            <div className="mx-auto mb-5 h-1 w-10 rounded-full bg-black/10" />
-            <div className="mb-5 flex items-start justify-between gap-4">
+            <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-black/10" />
+            <div className="mb-3 flex items-start justify-between gap-4">
               <div>
-                <h2 className="text-lg font-extrabold text-ink">
+                <h2 className="text-base font-extrabold text-ink">
                   {reviewTarget.existingReview ? "แก้ไขรีวิว" : "เขียนรีวิว"}
                 </h2>
-                <p className="mt-1 line-clamp-1 text-sm font-semibold text-ink-soft">
+                <p className="mt-0.5 line-clamp-1 text-xs font-semibold text-ink-soft">
                   {reviewTarget.item.name}
                 </p>
               </div>
@@ -1600,14 +1600,15 @@ export default function OrderTrackingPage({
                 onClick={handleCloseReview}
                 disabled={reviewSubmitting}
                 aria-label="ปิด"
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-surface-muted text-ink-soft transition active:scale-95"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface-muted text-ink-soft transition active:scale-95"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
 
-            <div className="mb-4">
-              <p className="mb-2 text-sm font-extrabold text-ink">ให้คะแนนสินค้า</p>
+            <div className="min-h-0 flex-1 overflow-y-auto pb-3">
+            <div className="mb-3">
+              <p className="mb-1.5 text-sm font-extrabold text-ink">ให้คะแนนสินค้า</p>
               <div className="flex gap-1.5">
                 {Array.from({ length: 5 }).map((_, index) => {
                   const value = index + 1;
@@ -1619,11 +1620,11 @@ export default function OrderTrackingPage({
                         setReviewRating(value);
                         setReviewError(null);
                       }}
-                      className="flex h-11 w-11 items-center justify-center rounded-full bg-brand-soft text-amber-500 transition active:scale-95"
+                      className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-soft text-amber-500 transition active:scale-95"
                       aria-label={`${value} ดาว`}
                     >
                       <Star
-                        className={`h-6 w-6 ${
+                        className={`h-5 w-5 ${
                           value <= reviewRating
                             ? "fill-amber-400 text-amber-500"
                             : "fill-white text-ink-soft/40"
@@ -1636,7 +1637,7 @@ export default function OrderTrackingPage({
             </div>
 
             <label className="block">
-              <span className="mb-2 block text-sm font-extrabold text-ink">
+              <span className="mb-1.5 block text-sm font-extrabold text-ink">
                 รีวิวสินค้า
               </span>
               <textarea
@@ -1646,9 +1647,9 @@ export default function OrderTrackingPage({
                   setReviewError(null);
                 }}
                 maxLength={1000}
-                rows={5}
+                rows={3}
                 placeholder="บอกความรู้สึกหลังได้รับสินค้า"
-                className="w-full resize-none rounded-2xl border border-black/10 bg-surface-muted/50 px-4 py-3 text-sm font-semibold text-ink outline-none transition placeholder:text-ink-soft/70 focus:border-brand focus:bg-white"
+                className="min-h-20 w-full resize-none rounded-2xl border border-black/10 bg-surface-muted/50 px-3 py-2.5 text-sm font-semibold text-ink outline-none transition placeholder:text-ink-soft/70 focus:border-brand focus:bg-white"
               />
               <span className="mt-1 block text-right text-xs font-semibold text-ink-soft">
                 {reviewComment.trim().length}/1000
@@ -1656,18 +1657,18 @@ export default function OrderTrackingPage({
             </label>
 
             <label
-              className={`mt-4 flex cursor-pointer items-center gap-3 rounded-2xl border p-3 transition active:scale-[0.99] ${
+              className={`mt-3 flex cursor-pointer items-center gap-3 rounded-2xl border p-2.5 transition active:scale-[0.99] ${
                 reviewIsAnonymous
                   ? "border-brand/35 bg-brand-soft ring-1 ring-brand/10"
                   : "border-black/10 bg-surface-muted/45"
               }`}
             >
-              <span className="relative h-11 w-11 shrink-0 overflow-hidden rounded-full bg-white ring-1 ring-black/[0.06]">
+              <span className="relative h-9 w-9 shrink-0 overflow-hidden rounded-full bg-white ring-1 ring-black/[0.06]">
                 <Image
                   src="/images/review-anonymous.png"
                   alt=""
                   fill
-                  sizes="44px"
+                  sizes="36px"
                   className="object-cover"
                 />
               </span>
@@ -1675,7 +1676,7 @@ export default function OrderTrackingPage({
                 <span className="block text-sm font-extrabold text-ink">
                   โพสต์แบบไม่ระบุตัวตน
                 </span>
-                <span className="mt-0.5 block text-xs font-semibold leading-relaxed text-ink-soft">
+                <span className="mt-0.5 block truncate text-xs font-semibold text-ink-soft">
                   {reviewIsAnonymous
                     ? "จะแสดงชื่อว่า “ผู้ใช้ไม่ระบุตัวตน”"
                     : "จะแสดงชื่อและรูปโปรไฟล์ LINE ของคุณ"}
@@ -1697,7 +1698,7 @@ export default function OrderTrackingPage({
               </span>
             </label>
 
-            <div className="mt-4">
+            <div className="mt-3">
               <div className="mb-2 flex items-center justify-between gap-3">
                 <p className="text-sm font-extrabold text-ink">รูป/วิดีโอ</p>
                 <span className="text-xs font-semibold text-ink-soft">
@@ -1705,7 +1706,7 @@ export default function OrderTrackingPage({
                   {REVIEW_MEDIA_SLOTS}
                 </span>
               </div>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-4 gap-2">
                 {reviewTarget.existingReview?.media?.map((media, index) => (
                   <div
                     key={`${media.url}-${index}`}
@@ -1825,14 +1826,15 @@ export default function OrderTrackingPage({
                 {reviewInfo}
               </p>
             )}
+            </div>
 
-            <div className="mt-5 flex gap-3">
+            <div className="-mx-4 flex shrink-0 gap-2 border-t border-black/[0.06] bg-white px-4 py-3">
               <Button
                 variant="secondary"
-                size="lg"
                 fullWidth
                 onClick={handleCloseReview}
                 disabled={reviewSubmitting}
+                className="h-11"
               >
                 ยกเลิก
               </Button>
@@ -1840,7 +1842,7 @@ export default function OrderTrackingPage({
                 type="button"
                 onClick={handleSubmitReview}
                 disabled={!canSubmitReview}
-                className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-brand px-4 text-sm font-extrabold text-white transition active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-brand px-4 text-sm font-extrabold text-white transition active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {reviewSubmitting ? (
                   <>
