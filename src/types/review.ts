@@ -29,6 +29,7 @@ export interface ProductReview {
   customerName?: string | null;
   rating: number;
   comment: string;
+  isAnonymous?: boolean;
   status?: ReviewStatus | string;
   media: ProductReviewMedia[];
   createdAt: string;

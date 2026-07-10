@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
   Check,
@@ -56,6 +57,10 @@ type ReviewMedia =
 
 type ReviewFilter = "all" | "media" | "5" | "4" | "3" | "2" | "1" | "latest";
 type DetailTab = "detail" | "shipping" | "review";
+
+const ANONYMOUS_REVIEW_AVATAR_URL =
+  "/images/review-anonymous.png";
+const DEFAULT_REVIEW_AVATAR_URL = "/images/review-default.png";
 
 interface ProductCoupon {
   id: string;
@@ -204,10 +209,45 @@ function getReviewMediaPreview(media: ProductReviewMedia): ReviewMedia | null {
 }
 
 function getReviewName(review: ProductReview): string {
+  if (review.isAnonymous) return "ผู้ใช้ไม่ระบุตัวตน";
+
   return (
     review.userName?.trim() ||
     review.customerName?.trim() ||
-    "ลูกค้า PonPon"
+    "ผู้ใช้ PonPon"
+  );
+}
+
+function getReviewAvatar(review: ProductReview): string | null {
+  return review.isAnonymous
+    ? ANONYMOUS_REVIEW_AVATAR_URL
+    : review.userAvatar?.trim() || DEFAULT_REVIEW_AVATAR_URL;
+}
+
+function ReviewAvatar({
+  name,
+  avatarUrl,
+  size,
+}: {
+  name: string;
+  avatarUrl: string | null;
+  size: "sm" | "md";
+}) {
+  const dimensions = size === "sm" ? "h-8 w-8 text-xs" : "h-9 w-9 text-sm";
+
+  return (
+    <span
+      className={cn(
+        "relative flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-white font-extrabold text-brand shadow-sm",
+        dimensions
+      )}
+    >
+      {avatarUrl ? (
+        <Image src={avatarUrl} alt="" fill sizes={size === "sm" ? "32px" : "36px"} className="object-cover" />
+      ) : (
+        name.charAt(0)
+      )}
+    </span>
   );
 }
 
@@ -674,6 +714,7 @@ export function ProductDetailClient({
   const reviews: {
     id: string;
     name: string;
+    avatarUrl: string | null;
     rating: number;
     text: string;
     tag: string;
@@ -682,6 +723,7 @@ export function ProductDetailClient({
   }[] = remoteReviews.map((review) => ({
     id: review.id,
     name: getReviewName(review),
+    avatarUrl: getReviewAvatar(review),
     rating: Math.max(1, Math.min(5, Math.round(Number(review.rating) || 0))),
     text: review.comment,
     tag: review.editedAt ? "แก้ไขแล้ว · ผู้ซื้อจริง" : "ผู้ซื้อจริง",
@@ -1221,9 +1263,7 @@ export function ProductDetailClient({
                       <article key={review.id} className="rounded-2xl bg-[#faf9f8] p-3.5">
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex items-center gap-2">
-                            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-xs font-extrabold text-brand shadow-sm">
-                              {review.name.charAt(0)}
-                            </span>
+                            <ReviewAvatar name={review.name} avatarUrl={review.avatarUrl} size="sm" />
                             <div>
                               <p className="text-sm font-bold text-ink">{review.name}</p>
                               <p className="text-[10px] text-ink-soft">{review.tag}</p>
@@ -1420,9 +1460,7 @@ export function ProductDetailClient({
                   <article key={review.id} className="rounded-3xl bg-[#fff8f6] p-3.5 ring-1 ring-black/[0.03]">
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-2">
-                        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-sm font-extrabold text-brand shadow-sm">
-                          {review.name.charAt(0)}
-                        </span>
+                        <ReviewAvatar name={review.name} avatarUrl={review.avatarUrl} size="md" />
                         <div>
                           <p className="text-sm font-extrabold text-ink">{review.name}</p>
                           <p className="text-[10px] font-bold text-ink-soft">{review.tag}</p>

@@ -17,6 +17,7 @@ export interface ReviewMediaFileInput {
 export interface ReviewFormPayload {
   rating: number;
   comment: string;
+  isAnonymous: boolean;
   media: ReviewMediaFileInput[];
 }
 
@@ -46,6 +47,7 @@ function buildReviewFormData(payload: ReviewFormPayload): FormData {
   const form = new FormData();
   form.append("rating", String(payload.rating));
   form.append("comment", payload.comment);
+  form.append("isAnonymous", String(payload.isAnonymous));
 
   payload.media.forEach((media, index) => {
     const prefix = `media[${index}]`;

@@ -793,6 +793,7 @@ export default function OrderTrackingPage({
   const [reviewTarget, setReviewTarget] = useState<ReviewTarget | null>(null);
   const [reviewRating, setReviewRating] = useState(0);
   const [reviewComment, setReviewComment] = useState("");
+  const [reviewIsAnonymous, setReviewIsAnonymous] = useState(false);
   const [reviewFiles, setReviewFiles] = useState<ReviewFile[]>([]);
   const [reviewError, setReviewError] = useState<string | null>(null);
   const [reviewInfo, setReviewInfo] = useState<string | null>(null);
@@ -912,6 +913,7 @@ export default function OrderTrackingPage({
     setReviewTarget(target);
     setReviewRating(target.existingReview?.rating ?? initialRating ?? 0);
     setReviewComment(target.existingReview?.comment ?? "");
+    setReviewIsAnonymous(target.existingReview?.isAnonymous ?? false);
     setReviewFiles([]);
     setReviewError(null);
     setReviewInfo(null);
@@ -1079,6 +1081,7 @@ export default function OrderTrackingPage({
       const payload = {
         rating: reviewRating,
         comment,
+        isAnonymous: reviewIsAnonymous,
         media: reviewFiles.map((file, index) => ({
           file: file.file,
           type: file.type,
@@ -1100,6 +1103,7 @@ export default function OrderTrackingPage({
       setReviewFiles([]);
       setReviewError(null);
       setReviewUploadStatus(null);
+      window.sessionStorage.setItem("ponpon.review.thank-you", "1");
       router.push("/orders");
     } catch (error) {
       setReviewError(
@@ -1608,6 +1612,23 @@ export default function OrderTrackingPage({
               </span>
             </label>
 
+            <label className="mt-4 flex cursor-pointer items-center justify-between gap-4 rounded-2xl border border-black/10 bg-surface-muted/45 px-4 py-3">
+              <span className="min-w-0">
+                <span className="block text-sm font-extrabold text-ink">
+                  ไม่ระบุตัวตน
+                </span>
+                <span className="mt-0.5 block text-xs font-semibold text-ink-soft">
+                  ชื่อและรูปโปรไฟล์จะไม่แสดงบนหน้ารีวิว
+                </span>
+              </span>
+              <input
+                type="checkbox"
+                checked={reviewIsAnonymous}
+                onChange={(event) => setReviewIsAnonymous(event.target.checked)}
+                className="h-5 w-5 shrink-0 accent-brand"
+              />
+            </label>
+
             <div className="mt-4">
               <div className="mb-2 flex items-center justify-between gap-3">
                 <p className="text-sm font-extrabold text-ink">รูป/วิดีโอ</p>
@@ -1626,6 +1647,8 @@ export default function OrderTrackingPage({
                       <video
                         src={media.url}
                         poster={media.thumbnailUrl ?? undefined}
+                        controls
+                        preload="metadata"
                         muted
                         playsInline
                         className="h-full w-full object-cover"
@@ -1647,6 +1670,8 @@ export default function OrderTrackingPage({
                     {file.type === "video" ? (
                       <video
                         src={file.previewUrl}
+                        controls
+                        preload="metadata"
                         muted
                         playsInline
                         className="h-full w-full object-cover"

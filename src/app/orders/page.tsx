@@ -922,12 +922,21 @@ export default function OrdersPage() {
   const [activeOrderCount, setActiveOrderCount] = useState<number | null>(null);
   const [activeFilter, setActiveFilter] = useState<OrderFilter>("all");
   const [query, setQuery] = useState("");
+  const [showReviewThankYou, setShowReviewThankYou] = useState(false);
   const [loadedTabs, setLoadedTabs] = useState<Set<OrderFilter>>(
     () => new Set()
   );
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const fetchingRef = useRef(false);
   const loadedTabsRef = useRef<Set<OrderFilter>>(new Set());
+
+  useEffect(() => {
+    if (window.sessionStorage.getItem("ponpon.review.thank-you") !== "1") return;
+
+    window.sessionStorage.removeItem("ponpon.review.thank-you");
+    const timer = window.setTimeout(() => setShowReviewThankYou(true), 0);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   const orders = ordersCache[activeFilter] ?? EMPTY_ORDERS;
   const { page = 0, hasMore = true } = paginationCache[activeFilter] ?? {};
@@ -1092,6 +1101,14 @@ export default function OrdersPage() {
     <>
       <AppHeader title="ออเดอร์ของฉัน" />
       <PageContainer className={ORDER_PAGE_CONTAINER_CLASS}>
+        {showReviewThankYou && (
+          <div
+            role="status"
+            className="mb-4 rounded-card border border-brand/15 bg-brand-soft px-4 py-3 text-sm font-bold text-brand"
+          >
+            ขอขอบคุณแสดงความคิดเห็นในการสั่งซื้อ
+          </div>
+        )}
         {activeFilter === "all" && orders.length === 0 && !shouldShowInitialLoading ? (
           <EmptyState
             emoji="📦"
