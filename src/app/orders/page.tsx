@@ -1101,14 +1101,6 @@ export default function OrdersPage() {
     <>
       <AppHeader title="ออเดอร์ของฉัน" />
       <PageContainer className={ORDER_PAGE_CONTAINER_CLASS}>
-        {showReviewThankYou && (
-          <div
-            role="status"
-            className="mb-4 rounded-card border border-brand/15 bg-brand-soft px-4 py-3 text-sm font-bold text-brand"
-          >
-            ขอขอบคุณแสดงความคิดเห็นในการสั่งซื้อ
-          </div>
-        )}
         {activeFilter === "all" && orders.length === 0 && !shouldShowInitialLoading ? (
           <EmptyState
             emoji="📦"
@@ -1285,6 +1277,47 @@ export default function OrdersPage() {
           </>
         )}
       </PageContainer>
+      {showReviewThankYou && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/45 p-5 backdrop-blur-sm"
+          onClick={() => setShowReviewThankYou(false)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="review-thank-you-title"
+            className="w-full max-w-sm rounded-card bg-white p-5 text-center shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowReviewThankYou(false)}
+                aria-label="ปิด"
+                className="-mr-1 -mt-1 flex h-8 w-8 items-center justify-center rounded-full bg-surface-muted text-ink-soft"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="mx-auto -mt-2 flex h-16 w-16 items-center justify-center rounded-full bg-brand-soft text-brand">
+              <PackageCheck className="h-8 w-8" />
+            </div>
+            <h2 id="review-thank-you-title" className="mt-4 text-lg font-extrabold text-ink">
+              ขอบคุณสำหรับรีวิว
+            </h2>
+            <p className="mt-2 text-sm font-semibold leading-relaxed text-ink-soft">
+              ขอขอบคุณแสดงความคิดเห็นในการสั่งซื้อ
+            </p>
+            <button
+              type="button"
+              onClick={() => setShowReviewThankYou(false)}
+              className="mt-5 inline-flex h-11 w-full items-center justify-center rounded-full bg-brand px-4 text-sm font-extrabold text-white transition active:scale-[0.97]"
+            >
+              ดูคำสั่งซื้อทั้งหมด
+            </button>
+          </div>
+        </div>
+      )}
     </>
   );
 }
