@@ -126,6 +126,12 @@ interface ReviewTarget {
   existingReview?: ProductReview | null;
 }
 
+interface ReviewVideoPreview {
+  src: string;
+  poster: string | null;
+  name: string;
+}
+
 function mapStatus(status: string): OrderStatus {
   const map: Record<string, OrderStatus> = {
     "0": "pending",
@@ -835,6 +841,8 @@ export default function OrderTrackingPage({
   const [reviewComment, setReviewComment] = useState("");
   const [reviewIsAnonymous, setReviewIsAnonymous] = useState(false);
   const [reviewFiles, setReviewFiles] = useState<ReviewFile[]>([]);
+  const [reviewVideoPreview, setReviewVideoPreview] =
+    useState<ReviewVideoPreview | null>(null);
   const [reviewError, setReviewError] = useState<string | null>(null);
   const [reviewInfo, setReviewInfo] = useState<string | null>(null);
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
@@ -955,6 +963,7 @@ export default function OrderTrackingPage({
     setReviewComment(target.existingReview?.comment ?? "");
     setReviewIsAnonymous(target.existingReview?.isAnonymous ?? false);
     setReviewFiles([]);
+    setReviewVideoPreview(null);
     setReviewError(null);
     setReviewInfo(null);
     setReviewUploadStatus(null);
@@ -990,6 +999,7 @@ export default function OrderTrackingPage({
     reviewFiles.forEach((file) => URL.revokeObjectURL(file.previewUrl));
     setReviewTarget(null);
     setReviewFiles([]);
+    setReviewVideoPreview(null);
     setReviewError(null);
     setReviewInfo(null);
     setReviewUploadStatus(null);
@@ -1713,15 +1723,32 @@ export default function OrderTrackingPage({
                     className="relative aspect-square overflow-hidden rounded-2xl bg-surface-muted ring-1 ring-black/[0.06]"
                   >
                     {media.type === "video" ? (
-                      <video
-                        src={media.url}
-                        poster={media.thumbnailUrl ?? undefined}
-                        controls
-                        preload="metadata"
-                        muted
-                        playsInline
-                        className="h-full w-full object-cover"
-                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setReviewVideoPreview({
+                            src: media.url,
+                            poster: media.thumbnailUrl ?? null,
+                            name: "วิดีโอรีวิว",
+                          })
+                        }
+                        className="relative h-full w-full"
+                        aria-label="เล่นวิดีโอรีวิว"
+                      >
+                        <video
+                          src={media.url}
+                          poster={media.thumbnailUrl ?? undefined}
+                          preload="metadata"
+                          muted
+                          playsInline
+                          className="h-full w-full object-cover"
+                        />
+                        <span className="absolute inset-0 flex items-center justify-center bg-black/20">
+                          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white/95 text-brand shadow-sm">
+                            <Play className="ml-0.5 h-4 w-4 fill-current" />
+                          </span>
+                        </span>
+                      </button>
                     ) : (
                       <img
                         src={media.thumbnailUrl ?? media.url}
@@ -1737,15 +1764,32 @@ export default function OrderTrackingPage({
                     className="relative aspect-square overflow-hidden rounded-2xl bg-surface-muted ring-1 ring-black/[0.06]"
                   >
                     {file.type === "video" ? (
-                      <video
-                        src={file.previewUrl}
-                        poster={file.thumbnailUrl ?? undefined}
-                        controls
-                        preload="metadata"
-                        muted
-                        playsInline
-                        className="h-full w-full object-cover"
-                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setReviewVideoPreview({
+                            src: file.previewUrl,
+                            poster: file.thumbnailUrl,
+                            name: file.file.name,
+                          })
+                        }
+                        className="relative h-full w-full"
+                        aria-label={`เล่น ${file.file.name}`}
+                      >
+                        <video
+                          src={file.previewUrl}
+                          poster={file.thumbnailUrl ?? undefined}
+                          preload="metadata"
+                          muted
+                          playsInline
+                          className="h-full w-full object-cover"
+                        />
+                        <span className="absolute inset-0 flex items-center justify-center bg-black/20">
+                          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white/95 text-brand shadow-sm">
+                            <Play className="ml-0.5 h-4 w-4 fill-current" />
+                          </span>
+                        </span>
+                      </button>
                     ) : (
                       <img
                         src={file.previewUrl}
@@ -1756,11 +1800,6 @@ export default function OrderTrackingPage({
                     <span className="absolute bottom-1.5 left-1.5 rounded-full bg-emerald-600 px-2 py-1 text-[10px] font-extrabold text-white shadow-sm">
                       พร้อมส่ง
                     </span>
-                    {file.type === "video" && (
-                      <span className="pointer-events-none absolute left-1/2 top-1/2 flex h-9 w-9 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-black/55 text-white shadow-sm">
-                        <Play className="ml-0.5 h-4 w-4 fill-current" />
-                      </span>
-                    )}
                     <button
                       type="button"
                       disabled={reviewSubmitting}
@@ -1857,6 +1896,40 @@ export default function OrderTrackingPage({
                 )}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {reviewVideoPreview && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/75 p-4"
+          onClick={() => setReviewVideoPreview(null)}
+        >
+          <div
+            className="w-full max-w-md overflow-hidden rounded-2xl bg-black shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-center justify-between bg-white px-4 py-3">
+              <p className="min-w-0 truncate text-sm font-extrabold text-ink">
+                {reviewVideoPreview.name}
+              </p>
+              <button
+                type="button"
+                onClick={() => setReviewVideoPreview(null)}
+                aria-label="ปิดวิดีโอ"
+                className="ml-3 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface-muted text-ink-soft"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <video
+              src={reviewVideoPreview.src}
+              poster={reviewVideoPreview.poster ?? undefined}
+              controls
+              autoPlay
+              playsInline
+              className="max-h-[70dvh] w-full bg-black object-contain"
+            />
           </div>
         </div>
       )}
