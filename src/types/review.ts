@@ -41,37 +41,3 @@ export interface ProductReviewSummary {
   totalReviews: number;
   ratingBreakdown?: Record<string, number>;
 }
-
-export interface ReviewMutationPayload {
-  rating: number;
-  comment: string;
-  media: ReviewMediaPayload[];
-}
-
-export interface ReviewUploadUrlRequest {
-  reviewId: string;
-  type: ReviewMediaType;
-  fileName: string;
-  fileSizeBytes: number;
-  mimeType: string;
-  durationSec?: number | null;
-  sortOrder?: number;
-}
-
-export interface OrderItemReviewUploadUrlRequest {
-  type: ReviewMediaType;
-  fileName: string;
-  fileSizeBytes: number;
-  mimeType: string;
-  durationSec?: number | null;
-  sortOrder?: number;
-}
-
-export interface ReviewUploadUrlResponse {
-  mediaId: string;
-  uploadUrl: string;
-  publicUrl?: string;
-  url?: string;
-  thumbnailUrl?: string | null;
-  maxFileSizeBytes?: number;
-}

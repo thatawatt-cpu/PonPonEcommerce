@@ -9,10 +9,11 @@ export async function PATCH(
   if (unauthorized) return unauthorized;
 
   const { reviewId } = await params;
-  const body = await request.text();
+  const body = await request.arrayBuffer();
+  const contentType = request.headers.get("content-type");
   return proxyBackendJson(request, `/api/reviews/${encodeURIComponent(reviewId)}`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
+    headers: contentType ? { "Content-Type": contentType } : undefined,
     body,
   });
 }

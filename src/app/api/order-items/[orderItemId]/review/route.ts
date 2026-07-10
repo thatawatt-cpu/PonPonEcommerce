@@ -9,13 +9,14 @@ export async function POST(
   if (unauthorized) return unauthorized;
 
   const { orderItemId } = await params;
-  const body = await request.text();
+  const body = await request.arrayBuffer();
+  const contentType = request.headers.get("content-type");
   return proxyBackendJson(
     request,
     `/api/order-items/${encodeURIComponent(orderItemId)}/review`,
     {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: contentType ? { "Content-Type": contentType } : undefined,
       body,
     }
   );

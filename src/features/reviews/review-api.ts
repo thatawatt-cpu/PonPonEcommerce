@@ -4,12 +4,21 @@ import { ponponFetch } from "@/features/auth/ponpon-auth";
 import type {
   ProductReview,
   ProductReviewSummary,
-  OrderItemReviewUploadUrlRequest,
-  ReviewMediaPayload,
-  ReviewMutationPayload,
-  ReviewUploadUrlRequest,
-  ReviewUploadUrlResponse,
+  ReviewMediaType,
 } from "@/types/review";
+
+export interface ReviewMediaFileInput {
+  file: File;
+  type: ReviewMediaType;
+  durationSec: number | null;
+  sortOrder: number;
+}
+
+export interface ReviewFormPayload {
+  rating: number;
+  comment: string;
+  media: ReviewMediaFileInput[];
+}
 
 interface ApiErrorPayload {
   message?: string;
@@ -33,10 +42,22 @@ async function readError(response: Response, fallback: string): Promise<Error> {
   return new Error(message);
 }
 
-function toUploadDuration(durationSec: number | null | undefined) {
-  return typeof durationSec === "number" && Number.isFinite(durationSec)
-    ? { durationSec: Math.ceil(durationSec) }
-    : {};
+function buildReviewFormData(payload: ReviewFormPayload): FormData {
+  const form = new FormData();
+  form.append("rating", String(payload.rating));
+  form.append("comment", payload.comment);
+
+  payload.media.forEach((media, index) => {
+    const prefix = `media[${index}]`;
+    form.append(`${prefix}.type`, media.type);
+    form.append(`${prefix}.file`, media.file);
+    if (media.type === "video" && media.durationSec != null) {
+      form.append(`${prefix}.durationSec`, String(Math.ceil(media.durationSec)));
+    }
+    form.append(`${prefix}.sortOrder`, String(media.sortOrder));
+  });
+
+  return form;
 }
 
 function unwrapItems<T>(data: unknown): T[] {
@@ -93,14 +114,13 @@ export async function fetchProductReviewSummary(
 
 export async function createOrderItemReview(
   orderItemId: string,
-  payload: ReviewMutationPayload
+  payload: ReviewFormPayload
 ): Promise<ProductReview> {
   const response = await ponponFetch(
     `/api/order-items/${encodeURIComponent(orderItemId)}/review`,
     {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+      body: buildReviewFormData(payload),
     }
   );
   if (!response.ok) {
@@ -111,136 +131,14 @@ export async function createOrderItemReview(
 
 export async function updateReview(
   reviewId: string,
-  payload: ReviewMutationPayload
+  payload: ReviewFormPayload
 ): Promise<ProductReview> {
   const response = await ponponFetch(`/api/reviews/${encodeURIComponent(reviewId)}`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
+    body: buildReviewFormData(payload),
   });
   if (!response.ok) {
     throw await readError(response, "แก้ไขรีวิวไม่สำเร็จ");
   }
   return response.json();
-}
-
-export async function requestReviewUploadUrl(
-  payload: ReviewUploadUrlRequest
-): Promise<ReviewUploadUrlResponse> {
-  const response = await ponponFetch("/api/reviews/media/upload-url", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  if (!response.ok) {
-    throw await readError(response, "ขอ URL สำหรับอัปโหลดไม่สำเร็จ");
-  }
-  return response.json();
-}
-
-export async function requestOrderItemReviewUploadUrl(
-  orderItemId: string,
-  payload: OrderItemReviewUploadUrlRequest
-): Promise<ReviewUploadUrlResponse> {
-  const response = await ponponFetch(
-    `/api/order-items/${encodeURIComponent(orderItemId)}/review/media/upload-url`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    }
-  );
-  if (!response.ok) {
-    throw await readError(response, "ขอ URL สำหรับอัปโหลดไม่สำเร็จ");
-  }
-  return response.json();
-}
-
-export async function completeReviewMediaUpload(mediaId: string): Promise<void> {
-  const response = await ponponFetch(
-    `/api/reviews/media/${encodeURIComponent(mediaId)}/complete`,
-    { method: "POST" }
-  );
-  if (!response.ok) {
-    throw await readError(response, "ยืนยันอัปโหลดสื่อไม่สำเร็จ");
-  }
-}
-
-export async function uploadReviewFile(
-  file: File,
-  input: {
-    reviewId: string;
-    durationSec?: number | null;
-    sortOrder?: number;
-  }
-): Promise<ReviewMediaPayload> {
-  const type = file.type.startsWith("video/") ? "video" : "image";
-  const upload = await requestReviewUploadUrl({
-    reviewId: input.reviewId,
-    type,
-    fileName: file.name,
-    fileSizeBytes: file.size,
-    mimeType: file.type,
-    sortOrder: input.sortOrder ?? 0,
-    ...toUploadDuration(input.durationSec),
-  });
-
-  const uploadResponse = await fetch(upload.uploadUrl, {
-    method: "PUT",
-    headers: { "Content-Type": file.type },
-    body: file,
-  });
-  if (!uploadResponse.ok) {
-    throw new Error("อัปโหลดไฟล์รีวิวไม่สำเร็จ");
-  }
-
-  await completeReviewMediaUpload(upload.mediaId);
-
-  return {
-    type,
-    url: upload.publicUrl ?? upload.url ?? upload.uploadUrl.split("?")[0],
-    thumbnailUrl: upload.thumbnailUrl ?? null,
-    durationSec: input.durationSec ?? null,
-    fileSizeBytes: file.size,
-    mimeType: file.type,
-    sortOrder: input.sortOrder ?? 0,
-  };
-}
-
-export async function uploadOrderItemReviewFile(
-  orderItemId: string,
-  file: File,
-  input: {
-    durationSec?: number | null;
-    sortOrder?: number;
-  }
-): Promise<ReviewMediaPayload> {
-  const type = file.type.startsWith("video/") ? "video" : "image";
-  const upload = await requestOrderItemReviewUploadUrl(orderItemId, {
-    type,
-    fileName: file.name,
-    fileSizeBytes: file.size,
-    mimeType: file.type,
-    sortOrder: input.sortOrder ?? 0,
-    ...toUploadDuration(input.durationSec),
-  });
-
-  const uploadResponse = await fetch(upload.uploadUrl, {
-    method: "PUT",
-    headers: { "Content-Type": file.type },
-    body: file,
-  });
-  if (!uploadResponse.ok) {
-    throw new Error("อัปโหลดไฟล์รีวิวไม่สำเร็จ");
-  }
-
-  return {
-    type,
-    url: upload.publicUrl ?? upload.url ?? upload.uploadUrl.split("?")[0],
-    thumbnailUrl: upload.thumbnailUrl ?? null,
-    durationSec: input.durationSec ?? null,
-    fileSizeBytes: file.size,
-    mimeType: file.type,
-    sortOrder: input.sortOrder ?? 0,
-  };
 }
