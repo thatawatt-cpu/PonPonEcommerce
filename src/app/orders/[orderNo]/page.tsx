@@ -472,6 +472,16 @@ function formatOptions(options: Record<string, string> | undefined): string {
     .join(" · ");
 }
 
+function getOrderItemReviewId(item: ApiOrderDetailItem): string | null {
+  const source = item as ApiOrderDetailItem & {
+    reviewId?: string | null;
+    isReviewed?: boolean | null;
+  };
+
+  if (source.isReviewed !== true) return null;
+  return source.reviewId?.trim() || null;
+}
+
 function getExistingReview(item: ApiOrderDetailItem): ProductReview | null {
   const source = item as ApiOrderDetailItem & {
     review?: ProductReview | null;
@@ -480,12 +490,13 @@ function getExistingReview(item: ApiOrderDetailItem): ProductReview | null {
     reviewComment?: string | null;
     isReviewed?: boolean | null;
   };
+  const reviewId = getOrderItemReviewId(item);
 
-  if (source.review?.id) return source.review;
-  if (!source.reviewId) return null;
+  if (!reviewId) return null;
+  if (source.review?.id === reviewId) return source.review;
 
   return {
-    id: source.reviewId,
+    id: reviewId,
     orderItemId: item.id,
     productId: item.productId,
     variantId: item.variantId,
@@ -1076,8 +1087,9 @@ export default function OrderTrackingPage({
         })),
       };
 
-      if (reviewTarget.existingReview?.id) {
-        await updateReview(reviewTarget.existingReview.id, payload);
+      const existingReviewId = getOrderItemReviewId(reviewTarget.item);
+      if (existingReviewId) {
+        await updateReview(existingReviewId, payload);
       } else {
         await createOrderItemReview(reviewTarget.item.id, payload);
       }
