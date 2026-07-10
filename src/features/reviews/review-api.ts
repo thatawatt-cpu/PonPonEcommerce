@@ -14,11 +14,23 @@ import type {
 interface ApiErrorPayload {
   message?: string;
   error?: string;
+  title?: string;
+  detail?: string;
+  errors?: Record<string, string[] | string>;
 }
 
 async function readError(response: Response, fallback: string): Promise<Error> {
   const data = (await response.json().catch(() => null)) as ApiErrorPayload | null;
-  return new Error(data?.message ?? data?.error ?? fallback);
+  const validationErrors = data?.errors
+    ? Object.values(data.errors)
+        .flatMap((value) => (Array.isArray(value) ? value : [value]))
+        .filter((value): value is string => typeof value === "string" && value.length > 0)
+        .join(" ")
+    : "";
+  const message =
+    validationErrors || data?.detail || data?.message || data?.error || data?.title || fallback;
+
+  return new Error(message);
 }
 
 function unwrapItems<T>(data: unknown): T[] {
@@ -215,8 +227,6 @@ export async function uploadOrderItemReviewFile(
   if (!uploadResponse.ok) {
     throw new Error("อัปโหลดไฟล์รีวิวไม่สำเร็จ");
   }
-
-  await completeReviewMediaUpload(upload.mediaId);
 
   return {
     type,
