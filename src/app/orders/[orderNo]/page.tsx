@@ -14,6 +14,7 @@ import {
   MapPin,
   MessageCircle,
   PackageCheck,
+  Play,
   QrCode,
   RotateCcw,
   Star,
@@ -107,6 +108,7 @@ interface ReviewFile {
   id: string;
   file: File;
   previewUrl: string;
+  thumbnailUrl: string | null;
   type: "image" | "video";
   durationSec: number | null;
 }
@@ -536,6 +538,44 @@ function readVideoDuration(file: File): Promise<number> {
       reject(new Error("อ่านความยาววิดีโอไม่สำเร็จ"));
     };
     video.src = url;
+  });
+}
+
+function createVideoThumbnail(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const sourceUrl = URL.createObjectURL(file);
+    const video = document.createElement("video");
+    video.muted = true;
+    video.playsInline = true;
+    video.preload = "auto";
+
+    const cleanup = () => URL.revokeObjectURL(sourceUrl);
+    video.onerror = () => {
+      cleanup();
+      reject(new Error("Unable to generate video thumbnail"));
+    };
+    video.onloadeddata = () => {
+      const seekTo = Math.min(0.5, Math.max(video.duration / 2, 0));
+      if (seekTo === 0) {
+        video.onseeked?.(new Event("seeked"));
+        return;
+      }
+      video.currentTime = seekTo;
+    };
+    video.onseeked = () => {
+      const width = Math.min(video.videoWidth || 240, 360);
+      const height = Math.max(
+        1,
+        Math.round(width / Math.max(video.videoWidth / (video.videoHeight || 1), 1))
+      );
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      canvas.getContext("2d")?.drawImage(video, 0, 0, width, height);
+      cleanup();
+      resolve(canvas.toDataURL("image/jpeg", 0.82));
+    };
+    video.src = sourceUrl;
   });
 }
 
@@ -1025,9 +1065,11 @@ export default function OrderTrackingPage({
       }
 
       let durationSec: number | null = null;
+      let thumbnailUrl: string | null = null;
       if (type === "video") {
         try {
           durationSec = await readVideoDuration(file);
+          thumbnailUrl = await createVideoThumbnail(file).catch(() => null);
         } catch {
           setReviewError("อ่านความยาววิดีโอไม่สำเร็จ กรุณาลองเลือกใหม่");
           continue;
@@ -1047,6 +1089,7 @@ export default function OrderTrackingPage({
         id: `${file.name}-${file.lastModified}-${crypto.randomUUID()}`,
         file,
         previewUrl: URL.createObjectURL(file),
+        thumbnailUrl,
         type,
         durationSec,
       });
@@ -1612,21 +1655,46 @@ export default function OrderTrackingPage({
               </span>
             </label>
 
-            <label className="mt-4 flex cursor-pointer items-center justify-between gap-4 rounded-2xl border border-black/10 bg-surface-muted/45 px-4 py-3">
-              <span className="min-w-0">
+            <label
+              className={`mt-4 flex cursor-pointer items-center gap-3 rounded-2xl border p-3 transition active:scale-[0.99] ${
+                reviewIsAnonymous
+                  ? "border-brand/35 bg-brand-soft ring-1 ring-brand/10"
+                  : "border-black/10 bg-surface-muted/45"
+              }`}
+            >
+              <span className="relative h-11 w-11 shrink-0 overflow-hidden rounded-full bg-white ring-1 ring-black/[0.06]">
+                <Image
+                  src="/images/review-anonymous.png"
+                  alt=""
+                  fill
+                  sizes="44px"
+                  className="object-cover"
+                />
+              </span>
+              <span className="min-w-0 flex-1">
                 <span className="block text-sm font-extrabold text-ink">
-                  ไม่ระบุตัวตน
+                  โพสต์แบบไม่ระบุตัวตน
                 </span>
-                <span className="mt-0.5 block text-xs font-semibold text-ink-soft">
-                  ชื่อและรูปโปรไฟล์จะไม่แสดงบนหน้ารีวิว
+                <span className="mt-0.5 block text-xs font-semibold leading-relaxed text-ink-soft">
+                  {reviewIsAnonymous
+                    ? "จะแสดงชื่อว่า “ผู้ใช้ไม่ระบุตัวตน”"
+                    : "จะแสดงชื่อและรูปโปรไฟล์ LINE ของคุณ"}
                 </span>
               </span>
-              <input
-                type="checkbox"
-                checked={reviewIsAnonymous}
-                onChange={(event) => setReviewIsAnonymous(event.target.checked)}
-                className="h-5 w-5 shrink-0 accent-brand"
-              />
+              <span
+                className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full p-1 transition ${
+                  reviewIsAnonymous ? "bg-brand" : "bg-black/15"
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={reviewIsAnonymous}
+                  onChange={(event) => setReviewIsAnonymous(event.target.checked)}
+                  aria-label="โพสต์แบบไม่ระบุตัวตน"
+                  className="peer sr-only"
+                />
+                <span className="h-5 w-5 rounded-full bg-white shadow-sm transition peer-checked:translate-x-5" />
+              </span>
             </label>
 
             <div className="mt-4">
@@ -1670,6 +1738,7 @@ export default function OrderTrackingPage({
                     {file.type === "video" ? (
                       <video
                         src={file.previewUrl}
+                        poster={file.thumbnailUrl ?? undefined}
                         controls
                         preload="metadata"
                         muted
@@ -1686,6 +1755,11 @@ export default function OrderTrackingPage({
                     <span className="absolute bottom-1.5 left-1.5 rounded-full bg-emerald-600 px-2 py-1 text-[10px] font-extrabold text-white shadow-sm">
                       พร้อมส่ง
                     </span>
+                    {file.type === "video" && (
+                      <span className="pointer-events-none absolute left-1/2 top-1/2 flex h-9 w-9 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-black/55 text-white shadow-sm">
+                        <Play className="ml-0.5 h-4 w-4 fill-current" />
+                      </span>
+                    )}
                     <button
                       type="button"
                       disabled={reviewSubmitting}
