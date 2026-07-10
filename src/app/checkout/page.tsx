@@ -356,12 +356,24 @@ function getCouponErrorMessage(
     : fallbackMessage;
 }
 
+function parseCouponCodesParam(value?: string): string[] {
+  if (!value) return [];
+  return [
+    ...new Set(
+      value
+        .split(",")
+        .map((item) => item.trim().toUpperCase())
+        .filter(Boolean)
+    ),
+  ].slice(0, 2);
+}
+
 export default function CheckoutPage({
   searchParams,
 }: {
-  searchParams: Promise<{ mode?: string; promo?: string }>;
+  searchParams: Promise<{ mode?: string; promo?: string; coupons?: string }>;
 }) {
-  const { mode, promo } = use(searchParams);
+  const { mode, promo, coupons } = use(searchParams);
   const router = useRouter();
   const hydrated = useCartHydrated();
   const membershipHydrated = useMembershipHydrated();
@@ -552,6 +564,34 @@ export default function CheckoutPage({
   }, [router]);
 
   useEffect(() => {
+    const nextCodes = parseCouponCodesParam(coupons);
+    if (nextCodes.length === 0) return;
+
+    const timer = window.setTimeout(() => {
+      setCouponCodes(nextCodes);
+      setPromoMessage("");
+      setPromoError(false);
+
+      const params = new URLSearchParams();
+      if (mode) params.set("mode", mode);
+      router.replace(
+        params.size > 0 ? `/checkout?${params.toString()}` : "/checkout",
+        { scroll: false }
+      );
+
+      window.setTimeout(() => {
+        document.getElementById(CHECKOUT_COUPON_SECTION_ID)?.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+      }, 120);
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [coupons, mode, router]);
+
+  useEffect(() => {
+    if (coupons) return;
     const nextCode = promo?.trim().toUpperCase();
     if (!nextCode) return;
 
@@ -592,10 +632,10 @@ export default function CheckoutPage({
     }, 0);
 
     return () => window.clearTimeout(timer);
-  }, [mode, promo, router]);
+  }, [coupons, mode, promo, router]);
 
   useEffect(() => {
-    if (promo) return;
+    if (promo || coupons) return;
 
     const nextCode = consumePendingCouponCode();
     if (!nextCode) return;
@@ -623,7 +663,7 @@ export default function CheckoutPage({
     }, 0);
 
     return () => window.clearTimeout(timer);
-  }, [promo]);
+  }, [coupons, promo]);
 
   useEffect(() => {
     if (!usesStoredCheckoutItems) return;
@@ -760,6 +800,9 @@ export default function CheckoutPage({
   const displayAppliedCoupons = pricingPreviewIsCurrent
     ? pricingPreview.appliedCoupons
     : estimatedAppliedCoupons;
+  const displayCouponDiscountAmount = displayAppliedCoupons
+    .filter((coupon) => coupon.type !== "free_shipping")
+    .reduce((sum, coupon) => sum + coupon.discountAmount, 0);
   const memberTier = getTierBySpend(lifetimeSpend);
   const earnedPoints = calculateEarnedPoints(payableTotal, memberTier.id);
   const totalQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
@@ -1590,9 +1633,9 @@ export default function CheckoutPage({
                 โค้ดส่วนลด PonPon
               </h2>
             </div>
-            {discountAmount > 0 ? (
+            {displayCouponDiscountAmount > 0 ? (
               <span className="shrink-0 rounded-full border border-success/20 bg-success-soft px-2.5 py-1 text-xs font-extrabold text-success">
-                -{formatBaht(discountAmount)}
+                -{formatBaht(displayCouponDiscountAmount)}
               </span>
             ) : null}
           </div>
@@ -1788,10 +1831,10 @@ export default function CheckoutPage({
                 tone="discount"
               />
             )}
-            {couponDiscountAmount > 0 && (
+            {displayCouponDiscountAmount > 0 && (
               <SummaryLine
                 label="ส่วนลดคูปอง"
-                value={`-${formatBaht(couponDiscountAmount)}`}
+                value={`-${formatBaht(displayCouponDiscountAmount)}`}
                 tone="discount"
               />
             )}

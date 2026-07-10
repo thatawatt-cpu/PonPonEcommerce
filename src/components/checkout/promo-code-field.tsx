@@ -40,6 +40,13 @@ export function PromoCodeField({
   const appliedCouponByCode = new Map(
     appliedCoupons.map((coupon) => [coupon.code, coupon])
   );
+  const couponPickerHref =
+    selectedCodes.length > 0
+      ? `/coupons?${new URLSearchParams({
+          returnTo: "checkout",
+          selected: selectedCodes.join(","),
+        }).toString()}`
+      : "/coupons?returnTo=checkout";
 
   return (
     <div>
@@ -48,7 +55,7 @@ export function PromoCodeField({
           กรอกโค้ด หรือเลือกจากคูปองที่มี
         </p>
         <Link
-          href="/coupons?returnTo=checkout"
+          href={couponPickerHref}
           className="flex shrink-0 items-center gap-0.5 text-xs font-extrabold text-brand"
         >
           เลือกคูปอง
