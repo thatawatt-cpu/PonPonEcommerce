@@ -1098,7 +1098,7 @@ export default function CheckoutPage({
           clientRequestId: crypto.randomUUID(),
           quoteId,
           customerName: shipping.customerName,
-          customerEmail: null,
+          customerEmail: selectedAddress?.email || null,
           customerPhone: shipping.phone,
           customerAddress: shipping.address,
           shippingName: shipping.customerName,
