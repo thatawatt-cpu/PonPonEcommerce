@@ -1,5 +1,7 @@
 "use client";
 
+import { fetchOmiseConfig } from "@/features/payments/payment-api";
+
 const OMISE_JS_URL = "https://cdn.omise.co/omise.js";
 
 export interface OmiseCardInput {
@@ -32,6 +34,27 @@ declare global {
 }
 
 let omiseScriptPromise: Promise<OmiseClient> | null = null;
+let omiseConfigPromise: Promise<string> | null = null;
+
+async function getOmisePublicKey(): Promise<string> {
+  if (!omiseConfigPromise) {
+    omiseConfigPromise = fetchOmiseConfig()
+      .then((config) => {
+        const publicKey = config.publicKey.trim();
+        if (!publicKey) {
+          throw new Error("Missing Omise public key.");
+        }
+
+        return publicKey;
+      })
+      .catch((error) => {
+        omiseConfigPromise = null;
+        throw error;
+      });
+  }
+
+  return omiseConfigPromise;
+}
 
 function loadOmiseJs(): Promise<OmiseClient> {
   if (typeof window === "undefined") {
@@ -75,11 +98,7 @@ function loadOmiseJs(): Promise<OmiseClient> {
 }
 
 export async function tokenizeCard(input: OmiseCardInput): Promise<string> {
-  const publicKey = process.env.NEXT_PUBLIC_OMISE_PUBLIC_KEY?.trim();
-
-  if (!publicKey) {
-    throw new Error("Missing NEXT_PUBLIC_OMISE_PUBLIC_KEY.");
-  }
+  const publicKey = await getOmisePublicKey();
 
   const omise = await loadOmiseJs();
   omise.setPublicKey(publicKey);

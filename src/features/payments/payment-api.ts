@@ -6,6 +6,7 @@ import type {
   ApiCreditCardPaymentResponse,
   ApiMobileBankingPaymentRequest,
   ApiMobileBankingPaymentResponse,
+  ApiOmiseConfigResponse,
   ApiPaymentStatusResponse,
   ApiPromptPayPaymentRequest,
   ApiPromptPayPaymentResponse,
@@ -173,6 +174,16 @@ export function clearStoredPromptPayCharge(orderId: string): void {
   );
 
   writeStoredPromptPayCharges(charges);
+}
+
+export async function fetchOmiseConfig(): Promise<ApiOmiseConfigResponse> {
+  const response = await ponponFetch("/api/payments/omise-config");
+
+  if (!response.ok) {
+    throw new Error(await readPaymentError(response, "Omise config failed"));
+  }
+
+  return response.json();
 }
 
 export async function createPromptPayPayment(

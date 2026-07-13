@@ -434,6 +434,10 @@ export interface ApiPromptPayPaymentRequest {
   orderId: string;
 }
 
+export interface ApiOmiseConfigResponse {
+  publicKey: string;
+}
+
 export interface ApiPromptPayPaymentResponse {
   chargeId: string;
   qrCodeUrl: string;
