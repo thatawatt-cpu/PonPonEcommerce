@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
-  Bell,
   ChevronDown,
   ChevronRight,
   Clock3,
@@ -11,9 +10,7 @@ import {
   Heart,
   HelpCircle,
   MapPin,
-  MessageCircle,
   PackageSearch,
-  UserPlus,
   Settings,
   ShieldCheck,
   TicketPercent,
@@ -29,15 +26,7 @@ import {
   clearStoredPonPonSession,
   getPonPonMe,
 } from "@/features/auth/ponpon-auth";
-import { loginWithLine, openExternalWindow } from "@/lib/liff";
-import { LINE_OA_URL } from "@/lib/constants";
-import { cn } from "@/lib/utils";
-import {
-  formatNotificationContext,
-  formatNotificationTime,
-  useNotificationStore,
-  useNotificationsHydrated,
-} from "@/store/notification-store";
+import { loginWithLine } from "@/lib/liff";
 
 const LOGIN_FLOW_KEY = "ponpon.line_login_inflight";
 const REAUTH_KEY = "ponpon.reauth_at";
@@ -57,16 +46,9 @@ interface ProfileCounts {
 
 export default function ProfilePage() {
   const { profile, loading, error } = useLiffProfile();
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [profileCounts, setProfileCounts] = useState<ProfileCounts | null>(
     null
   );
-  const notificationsHydrated = useNotificationsHydrated();
-  const notifications = useNotificationStore((state) => state.items);
-  const markNotificationRead = useNotificationStore((state) => state.markRead);
-  const latestNotifications = notificationsHydrated
-    ? notifications.slice(0, 3)
-    : [];
 
   useEffect(() => {
     let cancelled = false;
@@ -93,13 +75,7 @@ export default function ProfilePage() {
 
   const shortcuts: Shortcut[] = [
     { label: "ออเดอร์ของฉัน", icon: PackageSearch, href: "/orders" },
-    {
-      label: "ติดต่อร้าน",
-      icon: MessageCircle,
-      onClick: () => openExternalWindow(LINE_OA_URL),
-    },
     { label: "ที่อยู่จัดส่ง", icon: MapPin, href: "/addresses" },
-    { label: "แนะนำเพื่อน", icon: UserPlus, href: "/referrals" },
   ];
 
   const benefits = [
@@ -179,95 +155,6 @@ export default function ProfilePage() {
         </section>
 
         <section>
-          <div className="mb-2 flex items-center justify-between px-1">
-            <h2 className="text-sm font-extrabold text-ink">
-              การแจ้งเตือนล่าสุด
-            </h2>
-            <Link
-                href="/notifications"
-                className="flex items-center gap-1 text-[11px] font-extrabold text-brand"
-              >
-                ดูแจ้งเตือนทั้งหมด
-                <ChevronRight className="h-3.5 w-3.5" />
-              </Link>
-          </div>
-          <Card className="overflow-hidden">
-            {!notificationsEnabled ? (
-              <div className="px-4 py-5 text-center">
-                <Bell className="mx-auto h-6 w-6 text-ink-soft/50" />
-                <p className="mt-2 text-sm font-bold text-ink">
-                  ปิดการแจ้งเตือนอยู่
-                </p>
-                <p className="mt-1 text-xs text-ink-soft">
-                  เปิดสวิตช์ด้านล่างเพื่อรับสถานะออเดอร์และโปรโมชัน
-                </p>
-              </div>
-            ) : (
-              <>
-                {latestNotifications.length > 0 ? (
-                  <ul className="divide-y divide-black/[0.05]">
-                    {latestNotifications.map((notification) => {
-                      const unread = notification.unread;
-                      const context = formatNotificationContext(notification);
-                      return (
-                        <li key={notification.id}>
-                          <Link
-                            href={notification.href}
-                            onClick={() =>
-                              void markNotificationRead(notification.id)
-                            }
-                            className={cn(
-                              "flex items-start gap-3 px-4 py-3.5 transition active:bg-brand-soft",
-                              unread && "bg-brand-soft/35"
-                            )}
-                          >
-                            <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white text-brand shadow-sm">
-                              <PackageSearch className="h-5 w-5" />
-                              {unread && (
-                                <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-brand ring-2 ring-white" />
-                              )}
-                            </span>
-                            <span className="min-w-0 flex-1">
-                              <span className="block text-sm font-extrabold text-ink">
-                                {notification.title}
-                              </span>
-                              {context && (
-                                <span className="mt-0.5 block truncate text-xs font-extrabold text-brand">
-                                  {context}
-                                </span>
-                              )}
-                              <span className="mt-0.5 block text-xs leading-relaxed text-ink-soft">
-                                {notification.description}
-                              </span>
-                              <span className="mt-1 block text-[10px] font-semibold text-ink-soft/75">
-                                {formatNotificationTime(
-                                  notification.createdAtUtc
-                                )}
-                              </span>
-                            </span>
-                            <ChevronRight className="mt-2 h-4 w-4 shrink-0 text-ink-soft" />
-                          </Link>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                ) : (
-                  <div className="px-4 py-6 text-center">
-                    <Bell className="mx-auto h-6 w-6 text-ink-soft/50" />
-                    <p className="mt-2 text-sm font-bold text-ink">
-                      ยังไม่มีการแจ้งเตือนล่าสุด
-                    </p>
-                    <p className="mt-1 text-xs text-ink-soft">
-                      เมื่อร้านค้าอัปเดตคำสั่งซื้อ รายการจะแสดงที่นี่
-                    </p>
-                  </div>
-                )}
-              </>
-            )}
-          </Card>
-        </section>
-
-        <section>
           <h2 className="mb-2 px-1 text-sm font-extrabold text-ink">
             บัญชีและการตั้งค่า
           </h2>
@@ -302,37 +189,6 @@ export default function ProfilePage() {
                 </li>
               );
             })}
-            <li>
-              <div className="flex items-center gap-3 px-4 py-3.5">
-                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-soft text-brand">
-                  <Bell className="h-5 w-5" />
-                </span>
-                <span className="flex-1">
-                  <span className="block text-sm font-medium text-ink">
-                    การแจ้งเตือน
-                  </span>
-                  <span className="block text-[10px] text-ink-soft">
-                    สถานะออเดอร์และโปรโมชัน
-                  </span>
-                </span>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-label="การแจ้งเตือน"
-                  aria-checked={notificationsEnabled}
-                  onClick={() => setNotificationsEnabled((value) => !value)}
-                  className={`relative h-7 w-12 rounded-full transition ${
-                    notificationsEnabled ? "bg-brand" : "bg-black/15"
-                  }`}
-                >
-                  <span
-                    className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow-sm transition ${
-                      notificationsEnabled ? "left-6" : "left-1"
-                    }`}
-                  />
-                </button>
-              </div>
-            </li>
           </ul>
         </Card>
         </section>

@@ -32,7 +32,10 @@ export async function getShopHomeServer(params?: {
       String(params?.featuredProductLimit ?? 12)
     );
 
-    const res = await fetch(url.toString(), { next: { revalidate: 30 } });
+    const res = await fetch(url.toString(), {
+      cache: "no-store",
+      headers: { "Cache-Control": "no-cache" },
+    });
     if (!res.ok) {
       return {
         slides: [],

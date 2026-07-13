@@ -120,6 +120,7 @@ export default function PaymentCompletePage({
 
         if (status.paid || status.status === "successful") {
           window.sessionStorage.removeItem(PENDING_PAYMENT_STORAGE_KEY);
+          router.refresh();
           router.replace(buildSuccessPath(pendingPayment));
           return;
         }

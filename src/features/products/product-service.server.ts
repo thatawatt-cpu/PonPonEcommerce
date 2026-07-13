@@ -77,7 +77,10 @@ export async function getAllProductsServer(params?: {
       url.searchParams.set("category", params.category);
     url.searchParams.set("pageSize", String(params?.pageSize ?? 100));
 
-    const res = await fetch(url.toString(), { next: { revalidate: 30 } });
+    const res = await fetch(url.toString(), {
+      cache: "no-store",
+      headers: { "Cache-Control": "no-cache" },
+    });
     if (!res.ok) return [];
 
     const data: ApiShopProductListItem[] = await res.json();
@@ -105,7 +108,10 @@ export async function getProductDetailByIdServer(
     url.searchParams.set("salesChannel", "line_liff");
     url.searchParams.set("relatedProductLimit", "8");
 
-    const res = await fetch(url.toString(), { next: { revalidate: 30 } });
+    const res = await fetch(url.toString(), {
+      cache: "no-store",
+      headers: { "Cache-Control": "no-cache" },
+    });
     if (!res.ok) return null;
 
     const data = (await res.json().catch(() => null)) as
@@ -135,7 +141,10 @@ export async function getProductDetailBySlugServer(
     url.searchParams.set("salesChannel", "line_liff");
     url.searchParams.set("relatedProductLimit", "8");
 
-    const res = await fetch(url.toString(), { next: { revalidate: 30 } });
+    const res = await fetch(url.toString(), {
+      cache: "no-store",
+      headers: { "Cache-Control": "no-cache" },
+    });
     if (!res.ok) return null;
 
     const data = (await res.json().catch(() => null)) as

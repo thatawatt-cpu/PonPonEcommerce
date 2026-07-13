@@ -441,6 +441,7 @@ export default function PaymentPage({
 
         if (status.paid || status.status === "successful") {
           clearStoredPromptPayCharge(paymentOrderId);
+          router.refresh();
           router.push(successPath);
           return;
         }

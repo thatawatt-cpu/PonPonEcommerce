@@ -1197,6 +1197,7 @@ export default function CheckoutPage({
 
         if (payment.status === "successful") {
           setRedirecting(true);
+          router.refresh();
           router.replace(successPath);
           window.setTimeout(clearSubmittedCheckout, 0);
           return;
@@ -1228,6 +1229,7 @@ export default function CheckoutPage({
 
         if (payment.status === "successful") {
           setRedirecting(true);
+          router.refresh();
           router.replace(successPath);
           window.setTimeout(clearSubmittedCheckout, 0);
           return;

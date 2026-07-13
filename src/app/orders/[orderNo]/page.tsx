@@ -8,7 +8,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
   AlertTriangle,
   ChevronRight,
-  Headphones,
   ImagePlus,
   Loader2,
   MapPin,
@@ -63,7 +62,6 @@ import type { CartItem } from "@/types/cart";
 import type { ProductReview } from "@/types/review";
 
 const CANCELLABLE_STATUSES: OrderStatus[] = ["pending", "waiting"];
-const RETURN_REQUEST_STATUSES: OrderStatus[] = ["success"];
 const REFUNDABLE_PAYMENT_STATUSES: PaymentStatus[] = [
   "paid",
   "partial_payment",
@@ -691,28 +689,6 @@ function OrderProductCard({
   );
 }
 
-function ServiceRow({
-  icon,
-  label,
-  onClick,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  onClick?: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition active:scale-[0.99]"
-    >
-      <span className="text-ink-soft">{icon}</span>
-      <span className="flex-1 text-sm font-bold text-ink">{label}</span>
-      <ChevronRight className="h-4 w-4 text-ink-soft" />
-    </button>
-  );
-}
-
 function OrderMetaCard({ apiOrder, order }: { apiOrder: ApiOrderDetail; order: Order }) {
   const [copied, setCopied] = useState(false);
 
@@ -943,15 +919,6 @@ export default function OrderTrackingPage({
     setCancelError(null);
     setCancelSuccess(null);
     setShowCancelDialog(true);
-  };
-
-  const handleOpenReturn = () => {
-    setReturnReason("");
-    setReturnReasonDetail("");
-    setReturnImages([]);
-    setReturnError(null);
-    setReturnInfo(null);
-    setShowReturnDialog(true);
   };
 
   const handleOpenReview = (
@@ -1317,7 +1284,6 @@ export default function OrderTrackingPage({
   const cancellationNeedsRefund =
     cancellable &&
     REFUNDABLE_PAYMENT_STATUSES.includes(order.paymentStatus);
-  const canRequestReturn = RETURN_REQUEST_STATUSES.includes(order.orderStatus);
   const canPayNow =
     order.paymentStatus === "pending" && order.paymentMethod !== "cod";
   const hasShippingAddress = Boolean(order.address.trim());
@@ -1481,31 +1447,6 @@ export default function OrderTrackingPage({
           order={order}
           onReviewItem={handleOpenReview}
         />
-
-        <Card className="overflow-hidden bg-white">
-          <h2 className="px-4 pt-4 text-sm font-extrabold text-ink">
-            บริการหลังการขาย
-          </h2>
-          <div className="mt-1 divide-y divide-black/[0.05]">
-            {canRequestReturn && (
-              <ServiceRow
-                icon={<RotateCcw className="h-5 w-5" />}
-                label="ขอคืนเงิน/คืนสินค้า"
-                onClick={handleOpenReturn}
-              />
-            )}
-            <ServiceRow
-              icon={<MessageCircle className="h-5 w-5" />}
-              label="ติดต่อผู้ขาย"
-              onClick={() => openExternalWindow(LINE_OA_URL)}
-            />
-            <ServiceRow
-              icon={<Headphones className="h-5 w-5" />}
-              label="Customer Service"
-              onClick={() => openExternalWindow(LINE_OA_URL)}
-            />
-          </div>
-        </Card>
 
         <OrderMetaCard apiOrder={apiOrder} order={order} />
 
