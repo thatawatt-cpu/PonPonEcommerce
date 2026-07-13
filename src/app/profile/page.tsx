@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   Bell,
@@ -25,14 +25,13 @@ import { Card } from "@/components/ui/card";
 import { LiffProfileCard } from "@/features/liff/components/liff-profile-card";
 // import { MembershipSummaryCard } from "@/components/membership/membership-summary-card";
 import { useLiffProfile } from "@/features/liff/hooks/use-liff-profile";
-import { clearStoredPonPonSession } from "@/features/auth/ponpon-auth";
+import {
+  clearStoredPonPonSession,
+  getPonPonMe,
+} from "@/features/auth/ponpon-auth";
 import { loginWithLine, openExternalWindow } from "@/lib/liff";
 import { LINE_OA_URL } from "@/lib/constants";
 import { cn } from "@/lib/utils";
-import {
-  useFavoriteStore,
-  useFavoritesHydrated,
-} from "@/store/favorite-store";
 import {
   formatNotificationContext,
   formatNotificationTime,
@@ -50,19 +49,47 @@ interface Shortcut {
   onClick?: () => void;
 }
 
+interface ProfileCounts {
+  wishlistCount: number;
+  couponCount: number;
+  recentlyViewedCount: number;
+}
+
 export default function ProfilePage() {
   const { profile, loading, error } = useLiffProfile();
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const favoritesHydrated = useFavoritesHydrated();
-  const notificationsHydrated = useNotificationsHydrated();
-  const favoriteCount = useFavoriteStore(
-    (state) => state.productIds.length,
+  const [profileCounts, setProfileCounts] = useState<ProfileCounts | null>(
+    null
   );
+  const notificationsHydrated = useNotificationsHydrated();
   const notifications = useNotificationStore((state) => state.items);
   const markNotificationRead = useNotificationStore((state) => state.markRead);
   const latestNotifications = notificationsHydrated
     ? notifications.slice(0, 3)
     : [];
+
+  useEffect(() => {
+    let cancelled = false;
+
+    getPonPonMe()
+      .then((me) => {
+        if (!cancelled) {
+          setProfileCounts({
+            wishlistCount: me.wishlistCount,
+            couponCount: me.couponCount,
+            recentlyViewedCount: me.recentlyViewedCount,
+          });
+        }
+      })
+      .catch((error: unknown) => {
+        console.info("[profile] Count sync skipped", error);
+        if (!cancelled) setProfileCounts(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const shortcuts: Shortcut[] = [
     { label: "ออเดอร์ของฉัน", icon: PackageSearch, href: "/orders" },
@@ -78,19 +105,24 @@ export default function ProfilePage() {
   const benefits = [
     {
       label: "คูปองของฉัน",
-      value: "5",
+      value:
+        profileCounts == null ? "…" : String(profileCounts.couponCount),
       icon: TicketPercent,
       href: "/coupons",
     },
     {
       label: "สินค้าที่ถูกใจ",
-      value: favoritesHydrated ? String(favoriteCount) : "0",
+      value:
+        profileCounts == null ? "…" : String(profileCounts.wishlistCount),
       icon: Heart,
       href: "/favorites",
     },
     {
       label: "ดูล่าสุด",
-      value: "12",
+      value:
+        profileCounts == null
+          ? "…"
+          : String(profileCounts.recentlyViewedCount),
       icon: Clock3,
       href: "/recently-viewed",
     },

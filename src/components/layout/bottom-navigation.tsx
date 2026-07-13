@@ -10,10 +10,6 @@ import {
   UserRound,
   type LucideIcon,
 } from "lucide-react";
-import {
-  useFavoriteStore,
-  useFavoritesHydrated,
-} from "@/store/favorite-store";
 import { cn } from "@/lib/utils";
 
 interface NavItem {
@@ -45,9 +41,6 @@ function isActive(pathname: string, item: NavItem): boolean {
 
 export function BottomNavigation() {
   const pathname = usePathname();
-  const hydrated = useFavoritesHydrated();
-  const rawCount = useFavoriteStore((s) => s.productIds.length);
-  const count = hydrated ? rawCount : 0;
 
   if (pathname.startsWith("/payment")) {
     return null;
@@ -83,11 +76,6 @@ export function BottomNavigation() {
                     }
                     strokeWidth={active ? 2.5 : 2.2}
                   />
-                  {isFavorites && count > 0 && (
-                    <span className="absolute -right-2 -top-2 flex h-[18px] min-w-[18px] animate-pop items-center justify-center rounded-full bg-brand px-0.5 text-[10px] font-bold leading-none text-white ring-2 ring-white">
-                      {count}
-                    </span>
-                  )}
                 </span>
                 {active && (
                   <span className="max-w-full truncate leading-3">

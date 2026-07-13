@@ -10,17 +10,23 @@ import { Price } from "@/components/ui/price";
 import { Card } from "@/components/ui/card";
 import { mapApiShopProductToProduct } from "@/features/products/product-mapper";
 import {
+  fetchWishlist,
+  removeWishlistProduct,
+} from "@/features/customers/customer-engagement-api";
+import {
   useFavoriteStore,
   useFavoritesHydrated,
 } from "@/store/favorite-store";
-import type { ApiShopProductListItem } from "@/types/api";
 import type { Product } from "@/types/product";
 
 export default function FavoritesPage() {
   const hydrated = useFavoritesHydrated();
   const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
   const favoriteProductIds = useFavoriteStore((state) => state.productIds);
-  const toggleFavorite = useFavoriteStore((state) => state.toggleFavorite);
+  const setFavoriteProductIds = useFavoriteStore(
+    (state) => state.setFavoriteProductIds
+  );
   const favoriteProducts = useMemo(
     () =>
       products.filter((product) => favoriteProductIds.includes(product.id)),
@@ -28,22 +34,44 @@ export default function FavoritesPage() {
   );
 
   useEffect(() => {
-    const controller = new AbortController();
+    let cancelled = false;
 
-    fetch("/api/shop/products?pageSize=100", { signal: controller.signal })
-      .then(async (response) => {
-        if (!response.ok) return [];
-        const data = (await response.json()) as ApiShopProductListItem[];
-        return Array.isArray(data) ? data.map(mapApiShopProductToProduct) : [];
+    fetchWishlist()
+      .then((data) => {
+        if (cancelled) return;
+        setFavoriteProductIds(data.productIds);
+        setProducts(data.products.map(mapApiShopProductToProduct));
       })
-      .then(setProducts)
       .catch((error: unknown) => {
-        if (error instanceof Error && error.name === "AbortError") return;
         console.error("[favorites] Failed to load products", error);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
       });
 
-    return () => controller.abort();
-  }, []);
+    return () => {
+      cancelled = true;
+    };
+  }, [setFavoriteProductIds]);
+
+  const handleRemoveFavorite = (product: Product) => {
+    const previousIds = favoriteProductIds;
+    const previousProducts = products;
+    setFavoriteProductIds(previousIds.filter((id) => id !== product.id));
+    setProducts((current) => current.filter((item) => item.id !== product.id));
+
+    removeWishlistProduct(product.id)
+      .then((data) => {
+        if (!data) return;
+        setFavoriteProductIds(data.productIds);
+        setProducts(data.products.map(mapApiShopProductToProduct));
+      })
+      .catch((error: unknown) => {
+        console.error("[favorites] Failed to remove product", error);
+        setFavoriteProductIds(previousIds);
+        setProducts(previousProducts);
+      });
+  };
 
   return (
     <>
@@ -68,7 +96,7 @@ export default function FavoritesPage() {
           </span>
         </Card>
 
-        {!hydrated ? (
+        {!hydrated || loading ? (
           <div className="grid gap-3 md:grid-cols-2">
             {[0, 1].map((item) => (
               <div
@@ -122,7 +150,7 @@ export default function FavoritesPage() {
 
                   <button
                     type="button"
-                    onClick={() => toggleFavorite(product.id)}
+                    onClick={() => handleRemoveFavorite(product)}
                     aria-label={`นำ ${product.name} ออกจากรายการโปรด`}
                     className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand text-white shadow-[0_7px_18px_rgba(190,9,14,0.22)] transition hover:bg-brand-dark active:scale-90"
                   >

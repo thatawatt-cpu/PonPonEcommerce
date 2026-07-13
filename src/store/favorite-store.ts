@@ -6,6 +6,7 @@ import { persist } from "zustand/middleware";
 
 interface FavoriteState {
   productIds: string[];
+  setFavoriteProductIds: (productIds: string[]) => void;
   toggleFavorite: (productId: string) => void;
   isFavorite: (productId: string) => boolean;
 }
@@ -14,6 +15,10 @@ export const useFavoriteStore = create<FavoriteState>()(
   persist(
     (set, get) => ({
       productIds: [],
+      setFavoriteProductIds: (productIds) =>
+        set({
+          productIds: [...new Set(productIds.filter(Boolean))],
+        }),
       toggleFavorite: (productId) =>
         set((state) => ({
           productIds: state.productIds.includes(productId)

@@ -1,13 +1,74 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Clock3, RotateCcw, ShoppingBag, Trash2 } from "lucide-react";
+import { Clock3, RotateCcw, ShoppingBag } from "lucide-react";
 import { AppHeader } from "@/components/layout/app-header";
 import { PageContainer } from "@/components/layout/page-container";
 import { ProductCard } from "@/components/product/product-card";
 import { Card } from "@/components/ui/card";
+import { fetchRecentlyViewed } from "@/features/customers/customer-engagement-api";
+import { mapApiShopProductToProduct } from "@/features/products/product-mapper";
+import type { ApiRecentlyViewedItem } from "@/types/api";
 import type { Product } from "@/types/product";
 
 export default function RecentlyViewedPage() {
-  const recentProducts: Product[] = [];
+  const [items, setItems] = useState<ApiRecentlyViewedItem[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    fetchRecentlyViewed()
+      .then((data) => {
+        if (cancelled) return;
+        setItems(data.items);
+        setProducts(data.products.map(mapApiShopProductToProduct));
+      })
+      .catch((error: unknown) => {
+        console.error("[recently-viewed] Failed to load products", error);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const recentProducts = useMemo(() => {
+    const viewedAtByProductId = new Map(
+      items.map((item) => [item.productId, item.viewedAtUtc])
+    );
+    return products
+      .filter((product) => viewedAtByProductId.has(product.id))
+      .sort((left, right) => {
+        const leftTime = Date.parse(viewedAtByProductId.get(left.id) ?? "");
+        const rightTime = Date.parse(viewedAtByProductId.get(right.id) ?? "");
+        return (Number.isFinite(rightTime) ? rightTime : 0) -
+          (Number.isFinite(leftTime) ? leftTime : 0);
+      });
+  }, [items, products]);
+
+  const viewedAtByProductId = useMemo(
+    () => new Map(items.map((item) => [item.productId, item.viewedAtUtc])),
+    [items]
+  );
+
+  const getViewedLabel = (productId: string) => {
+    const viewedAt = viewedAtByProductId.get(productId);
+    if (!viewedAt) return undefined;
+    const timestamp = Date.parse(viewedAt);
+    if (!Number.isFinite(timestamp)) return undefined;
+    return new Intl.DateTimeFormat("th-TH", {
+      day: "numeric",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(new Date(timestamp));
+  };
 
   return (
     <>
@@ -49,20 +110,25 @@ export default function RecentlyViewedPage() {
           </div>
         </Card>
 
-        {recentProducts.length > 0 ? (
+        {loading ? (
+          <div className="grid grid-cols-2 gap-3">
+            {[0, 1, 2, 3].map((item) => (
+              <div
+                key={item}
+                className="h-64 animate-pulse rounded-card bg-white/70"
+              />
+            ))}
+          </div>
+        ) : recentProducts.length > 0 ? (
           <>
             <section className="space-y-3">
               <div className="flex items-center justify-between px-1">
                 <h2 className="text-sm font-extrabold text-ink">
                   รายการล่าสุด
                 </h2>
-                <button
-                  type="button"
-                  className="flex items-center gap-1 text-[11px] font-extrabold text-brand"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                  ล้างประวัติ
-                </button>
+                <span className="text-[11px] font-bold text-ink-soft">
+                  {recentProducts.length} รายการ
+                </span>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -71,6 +137,7 @@ export default function RecentlyViewedPage() {
                     key={product.id}
                     product={product}
                     index={index}
+                    metaLabel={getViewedLabel(product.id)}
                   />
                 ))}
               </div>

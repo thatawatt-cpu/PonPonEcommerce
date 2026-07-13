@@ -11,6 +11,9 @@ export interface PonPonMeResponse {
   email: string | null;
   pictureUrl?: string | null;
   roles: string[];
+  wishlistCount?: number | null;
+  couponCount?: number | null;
+  recentlyViewedCount?: number | null;
 }
 
 export interface ShippingInfo {

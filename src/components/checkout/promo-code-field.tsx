@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronRight, X } from "lucide-react";
+import { ChevronRight, Loader2, X } from "lucide-react";
 
 interface AppliedCouponDisplay {
   code: string;
@@ -69,22 +69,28 @@ export function PromoCodeField({
             const coupon = appliedCouponByCode.get(code);
             const isFreeShipping = coupon?.type === "free_shipping";
             const isApplied = Boolean(coupon);
+            const toneClass = !isApplied
+              ? "border-black/10 bg-[#f7f4f1] text-ink-soft"
+              : isFreeShipping
+                ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                : "border-brand/15 bg-brand-soft text-brand";
 
             return (
               <div
                 key={code}
-                className={`flex min-h-11 items-center gap-2 rounded-2xl border px-3 py-2 shadow-sm ${
-                  isFreeShipping
-                    ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                    : "border-brand/15 bg-brand-soft text-brand"
-                }`}
+                className={`flex min-h-11 items-center gap-2 rounded-2xl border px-3 py-2 shadow-sm ${toneClass}`}
               >
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-extrabold leading-tight">
-                    {coupon?.name || code}
-                  </p>
+                  <div className="flex min-w-0 items-center gap-1.5">
+                    {!isApplied ? (
+                      <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
+                    ) : null}
+                    <p className="truncate text-sm font-extrabold leading-tight">
+                      {coupon?.name || code}
+                    </p>
+                  </div>
                   <p className="mt-0.5 text-[10px] font-bold opacity-70">
-                    {isApplied ? "ใช้คูปองแล้ว" : "รอระบบคำนวณ"}
+                    {isApplied ? "ใช้คูปองแล้ว" : "กำลังตรวจสอบคูปอง"}
                   </p>
                 </div>
                 <button
@@ -92,7 +98,11 @@ export function PromoCodeField({
                   onClick={() => onRemove(code)}
                   aria-label={`ลบคูปอง ${coupon?.name || code}`}
                   className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white transition active:scale-95 ${
-                    isFreeShipping ? "text-emerald-700" : "text-brand"
+                    !isApplied
+                      ? "text-ink-soft"
+                      : isFreeShipping
+                        ? "text-emerald-700"
+                        : "text-brand"
                   }`}
                 >
                   <X className="h-3.5 w-3.5" />

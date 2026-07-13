@@ -10,22 +10,19 @@ import {
   ChevronRight,
   CircleDollarSign,
   Clock3,
-  Heart,
   Home,
   LayoutGrid,
   Menu,
   PackageCheck,
   ReceiptText,
   RotateCcw,
+  ShoppingCart,
   TicketPercent,
   Truck,
   UserRound,
   X,
 } from "lucide-react";
-import {
-  useFavoriteStore,
-  useFavoritesHydrated,
-} from "@/store/favorite-store";
+import { useCartHydrated, useCartStore } from "@/store/cart-store";
 import {
   formatNotificationContext,
   formatNotificationTime,
@@ -78,10 +75,12 @@ export function AppHeader({
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
-  const favoritesHydrated = useFavoritesHydrated();
+  const hydrated = useCartHydrated();
   const notificationsHydrated = useNotificationsHydrated();
-  const rawFavoriteCount = useFavoriteStore((s) => s.productIds.length);
-  const favoriteCount = favoritesHydrated ? rawFavoriteCount : 0;
+  const rawCount = useCartStore((s) =>
+    s.items.reduce((n, i) => n + i.quantity, 0)
+  );
+  const count = hydrated ? rawCount : 0;
   const notifications = useNotificationStore((state) => state.items);
   const markAllRead = useNotificationStore((state) => state.markAllRead);
   const markRead = useNotificationStore((state) => state.markRead);
@@ -94,7 +93,7 @@ export function AppHeader({
   const menuItems = [
     { href: "/", label: "หน้าหลัก", icon: Home },
     { href: "/products", label: "สินค้าทั้งหมด", icon: LayoutGrid },
-    { href: "/favorites", label: "สินค้าที่ถูกใจ", icon: Heart },
+    { href: "/cart", label: "ตะกร้าสินค้า", icon: ShoppingCart },
     { href: "/coupons", label: "คูปองของฉัน", icon: TicketPercent },
     { href: "/orders", label: "ออเดอร์ของฉัน", icon: ReceiptText },
     { href: "/profile", label: "โปรไฟล์", icon: UserRound },
@@ -158,17 +157,17 @@ export function AppHeader({
 
             {showCart && (
               <Link
-                href="/favorites"
-                aria-label="สินค้าที่ถูกใจ"
+                href="/cart"
+                aria-label="ตะกร้าสินค้า"
                 className="relative flex h-9 w-9 items-center justify-center rounded-full text-ink transition active:scale-90 hover:bg-brand-soft motion-reduce:active:scale-100"
               >
-                <Heart className="h-6 w-6" />
-                {favoriteCount > 0 && (
+                <ShoppingCart className="h-6 w-6" />
+                {count > 0 && (
                   <span
-                    key={favoriteCount}
+                    key={count}
                     className="absolute -right-0.5 -top-0.5 flex h-5 min-w-5 animate-pop items-center justify-center rounded-full bg-brand px-1 text-[10px] font-bold text-white ring-2 ring-white"
                   >
-                    {favoriteCount}
+                    {count}
                   </span>
                 )}
               </Link>
@@ -333,9 +332,9 @@ export function AppHeader({
                     <Icon className="h-5 w-5" />
                   </span>
                   <span className="flex-1">{label}</span>
-                  {href === "/favorites" && favoriteCount > 0 && (
+                  {href === "/cart" && count > 0 && (
                     <span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-brand px-1.5 text-xs font-bold text-white">
-                      {favoriteCount}
+                      {count}
                     </span>
                   )}
                 </Link>

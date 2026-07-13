@@ -45,6 +45,9 @@ export interface PonPonMeSession {
   email: string | null;
   pictureUrl: string | null;
   roles: string[];
+  wishlistCount: number;
+  couponCount: number;
+  recentlyViewedCount: number;
 }
 
 function canUseStorage(): boolean {
@@ -320,6 +323,13 @@ export async function getPonPonMe(): Promise<PonPonMeSession> {
     email: data.email,
     pictureUrl: data.pictureUrl ?? null,
     roles: data.roles ?? [],
+    wishlistCount:
+      typeof data.wishlistCount === "number" ? data.wishlistCount : 0,
+    couponCount: typeof data.couponCount === "number" ? data.couponCount : 0,
+    recentlyViewedCount:
+      typeof data.recentlyViewedCount === "number"
+        ? data.recentlyViewedCount
+        : 0,
   };
 }
 

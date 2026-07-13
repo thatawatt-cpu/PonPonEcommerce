@@ -793,10 +793,11 @@ export default function CheckoutPage({
     !currentQuoteId ||
     !finalPricingQuote ||
     quoteExpired;
-  const estimatedAppliedCoupons =
-    pricingPreview?.appliedCoupons.filter((coupon) =>
-      couponCodes.includes(coupon.code)
-    ) ?? [];
+  const estimatedAppliedCoupons = pricingPreviewIsCurrent
+    ? pricingPreview.appliedCoupons.filter((coupon) =>
+        couponCodes.includes(coupon.code)
+      )
+    : [];
   const localShippingDiscountAmount = Math.min(
     shippingFee,
     estimatedAppliedCoupons
@@ -926,7 +927,6 @@ export default function CheckoutPage({
           setPricingPreview(preview);
           setPricingPreviewSignature(requestSignature);
           setQuoteTime(Date.now());
-          setPromoError(false);
           if (couponCodes.length > 0) {
             const appliedCodes = preview.appliedCoupons.map(
               (coupon) => coupon.code
@@ -934,12 +934,14 @@ export default function CheckoutPage({
             const missingCodes = couponCodes.filter(
               (code) => !appliedCodes.includes(code)
             );
+            setPromoError(missingCodes.length > 0);
             setPromoMessage(
               missingCodes.length > 0
                 ? `คูปอง ${missingCodes.join(", ")} ยังไม่ได้ถูกใช้กับออเดอร์นี้`
                 : "ใช้คูปองเรียบร้อย"
             );
           } else {
+            setPromoError(false);
             setPromoMessage("");
           }
         })

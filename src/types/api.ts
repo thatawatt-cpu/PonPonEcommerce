@@ -48,6 +48,21 @@ export interface ApiShopHomeResponse {
   availableCoupons: ApiCouponListItem[];
 }
 
+export interface ApiCustomerWishlistResponse {
+  productIds: string[];
+  products: ApiShopProductListItem[];
+}
+
+export interface ApiRecentlyViewedItem {
+  productId: string;
+  viewedAtUtc: string;
+}
+
+export interface ApiRecentlyViewedResponse {
+  items: ApiRecentlyViewedItem[];
+  products: ApiShopProductListItem[];
+}
+
 export interface ApiResolvedProductPrice {
   displayPrice: number;
   displayOriginalPrice: number | null;

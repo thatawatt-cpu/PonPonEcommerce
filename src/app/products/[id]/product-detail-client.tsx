@@ -41,6 +41,12 @@ import {
   fetchProductReviews,
   fetchProductReviewSummary,
 } from "@/features/reviews/review-api";
+import {
+  addWishlistProduct,
+  fetchWishlist,
+  recordRecentlyViewed,
+  removeWishlistProduct,
+} from "@/features/customers/customer-engagement-api";
 import { storePendingCouponCode } from "@/features/coupons/pending-coupon";
 import { cn } from "@/lib/utils";
 import type { ApiCouponListItem } from "@/types/api";
@@ -347,6 +353,7 @@ export function ProductDetailClient({
   const favoritesHydrated = useFavoritesHydrated();
   const favoriteProductIds = useFavoriteStore((s) => s.productIds);
   const toggleFavorite = useFavoriteStore((s) => s.toggleFavorite);
+  const setFavoriteProductIds = useFavoriteStore((s) => s.setFavoriteProductIds);
   const isFavorite =
     favoritesHydrated && favoriteProductIds.includes(product.id);
 
@@ -382,6 +389,7 @@ export function ProductDetailClient({
   const [reviewsLoading, setReviewsLoading] = useState(true);
   const [reviewsError, setReviewsError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<DetailTab>("detail");
+  const [favoriteUpdating, setFavoriteUpdating] = useState(false);
   const apiProductCoupons = remoteProductCoupons
     .map(mapApiCoupon)
     .filter((coupon): coupon is ProductCoupon => Boolean(coupon));
@@ -418,6 +426,31 @@ export function ProductDetailClient({
   const handleUseProductCoupon = (coupon: ProductCoupon) => {
     storePendingCouponCode(coupon.code);
     router.push(`/products?coupon=${encodeURIComponent(coupon.code)}`);
+  };
+
+  const handleFavoriteToggle = () => {
+    if (favoriteUpdating) return;
+
+    const wasFavorite = favoriteProductIds.includes(product.id);
+    const previousIds = favoriteProductIds;
+    setFavoriteUpdating(true);
+    toggleFavorite(product.id);
+
+    const request = wasFavorite
+      ? removeWishlistProduct(product.id)
+      : addWishlistProduct(product.id);
+
+    request
+      .then((data) => {
+        if (data) setFavoriteProductIds(data.productIds);
+      })
+      .catch((error: unknown) => {
+        console.error("[product-detail] Failed to update wishlist", error);
+        setFavoriteProductIds(previousIds);
+      })
+      .finally(() => {
+        setFavoriteUpdating(false);
+      });
   };
 
   const detailContent =
@@ -518,6 +551,28 @@ export function ProductDetailClient({
       : hasVariantStock && !hasSelectedAllOptions
         ? "สินค้าพร้อมส่ง"
         : `มีสินค้าทั้งหมด ${effectiveStock.toLocaleString("th-TH")} ชิ้น`;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    fetchWishlist()
+      .then((data) => {
+        if (!cancelled) setFavoriteProductIds(data.productIds);
+      })
+      .catch((error: unknown) => {
+        console.info("[product-detail] Wishlist sync skipped", error);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [setFavoriteProductIds]);
+
+  useEffect(() => {
+    recordRecentlyViewed({ productId: product.id }).catch((error: unknown) => {
+      console.info("[product-detail] Recently viewed sync skipped", error);
+    });
+  }, [product.id]);
 
   useEffect(() => {
     let cancelled = false;
@@ -798,9 +853,10 @@ export function ProductDetailClient({
               {/* Favorite */}
               <button
                 type="button"
-                onClick={() => toggleFavorite(product.id)}
+                onClick={handleFavoriteToggle}
                 aria-label={isFavorite ? `นำ ${product.name} ออกจากรายการโปรด` : `เพิ่ม ${product.name} ในรายการโปรด`}
                 aria-pressed={isFavorite}
+                disabled={favoriteUpdating}
                 className={cn(
                   "absolute right-3 top-3 flex h-10 w-10 items-center justify-center rounded-full shadow-md ring-1 transition active:scale-90",
                   isFavorite
