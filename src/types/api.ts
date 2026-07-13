@@ -191,6 +191,7 @@ export interface ApiSubmitOrderRequest {
     ApiCreateOrderRequest,
     "paymentMethod" | "shippingAmount" | "couponCodes"
   > & {
+    paymentMethod: "promptpay" | "mobile_banking" | "card";
     couponCode?: string | null;
     couponCodes?: string[];
   };

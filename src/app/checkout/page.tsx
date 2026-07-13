@@ -200,6 +200,14 @@ function getCheckoutPaymentLabel(method: PaymentMethod): string {
   return "QR พร้อมเพย์";
 }
 
+function getSubmitOrderPaymentMethod(
+  method: PaymentMethod
+): "promptpay" | "mobile_banking" | "card" {
+  if (method === "credit_card") return "card";
+  if (method === "mobile_banking") return "mobile_banking";
+  return "promptpay";
+}
+
 function buildSuccessPath(input: {
   orderId: string;
   orderNo: string;
@@ -1082,6 +1090,7 @@ export default function CheckoutPage({
 
       const returnUri = `${window.location.origin}/payment/complete`;
       const mobileBankingReturnUri = `${window.location.origin}/payment/callback`;
+      const submitPaymentMethod = getSubmitOrderPaymentMethod(method);
       const submitResult = await submitOrder({
         order: {
           clientRequestId: crypto.randomUUID(),
@@ -1094,6 +1103,7 @@ export default function CheckoutPage({
           shippingPhone: shipping.phone,
           shippingAddress: shipping.address,
           shippingChannel: selectedShippingRate?.courierCode ?? null,
+          paymentMethod: submitPaymentMethod,
           couponCodes,
           description: shipping.note || null,
           items: items.map((item) => ({
