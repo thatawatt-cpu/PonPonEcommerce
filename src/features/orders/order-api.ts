@@ -6,6 +6,8 @@ import type {
   ApiCreateOrderResponse,
   ApiPricingPreviewRequest,
   ApiPricingPreviewResponse,
+  ApiSubmitOrderRequest,
+  ApiSubmitOrderResponse,
   ApiOrderListItem,
   ApiOrderListResponse,
   ApiOrderDetail,
@@ -66,6 +68,25 @@ export async function createOrder(
     throw await readApiRequestError(
       response,
       `สร้างออเดอร์ไม่สำเร็จ (${response.status})`
+    );
+  }
+
+  return response.json();
+}
+
+export async function submitOrder(
+  body: ApiSubmitOrderRequest
+): Promise<ApiSubmitOrderResponse> {
+  const response = await ponponFetch("/api/orders/submit", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    throw await readApiRequestError(
+      response,
+      `สร้างออเดอร์และชำระเงินไม่สำเร็จ (${response.status})`
     );
   }
 

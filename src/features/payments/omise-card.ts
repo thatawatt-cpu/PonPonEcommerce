@@ -98,9 +98,10 @@ function loadOmiseJs(): Promise<OmiseClient> {
 }
 
 export async function tokenizeCard(input: OmiseCardInput): Promise<string> {
-  const publicKey = await getOmisePublicKey();
-
-  const omise = await loadOmiseJs();
+  const [publicKey, omise] = await Promise.all([
+    getOmisePublicKey(),
+    loadOmiseJs(),
+  ]);
   omise.setPublicKey(publicKey);
 
   return new Promise((resolve, reject) => {
@@ -123,4 +124,8 @@ export async function tokenizeCard(input: OmiseCardInput): Promise<string> {
       }
     );
   });
+}
+
+export async function preloadOmiseCardResources(): Promise<void> {
+  await Promise.all([getOmisePublicKey(), loadOmiseJs()]);
 }

@@ -20,6 +20,7 @@ export function PromoHeroCarousel({ slides }: Props) {
 
   useEffect(() => {
     if (
+      slides.length <= 1 ||
       paused ||
       window.matchMedia("(prefers-reduced-motion: reduce)").matches
     ) {

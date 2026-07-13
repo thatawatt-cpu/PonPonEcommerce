@@ -8,12 +8,10 @@ import { FlashSaleSection } from "@/components/product/flash-sale-section";
 import { PromoHeroCarousel } from "@/components/home/promo-hero-carousel";
 import { ShopBenefits } from "@/components/home/shop-benefits";
 import { ReorderSection } from "@/components/home/reorder-section";
-import { CouponSectionLazy } from "@/components/home/coupon-section-lazy";
+import { CouponSection } from "@/components/home/coupon-section";
 import { getCategoriesServer } from "@/features/products/product-service.server";
 import { getShopHomeServer } from "@/features/shop-home/shop-home-service.server";
 import { buildFlashSaleProducts } from "@/features/flash-sales/flash-sale-products";
-
-export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
   const [home, rawCategories] = await Promise.all([
@@ -69,7 +67,7 @@ export default async function HomePage() {
             slots={home.flashSale.slots}
           />
         )}
-        <CouponSectionLazy coupons={home.availableCoupons} />
+        <CouponSection coupons={home.availableCoupons} />
         <ShopBenefits />
 
         <section className="mt-5">

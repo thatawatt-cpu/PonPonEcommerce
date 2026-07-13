@@ -171,6 +171,41 @@ export interface ApiCreateOrderResponse {
   paymentExpiresAt: string;
 }
 
+export type ApiSubmitPaymentRequest =
+  | {
+      method: "promptpay";
+    }
+  | {
+      method: "mobile_banking";
+      bankType: ApiMobileBankingType;
+      returnUri: string;
+    }
+  | {
+      method: "card";
+      tokenId: string;
+      returnUri: string;
+    };
+
+export interface ApiSubmitOrderRequest {
+  order: Omit<
+    ApiCreateOrderRequest,
+    "paymentMethod" | "shippingAmount" | "couponCodes"
+  > & {
+    couponCode?: string | null;
+    couponCodes?: string[];
+  };
+  payment: ApiSubmitPaymentRequest;
+}
+
+export interface ApiSubmitOrderResponse {
+  order?: ApiCreateOrderResponse;
+  payment?:
+    | ApiPromptPayPaymentResponse
+    | ApiMobileBankingPaymentResponse
+    | ApiCreditCardPaymentResponse
+    | null;
+}
+
 export interface ApiPricingPreviewRequest {
   customerEmail: string | null;
   shippingName: string;

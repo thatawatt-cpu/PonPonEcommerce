@@ -39,19 +39,18 @@ import {
 import { fetchCustomerAddresses } from "@/features/customer-addresses/customer-address-api";
 import {
   ApiRequestError,
-  createOrder,
   fetchPricingPreview,
+  submitOrder,
 } from "@/features/orders/order-api";
 import { fetchShippingRates } from "@/features/shipping/shipping-api";
 import {
-  bahtToSatang,
-  createCreditCardPayment,
-  createMobileBankingPayment,
-  createPromptPayPayment,
   satangToBaht,
   storePromptPayCharge,
 } from "@/features/payments/payment-api";
-import { tokenizeCard } from "@/features/payments/omise-card";
+import {
+  preloadOmiseCardResources,
+  tokenizeCard,
+} from "@/features/payments/omise-card";
 import {
   getSelectedAddressId,
   setSelectedAddressId as rememberSelectedAddressId,
@@ -70,8 +69,11 @@ import type { ShippingInfo } from "@/types/customer";
 import type { PaymentMethod } from "@/types/order";
 import type { CartItem } from "@/types/cart";
 import type {
+  ApiCreditCardPaymentResponse,
+  ApiMobileBankingPaymentResponse,
   ApiMobileBankingType,
   ApiPricingPreviewResponse,
+  ApiPromptPayPaymentResponse,
 } from "@/types/api";
 import type { ShippingRateOption, ShippingRateRequest } from "@/features/shipping/shipping-types";
 
@@ -489,7 +491,6 @@ export default function CheckoutPage({
     ]
   );
   const previewCanLoad = canLoadShippingRates && shippingQuoteResolved;
-  const apiPaymentMethod = method === "mobile_banking" ? bankType : method;
   const currentPricingPreviewSignature = useMemo(
     () =>
       JSON.stringify({
@@ -518,6 +519,7 @@ export default function CheckoutPage({
 
   useEffect(() => {
     let cancelled = false;
+    const fetchDelayMs = selectedAddressId ? 0 : 350;
     const timer = window.setTimeout(() => {
       if (!shippingRateRequest) {
         setShippingRates([]);
@@ -549,17 +551,29 @@ export default function CheckoutPage({
             setShippingQuoteResolved(true);
           }
         });
-    }, 0);
+    }, fetchDelayMs);
 
     return () => {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [shippingRateRequest]);
+  }, [selectedAddressId, shippingRateRequest]);
 
   useEffect(() => {
     router.prefetch("/payment");
   }, [router]);
+
+  useEffect(() => {
+    if (method !== "credit_card") return;
+
+    const timer = window.setTimeout(() => {
+      preloadOmiseCardResources().catch(() => {
+        // Tokenization will surface the real error if the customer submits.
+      });
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [method]);
 
   useEffect(() => {
     const nextCodes = parseCouponCodesParam(coupons);
@@ -1066,52 +1080,55 @@ export default function CheckoutPage({
             })
           : null;
 
-      const order = await createOrder({
-        clientRequestId: crypto.randomUUID(),
-        quoteId,
-        customerName: shipping.customerName,
-        customerEmail: null,
-        customerPhone: shipping.phone,
-        customerAddress: shipping.address,
-        shippingName: shipping.customerName,
-        shippingPhone: shipping.phone,
-        shippingAddress: shipping.address,
-        shippingChannel: selectedShippingRate?.courierCode ?? null,
-        shippingAmount: shippingFee,
-        paymentMethod: apiPaymentMethod,
-        couponCodes,
-        description: shipping.note || null,
-        items: items.map((item) => ({
-          productId: item.productId,
-          variantId: item.variantId ?? null,
-          quantity: item.quantity,
-        })),
+      const returnUri = `${window.location.origin}/payment/complete`;
+      const mobileBankingReturnUri = `${window.location.origin}/payment/callback`;
+      const submitResult = await submitOrder({
+        order: {
+          clientRequestId: crypto.randomUUID(),
+          quoteId,
+          customerName: shipping.customerName,
+          customerEmail: null,
+          customerPhone: shipping.phone,
+          customerAddress: shipping.address,
+          shippingName: shipping.customerName,
+          shippingPhone: shipping.phone,
+          shippingAddress: shipping.address,
+          shippingChannel: selectedShippingRate?.courierCode ?? null,
+          couponCodes,
+          description: shipping.note || null,
+          items: items.map((item) => ({
+            productId: item.productId,
+            variantId: item.variantId ?? null,
+            quantity: item.quantity,
+          })),
+        },
+        payment:
+          method === "credit_card"
+            ? {
+                method: "card",
+                tokenId: creditCardTokenId ?? "",
+                returnUri,
+              }
+            : method === "mobile_banking"
+              ? {
+                  method: "mobile_banking",
+                  bankType,
+                  returnUri: mobileBankingReturnUri,
+                }
+              : { method: "promptpay" },
       });
 
-      const paymentAmount = bahtToSatang(order.amount);
-      const paymentDescription = order.number;
+      const order = submitResult.order;
+      if (!order) {
+        throw new Error("Order submit response is missing order data.");
+      }
+
       const successPath = buildSuccessPath({
         orderId: order.id,
         orderNo: order.number,
         points: earnedPoints,
         spend: order.amount,
       });
-      const returnUri = `${window.location.origin}/payment/complete?${new URLSearchParams(
-        {
-          orderId: order.id,
-          orderNo: order.number,
-          points: String(earnedPoints),
-          spend: String(order.amount),
-        }
-      ).toString()}`;
-      const mobileBankingReturnUri = `${window.location.origin}/payment/callback?${new URLSearchParams(
-        {
-          orderId: order.id,
-          orderNo: order.number,
-          points: String(earnedPoints),
-          spend: String(order.amount),
-        }
-      ).toString()}`;
 
       if (method === "promptpay") {
         if (!canRequestPayment(order.paymentExpiresAt)) {
@@ -1126,9 +1143,11 @@ export default function CheckoutPage({
           return;
         }
 
-        const payment = await createPromptPayPayment({
-          orderId: order.id,
-        });
+        const payment =
+          submitResult.payment as ApiPromptPayPaymentResponse | null;
+        if (!payment?.chargeId || !payment.qrCodeUrl) {
+          throw new Error("PromptPay payment response is missing QR data.");
+        }
         const promptPayAmount = satangToBaht(payment.amount);
         storePromptPayCharge({
           orderId: order.id,
@@ -1158,11 +1177,11 @@ export default function CheckoutPage({
       }
 
       if (method === "mobile_banking") {
-        const payment = await createMobileBankingPayment({
-          orderId: order.id,
-          bankType,
-          returnUri: mobileBankingReturnUri,
-        });
+        const payment =
+          submitResult.payment as ApiMobileBankingPaymentResponse | null;
+        if (!payment?.chargeId) {
+          throw new Error("Mobile banking payment response is missing charge data.");
+        }
 
         if (payment.status === "successful") {
           setRedirecting(true);
@@ -1189,14 +1208,11 @@ export default function CheckoutPage({
       }
 
       if (method === "credit_card" && creditCardTokenId) {
-        const payment = await createCreditCardPayment({
-          orderId: order.id,
-          tokenId: creditCardTokenId,
-          amount: paymentAmount,
-          currency: "THB",
-          description: paymentDescription,
-          returnUri,
-        });
+        const payment =
+          submitResult.payment as ApiCreditCardPaymentResponse | null;
+        if (!payment?.chargeId) {
+          throw new Error("Credit card payment response is missing charge data.");
+        }
 
         if (payment.status === "successful") {
           setRedirecting(true);
