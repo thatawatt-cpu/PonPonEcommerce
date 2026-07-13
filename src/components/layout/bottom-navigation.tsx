@@ -3,14 +3,17 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  Heart,
   Home,
   LayoutGrid,
   ReceiptText,
-  ShoppingCart,
   UserRound,
   type LucideIcon,
 } from "lucide-react";
-import { useCartHydrated, useCartStore } from "@/store/cart-store";
+import {
+  useFavoriteStore,
+  useFavoritesHydrated,
+} from "@/store/favorite-store";
 import { cn } from "@/lib/utils";
 
 interface NavItem {
@@ -24,7 +27,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { href: "/", label: "Shop", icon: Home },
   { href: "/products", label: "Products", icon: LayoutGrid },
-  { href: "/cart", label: "Cart", icon: ShoppingCart },
+  { href: "/favorites", label: "สินค้าที่ถูกใจ", icon: Heart },
   {
     href: "/orders",
     label: "Orders",
@@ -42,10 +45,8 @@ function isActive(pathname: string, item: NavItem): boolean {
 
 export function BottomNavigation() {
   const pathname = usePathname();
-  const hydrated = useCartHydrated();
-  const rawCount = useCartStore((s) =>
-    s.items.reduce((n, i) => n + i.quantity, 0)
-  );
+  const hydrated = useFavoritesHydrated();
+  const rawCount = useFavoriteStore((s) => s.productIds.length);
   const count = hydrated ? rawCount : 0;
 
   if (pathname.startsWith("/payment")) {
@@ -58,7 +59,7 @@ export function BottomNavigation() {
         {NAV_ITEMS.map((item) => {
           const active = isActive(pathname, item);
           const Icon = item.icon;
-          const isCart = item.href === "/cart";
+          const isFavorites = item.href === "/favorites";
           return (
             <li key={item.href} className="flex-1">
               <Link
@@ -75,16 +76,24 @@ export function BottomNavigation() {
                       "h-6 w-6 transition-transform duration-200",
                       active && "scale-105"
                     )}
-                    fill={active && item.href === "/" ? "currentColor" : "none"}
+                    fill={
+                      active && (item.href === "/" || isFavorites)
+                        ? "currentColor"
+                        : "none"
+                    }
                     strokeWidth={active ? 2.5 : 2.2}
                   />
-                  {isCart && count > 0 && (
+                  {isFavorites && count > 0 && (
                     <span className="absolute -right-2 -top-2 flex h-[18px] min-w-[18px] animate-pop items-center justify-center rounded-full bg-brand px-0.5 text-[10px] font-bold leading-none text-white ring-2 ring-white">
                       {count}
                     </span>
                   )}
                 </span>
-                {active && <span className="leading-3">{item.label}</span>}
+                {active && (
+                  <span className="max-w-full truncate leading-3">
+                    {item.label}
+                  </span>
+                )}
               </Link>
             </li>
           );
