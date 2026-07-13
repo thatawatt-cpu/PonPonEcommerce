@@ -1,12 +1,12 @@
 "use client";
 
-import { use, useEffect, useMemo, useState } from "react";
+import { use, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Check,
   ChevronRight,
-  Coins,
+  // Coins,
   Loader2,
   MapPin,
   MessageSquareText,
@@ -58,14 +58,14 @@ import {
   toSavedAddress,
   type SavedAddress,
 } from "@/lib/address-storage";
-import { calculateEarnedPoints, getTierBySpend } from "@/lib/membership";
+// import { calculateEarnedPoints, getTierBySpend } from "@/lib/membership";
 import { formatBaht } from "@/lib/format";
 import { SHIPPING_FEE } from "@/lib/constants";
 import { consumePendingCouponCode } from "@/features/coupons/pending-coupon";
-import {
-  useMembershipHydrated,
-  useMembershipStore,
-} from "@/store/membership-store";
+// import {
+//   useMembershipHydrated,
+//   useMembershipStore,
+// } from "@/store/membership-store";
 import type { ShippingInfo } from "@/types/customer";
 import type { PaymentMethod } from "@/types/order";
 import type { CartItem } from "@/types/cart";
@@ -376,7 +376,7 @@ export default function CheckoutPage({
   const { mode, promo, coupons } = use(searchParams);
   const router = useRouter();
   const hydrated = useCartHydrated();
-  const membershipHydrated = useMembershipHydrated();
+  // const membershipHydrated = useMembershipHydrated();
   const isBuyNowCheckout = mode === "buy-now";
   const isCartSelectionCheckout = mode === "cart-selection";
 
@@ -385,7 +385,7 @@ export default function CheckoutPage({
   const cartShippingFee = useCartStore((s) => s.shippingFee());
   const clearCart = useCartStore((s) => s.clearCart);
   const removeCartItem = useCartStore((s) => s.removeItem);
-  const lifetimeSpend = useMembershipStore((state) => state.lifetimeSpend);
+  // const lifetimeSpend = useMembershipStore((state) => state.lifetimeSpend);
 
   const [shipping, setShipping] =
     useState<ShippingInfo>(emptyShippingInfo);
@@ -406,6 +406,10 @@ export default function CheckoutPage({
     useState<ApiPricingPreviewResponse | null>(null);
   const [pricingPreviewSignature, setPricingPreviewSignature] = useState("");
   const [pricingPreviewLoading, setPricingPreviewLoading] = useState(false);
+  const [quoteTime, setQuoteTime] = useState(() => Date.now());
+  const pricingPreviewCacheRef = useRef(
+    new Map<string, ApiPricingPreviewResponse>()
+  );
   const [addressPickerOpen, setAddressPickerOpen] = useState(false);
   const [showAllAddresses, setShowAllAddresses] = useState(false);
   const [showAllItems, setShowAllItems] = useState(false);
@@ -484,11 +488,7 @@ export default function CheckoutPage({
       shipping.phone,
     ]
   );
-  const previewCanLoad =
-    canLoadShippingRates;
-  const totalLoading =
-    !addressesLoaded ||
-    (canLoadShippingRates && !shippingQuoteResolved);
+  const previewCanLoad = canLoadShippingRates && shippingQuoteResolved;
   const apiPaymentMethod = method === "mobile_banking" ? bankType : method;
   const currentPricingPreviewSignature = useMemo(
     () =>
@@ -741,8 +741,17 @@ export default function CheckoutPage({
     currentPricingPreview && typeof currentPricingPreview.quoteId === "string"
       ? currentPricingPreview.quoteId
       : null;
+  const currentQuoteExpiresAtMs =
+    currentPricingPreview?.expiresAt != null
+      ? new Date(currentPricingPreview.expiresAt).getTime()
+      : null;
+  const quoteExpired =
+    currentQuoteExpiresAtMs != null &&
+    Number.isFinite(currentQuoteExpiresAtMs) &&
+    currentQuoteExpiresAtMs <= quoteTime;
   const finalPricingQuote =
     currentQuoteId &&
+    !quoteExpired &&
     currentPricingPreview?.isFinal === true &&
     currentPricingPreview.shippingFinalized === true &&
     currentPricingPreview.calculationStatus === "final"
@@ -750,12 +759,18 @@ export default function CheckoutPage({
       : null;
   const manualShippingRequired =
     currentPricingPreview?.calculationStatus === "manual_shipping_required";
+  const shippingPreviewPending = canLoadShippingRates && !shippingQuoteResolved;
   const waitingForFinalQuote =
     previewCanLoad &&
     !manualShippingRequired &&
-    (!finalPricingQuote || pricingPreviewLoading);
-  const totalConfirming = totalLoading || waitingForFinalQuote;
-  const paymentBlocked = totalConfirming || manualShippingRequired;
+    (pricingPreviewLoading || !currentQuoteId || !finalPricingQuote);
+  const summaryRecalculating = shippingPreviewPending || waitingForFinalQuote;
+  const paymentBlocked =
+    summaryRecalculating ||
+    manualShippingRequired ||
+    !currentQuoteId ||
+    !finalPricingQuote ||
+    quoteExpired;
   const estimatedAppliedCoupons =
     pricingPreview?.appliedCoupons.filter((coupon) =>
       couponCodes.includes(coupon.code)
@@ -801,8 +816,9 @@ export default function CheckoutPage({
   const displayCouponDiscountAmount = displayAppliedCoupons
     .filter((coupon) => coupon.type !== "free_shipping")
     .reduce((sum, coupon) => sum + coupon.discountAmount, 0);
-  const memberTier = getTierBySpend(lifetimeSpend);
-  const earnedPoints = calculateEarnedPoints(payableTotal, memberTier.id);
+  // const memberTier = getTierBySpend(lifetimeSpend);
+  // const earnedPoints = calculateEarnedPoints(payableTotal, memberTier.id);
+  const earnedPoints = 0;
   const totalQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
   const visibleAddresses = showAllAddresses
     ? savedAddresses
@@ -818,6 +834,19 @@ export default function CheckoutPage({
       })();
 
   useEffect(() => {
+    if (!currentQuoteExpiresAtMs || !Number.isFinite(currentQuoteExpiresAtMs)) {
+      return;
+    }
+
+    const delay = Math.max(currentQuoteExpiresAtMs - Date.now(), 0);
+    const timer = window.setTimeout(() => {
+      setQuoteTime(Date.now());
+    }, delay);
+
+    return () => window.clearTimeout(timer);
+  }, [currentQuoteExpiresAtMs]);
+
+  useEffect(() => {
     if (!previewCanLoad) {
       const resetTimer = window.setTimeout(() => {
         setPricingPreview(null);
@@ -830,6 +859,29 @@ export default function CheckoutPage({
     let cancelled = false;
     const controller = new AbortController();
     const requestSignature = currentPricingPreviewSignature;
+    const cachedPreview = pricingPreviewCacheRef.current.get(requestSignature);
+    const cachedExpiresAtMs = cachedPreview?.expiresAt
+      ? new Date(cachedPreview.expiresAt).getTime()
+      : null;
+    const cachedPreviewExpired =
+      cachedExpiresAtMs != null &&
+      Number.isFinite(cachedExpiresAtMs) &&
+      cachedExpiresAtMs <= quoteTime;
+
+    if (cachedPreview && !cachedPreviewExpired) {
+      setPricingPreview(cachedPreview);
+      setPricingPreviewSignature(requestSignature);
+      setPricingPreviewLoading(false);
+      return () => {
+        cancelled = true;
+        controller.abort();
+      };
+    }
+
+    if (cachedPreviewExpired) {
+      pricingPreviewCacheRef.current.delete(requestSignature);
+    }
+
     const timer = window.setTimeout(() => {
       setPricingPreviewLoading(true);
 
@@ -848,8 +900,10 @@ export default function CheckoutPage({
       }, { signal: controller.signal })
         .then((preview) => {
           if (cancelled) return;
+          pricingPreviewCacheRef.current.set(requestSignature, preview);
           setPricingPreview(preview);
           setPricingPreviewSignature(requestSignature);
+          setQuoteTime(Date.now());
           setPromoError(false);
           if (couponCodes.length > 0) {
             const appliedCodes = preview.appliedCoupons.map(
@@ -879,7 +933,7 @@ export default function CheckoutPage({
             setPricingPreviewLoading(false);
           }
         });
-    }, 400);
+    }, 0);
 
     return () => {
       cancelled = true;
@@ -893,12 +947,12 @@ export default function CheckoutPage({
     hydrated,
     items,
     previewCanLoad,
+    quoteTime,
     selectedAddress?.email,
     selectedShippingRate?.courierCode,
     shipping.address,
     shipping.customerName,
     shipping.phone,
-    shippingFee,
     usesStoredCheckoutItems,
   ]);
 
@@ -987,7 +1041,7 @@ export default function CheckoutPage({
   };
 
   const handleConfirm = async () => {
-    if (!validate() || placing || redirecting || totalLoading) return;
+    if (!validate() || placing || redirecting || paymentBlocked) return;
     const quoteId = currentQuoteId;
     if (manualShippingRequired) {
       setPlaceError("ออเดอร์นี้ต้องให้ร้านยืนยันค่าจัดส่งก่อนชำระเงิน");
@@ -1655,6 +1709,7 @@ export default function CheckoutPage({
           </div>
         </Card>
 
+        {/*
         <Card className="flex items-center gap-3 bg-white p-4">
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-warning-soft text-warning">
             <Coins className="h-5 w-5" />
@@ -1675,6 +1730,7 @@ export default function CheckoutPage({
             ดูสิทธิ์
           </Link>
         </Card>
+        */}
 
         <Card id="payment-section" className="overflow-hidden bg-white">
           <div className="flex items-center justify-between gap-3 px-4 py-3">
@@ -1792,10 +1848,10 @@ export default function CheckoutPage({
               aria-live="polite"
               className="flex h-6 w-28 shrink-0 items-center justify-end gap-1.5 text-[10px] font-bold text-ink-soft"
             >
-              {shippingRatesLoading ? (
+              {summaryRecalculating ? (
                 <>
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  อัปเดตค่าส่ง
+                  กำลังคำนวณ
                 </>
               ) : selectedShippingRate ? (
                 <>
@@ -1857,7 +1913,7 @@ export default function CheckoutPage({
                 }
                 strong
                 tone="brand"
-                loading={totalConfirming}
+                loading={summaryRecalculating}
               />
             </div>
           </div>
@@ -1884,7 +1940,7 @@ export default function CheckoutPage({
                 ยอดรวมทั้งหมด
               </p>
               <div className="mt-0.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                {totalConfirming ? (
+                {summaryRecalculating ? (
                   <span
                     aria-label="กำลังยืนยันยอดรวม"
                     role="status"

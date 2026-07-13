@@ -23,7 +23,7 @@ import { AppHeader } from "@/components/layout/app-header";
 import { PageContainer } from "@/components/layout/page-container";
 import { Card } from "@/components/ui/card";
 import { LiffProfileCard } from "@/features/liff/components/liff-profile-card";
-import { MembershipSummaryCard } from "@/components/membership/membership-summary-card";
+// import { MembershipSummaryCard } from "@/components/membership/membership-summary-card";
 import { useLiffProfile } from "@/features/liff/hooks/use-liff-profile";
 import { clearStoredPonPonSession } from "@/features/auth/ponpon-auth";
 import { loginWithLine, openExternalWindow } from "@/lib/liff";
@@ -117,7 +117,9 @@ export default function ProfilePage() {
           error={error}
           onRetryLogin={handleRetryLogin}
         />
+        {/*
         <MembershipSummaryCard />
+        */}
 
         <section>
           <h2 className="mb-2 px-1 text-sm font-extrabold text-ink">

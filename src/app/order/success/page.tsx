@@ -4,7 +4,7 @@ import { use, useEffect } from "react";
 import Link from "next/link";
 import {
   CheckCircle2,
-  Coins,
+  // Coins,
   Home,
   MessageCircle,
   PackageSearch,
@@ -16,7 +16,7 @@ import { Card } from "@/components/ui/card";
 import { openExternalWindow } from "@/lib/liff";
 import { LINE_OA_URL } from "@/lib/constants";
 import { dispatchShopNotificationToast } from "@/lib/shop-notification-toast";
-import { useMembershipStore } from "@/store/membership-store";
+// import { useMembershipStore } from "@/store/membership-store";
 import { markOrderPaid } from "@/features/payments/payment-api";
 
 export default function OrderSuccessPage({
@@ -32,22 +32,22 @@ export default function OrderSuccessPage({
   const {
     orderId,
     orderNo: orderNoParam,
-    points: pointsParam = "0",
-    spend: spendParam = "0",
+    // points: pointsParam = "0",
+    // spend: spendParam = "0",
   } = use(searchParams);
-  const creditOrder = useMembershipStore((state) => state.creditOrder);
-  const earnedPoints = Math.max(Number(pointsParam) || 0, 0);
-  const orderSpend = Math.max(Number(spendParam) || 0, 0);
+  // const creditOrder = useMembershipStore((state) => state.creditOrder);
+  // const earnedPoints = Math.max(Number(pointsParam) || 0, 0);
+  // const orderSpend = Math.max(Number(spendParam) || 0, 0);
   const trackingOrderId = orderId || orderNoParam || "";
   const orderNo = orderNoParam || orderId || "คำสั่งซื้อนี้";
   const trackingHref = trackingOrderId
     ? `/orders/${encodeURIComponent(trackingOrderId)}`
     : "/orders";
 
-  useEffect(() => {
-    if (earnedPoints <= 0) return;
-    creditOrder(orderNo, earnedPoints, orderSpend);
-  }, [creditOrder, earnedPoints, orderNo, orderSpend]);
+  // useEffect(() => {
+  //   if (earnedPoints <= 0) return;
+  //   creditOrder(orderNo, earnedPoints, orderSpend);
+  // }, [creditOrder, earnedPoints, orderNo, orderSpend]);
 
   useEffect(() => {
     if (!trackingOrderId) return;
@@ -94,6 +94,7 @@ export default function OrderSuccessPage({
         </span>
       </Card>
 
+      {/*
       {earnedPoints > 0 ? (
         <Link href="/membership" className="mt-3 block w-full text-left">
           <Card className="flex items-center gap-3 border border-warning/10 bg-warning-soft/60 p-4">
@@ -111,6 +112,7 @@ export default function OrderSuccessPage({
           </Card>
         </Link>
       ) : null}
+      */}
 
       <div className="mt-6 w-full space-y-2.5">
         <Link href={trackingHref} className="block">

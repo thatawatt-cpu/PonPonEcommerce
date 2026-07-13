@@ -173,6 +173,7 @@ export default function CartPage() {
         ) : (
           <>
             {/* ── Free-shipping promo banner ── */}
+            {false && (
             <section className="overflow-hidden rounded-3xl bg-brand p-5 text-white shadow-[0_12px_32px_rgba(190,9,14,0.22)]">
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0 flex-1">
@@ -215,7 +216,10 @@ export default function CartPage() {
               </div>
             </section>
 
+            )}
+
             {/* ── Cart items ── */}
+
             <section className="overflow-hidden rounded-3xl bg-white ring-1 ring-black/[0.04]">
               {/* Select-all row */}
               <div className="flex items-center justify-between border-b border-black/[0.05] px-4 py-3">
