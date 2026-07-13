@@ -6,7 +6,12 @@ const SKIP_AUTH =
 
 export async function POST(request: NextRequest) {
   const auth = request.headers.get("Authorization");
-  const body = await request.json().catch(() => null);
+  const rawBody = await request.json().catch(() => null);
+  const body = rawBody as Record<string, unknown> | null;
+
+  if (body && typeof body === "object" && !Array.isArray(body)) {
+    delete body.paymentMethod;
+  }
 
   if (!auth) {
     if (!SKIP_AUTH) {

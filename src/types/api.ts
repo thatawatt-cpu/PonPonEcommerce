@@ -177,7 +177,6 @@ export interface ApiPricingPreviewRequest {
   shippingPhone: string;
   shippingAddress: string;
   shippingChannel: string | null;
-  paymentMethod: string;
   couponCodes?: string[];
   couponCode?: string;
   items: ApiCreateOrderItem[];

@@ -498,7 +498,6 @@ export default function CheckoutPage({
         shippingPhone: shipping.phone.trim(),
         shippingAddress: shipping.address.trim(),
         shippingChannel: selectedShippingRate?.courierCode ?? null,
-        paymentMethod: apiPaymentMethod,
         couponCodes,
         items: items.map((item) => ({
           productId: item.productId,
@@ -507,7 +506,6 @@ export default function CheckoutPage({
         })),
       }),
     [
-      apiPaymentMethod,
       couponCodes,
       items,
       selectedAddress?.email,
@@ -841,7 +839,6 @@ export default function CheckoutPage({
         shippingPhone: shipping.phone.trim(),
         shippingAddress: shipping.address.trim(),
         shippingChannel: selectedShippingRate?.courierCode ?? null,
-        paymentMethod: apiPaymentMethod,
         couponCodes,
         items: items.map((item) => ({
           productId: item.productId,
@@ -891,7 +888,6 @@ export default function CheckoutPage({
     };
   }, [
     checkoutSourceLoaded,
-    apiPaymentMethod,
     couponCodes,
     currentPricingPreviewSignature,
     hydrated,
