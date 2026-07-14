@@ -44,11 +44,62 @@ interface ProfileCounts {
   recentlyViewedCount: number;
 }
 
+type ProfileBenefitKey = keyof ProfileCounts;
+
+const PROFILE_BENEFIT_SEEN_KEY = "ponpon.profile.benefitSeenCounts";
+const profileBenefitKeys: ProfileBenefitKey[] = [
+  "couponCount",
+  "wishlistCount",
+  "recentlyViewedCount",
+];
+
+function readProfileBenefitSeenCounts(): Partial<
+  Record<ProfileBenefitKey, number>
+> {
+  if (typeof window === "undefined") return {};
+
+  try {
+    const raw = window.localStorage.getItem(PROFILE_BENEFIT_SEEN_KEY);
+    if (!raw) return {};
+    const data = JSON.parse(raw) as Partial<Record<ProfileBenefitKey, unknown>>;
+    return profileBenefitKeys.reduce<Partial<Record<ProfileBenefitKey, number>>>(
+      (counts, key) => {
+        const value = data[key];
+        if (typeof value === "number" && Number.isFinite(value) && value >= 0) {
+          counts[key] = value;
+        }
+        return counts;
+      },
+      {}
+    );
+  } catch {
+    return {};
+  }
+}
+
+function writeProfileBenefitSeenCounts(
+  counts: Partial<Record<ProfileBenefitKey, number>>
+): void {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.localStorage.setItem(
+      PROFILE_BENEFIT_SEEN_KEY,
+      JSON.stringify(counts)
+    );
+  } catch {
+    // Ignore storage failures; badges still work for the current session.
+  }
+}
+
 export default function ProfilePage() {
   const { profile, loading, error } = useLiffProfile();
   const [profileCounts, setProfileCounts] = useState<ProfileCounts | null>(
     null
   );
+  const [benefitSeenCounts, setBenefitSeenCounts] = useState<
+    Partial<Record<ProfileBenefitKey, number>>
+  >(readProfileBenefitSeenCounts);
 
   useEffect(() => {
     let cancelled = false;
@@ -56,10 +107,21 @@ export default function ProfilePage() {
     getPonPonMe()
       .then((me) => {
         if (!cancelled) {
-          setProfileCounts({
+          const nextCounts = {
             wishlistCount: me.wishlistCount,
             couponCount: me.couponCount,
             recentlyViewedCount: me.recentlyViewedCount,
+          };
+          setProfileCounts(nextCounts);
+          setBenefitSeenCounts((current) => {
+            const next = { ...current };
+            for (const key of profileBenefitKeys) {
+              const seenCount = next[key] ?? 0;
+              const currentCount = nextCounts[key];
+              if (seenCount > currentCount) next[key] = currentCount;
+            }
+            writeProfileBenefitSeenCounts(next);
+            return next;
           });
         }
       })
@@ -74,35 +136,45 @@ export default function ProfilePage() {
   }, []);
 
   const shortcuts: Shortcut[] = [
-    { label: "ออเดอร์ของฉัน", icon: PackageSearch, href: "/orders" },
+    {
+      label: "ประวัติการสั่งซื้อ",
+      icon: PackageSearch,
+      href: "/orders?filter=completed",
+    },
     { label: "ที่อยู่จัดส่ง", icon: MapPin, href: "/addresses" },
   ];
 
   const benefits = [
     {
       label: "คูปองของฉัน",
-      value:
-        profileCounts == null ? "…" : String(profileCounts.couponCount),
+      countKey: "couponCount" as const,
       icon: TicketPercent,
       href: "/coupons",
     },
     {
       label: "สินค้าที่ถูกใจ",
-      value:
-        profileCounts == null ? "…" : String(profileCounts.wishlistCount),
+      countKey: "wishlistCount" as const,
       icon: Heart,
       href: "/favorites",
     },
     {
       label: "ดูล่าสุด",
-      value:
-        profileCounts == null
-          ? "…"
-          : String(profileCounts.recentlyViewedCount),
+      countKey: "recentlyViewedCount" as const,
       icon: Clock3,
       href: "/recently-viewed",
     },
   ];
+
+  const markBenefitSeen = (key: ProfileBenefitKey) => {
+    setBenefitSeenCounts((current) => {
+      const next = {
+        ...current,
+        [key]: profileCounts?.[key] ?? 0,
+      };
+      writeProfileBenefitSeenCounts(next);
+      return next;
+    });
+  };
 
   const handleRetryLogin = async () => {
     try {
@@ -134,23 +206,35 @@ export default function ProfilePage() {
             สิทธิประโยชน์ของฉัน
           </h2>
           <Card className="grid grid-cols-3 gap-2 p-3">
-            {benefits.map(({ label, value, icon: Icon, href }) => (
-              <Link
-                key={label}
-                href={href}
-                className="flex min-w-0 flex-col items-center rounded-2xl bg-[#fff8f6] px-2 py-3 text-center transition active:scale-95"
-              >
-                <span className="relative flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-brand shadow-sm">
-                  <Icon className="h-5 w-5" />
-                  <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1 text-[10px] font-extrabold text-white ring-2 ring-[#fff8f6]">
-                    {value}
+            {benefits.map(({ label, countKey, icon: Icon, href }) => {
+              const unseenCount =
+                profileCounts == null
+                  ? 0
+                  : Math.max(
+                      0,
+                      profileCounts[countKey] - (benefitSeenCounts[countKey] ?? 0)
+                    );
+              return (
+                <Link
+                  key={label}
+                  href={href}
+                  onClick={() => markBenefitSeen(countKey)}
+                  className="flex min-w-0 flex-col items-center rounded-2xl bg-[#fff8f6] px-2 py-3 text-center transition active:scale-95"
+                >
+                  <span className="relative flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-brand shadow-sm">
+                    <Icon className="h-5 w-5" />
+                    {unseenCount > 0 && (
+                      <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1 text-[10px] font-extrabold text-white ring-2 ring-[#fff8f6]">
+                        {unseenCount}
+                      </span>
+                    )}
                   </span>
-                </span>
-                <span className="mt-2 truncate text-[11px] font-bold text-ink">
-                  {label}
-                </span>
-              </Link>
-            ))}
+                  <span className="mt-2 truncate text-[11px] font-bold text-ink">
+                    {label}
+                  </span>
+                </Link>
+              );
+            })}
           </Card>
         </section>
 
@@ -231,8 +315,8 @@ export default function ProfilePage() {
                 <ChevronDown className="h-5 w-5 text-ink-soft transition group-open:rotate-180" />
               </summary>
               <div className="bg-[#fffaf8] px-4 pb-4 pt-1 text-xs leading-relaxed text-ink-soft">
-                ข้อมูลในระบบนี้เป็นข้อมูลจำลองสำหรับทดสอบหน้าร้าน
-                และยังไม่มีการส่งข้อมูลไปยัง LINE LIFF จริง
+                ร้านค้าดูแลข้อมูลบัญชีของคุณตามนโยบายความเป็นส่วนตัว
+                และใช้เพื่อให้บริการคำสั่งซื้อ คูปอง และการจัดส่งเท่านั้น
               </div>
             </details>
           </Card>
@@ -243,7 +327,7 @@ export default function ProfilePage() {
           <span>PonPon Official เวอร์ชัน 0.1.0</span>
           <span>·</span>
           <FileText className="h-3.5 w-3.5" />
-          <span>Frontend Demo</span>
+          <span>Shop</span>
         </div>
       </PageContainer>
     </>

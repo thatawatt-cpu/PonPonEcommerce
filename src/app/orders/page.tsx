@@ -9,7 +9,7 @@ import {
   type MouseEvent,
 } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowUpRight,
   ChevronRight,
@@ -133,7 +133,13 @@ const ORDER_PAGE_CONTAINER_CLASS = "pt-4 md:max-w-5xl md:px-8 xl:max-w-6xl";
 const ORDER_PAGE_SIZE = 10;
 const EMPTY_ORDERS: ApiOrderListItem[] = [];
 const FALLBACK_ORDER_PAGE_SIZE = 100;
-const ACTIVE_ORDER_STATUS_CODES = ["0", "3", "5", "6"];
+const ORDER_NOTIFICATION_FILTERS: OrderFilter[] = [
+  "payment",
+  "preparing",
+  "awaiting_receive",
+  "return_refund",
+];
+const ORDER_NOTIFICATION_SEEN_KEY = "ponpon.orders.notificationSeenCounts";
 const LIVE_ORDER_FILTERS: OrderFilter[] = [
   "awaiting_receive",
   "completed",
@@ -155,6 +161,53 @@ const orderFilterParams = orderTabs.reduce(
     { status: string[] | null; paymentstatus: string[] | null; apiFilter?: string }
   >
 );
+
+const orderFilterValues = new Set<OrderFilter>(
+  orderTabs.map((filter) => filter.value)
+);
+
+function parseOrderFilter(value: string | null): OrderFilter {
+  return value && orderFilterValues.has(value as OrderFilter)
+    ? (value as OrderFilter)
+    : "all";
+}
+
+function readOrderNotificationSeenCounts(): Partial<Record<OrderFilter, number>> {
+  if (typeof window === "undefined") return {};
+
+  try {
+    const raw = window.localStorage.getItem(ORDER_NOTIFICATION_SEEN_KEY);
+    if (!raw) return {};
+    const data = JSON.parse(raw) as Partial<Record<OrderFilter, unknown>>;
+    return ORDER_NOTIFICATION_FILTERS.reduce<Partial<Record<OrderFilter, number>>>(
+      (counts, filter) => {
+        const value = data[filter];
+        if (typeof value === "number" && Number.isFinite(value) && value >= 0) {
+          counts[filter] = value;
+        }
+        return counts;
+      },
+      {}
+    );
+  } catch {
+    return {};
+  }
+}
+
+function writeOrderNotificationSeenCounts(
+  counts: Partial<Record<OrderFilter, number>>
+): void {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.localStorage.setItem(
+      ORDER_NOTIFICATION_SEEN_KEY,
+      JSON.stringify(counts)
+    );
+  } catch {
+    // Ignore storage failures; the dots still work for the current session.
+  }
+}
 
 function shouldReloadOrderFilter(filter: OrderFilter): boolean {
   return LIVE_ORDER_FILTERS.includes(filter);
@@ -348,14 +401,20 @@ async function fetchOrdersWithClientFallback(
   };
 }
 
-async function fetchActiveOrderCount(): Promise<number> {
-  const response = await fetchOrders({
-    status: ACTIVE_ORDER_STATUS_CODES,
-    page: 1,
-    pageSize: 1,
-  });
+async function fetchOrderNotificationCounts(): Promise<
+  Partial<Record<OrderFilter, number>>
+> {
+  const entries = await Promise.all(
+    ORDER_NOTIFICATION_FILTERS.map(async (filter) => {
+      const response = await fetchOrdersWithClientFallback(filter, 1, 1);
+      const count = Number.isFinite(response.total)
+        ? response.total
+        : response.items.length;
+      return [filter, count] as const;
+    })
+  );
 
-  return Number.isFinite(response.total) ? response.total : response.items.length;
+  return Object.fromEntries(entries) as Partial<Record<OrderFilter, number>>;
 }
 
 function formatVariantOptions(
@@ -913,14 +972,23 @@ function OrderCard({
 type TabPagination = { page: number; hasMore: boolean };
 
 export default function OrdersPage() {
+  const searchParams = useSearchParams();
+  const initialFilter = parseOrderFilter(searchParams.get("filter"));
   const [ordersCache, setOrdersCache] = useState<Partial<Record<OrderFilter, ApiOrderListItem[]>>>({});
   const [paginationCache, setPaginationCache] = useState<Partial<Record<OrderFilter, TabPagination>>>({});
-  const [loadingTab, setLoadingTab] = useState<OrderFilter | null>("all");
+  const [loadingTab, setLoadingTab] = useState<OrderFilter | null>(initialFilter);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
   const [activeOrderCount, setActiveOrderCount] = useState<number | null>(null);
-  const [activeFilter, setActiveFilter] = useState<OrderFilter>("all");
+  const [orderNotificationCounts, setOrderNotificationCounts] = useState<
+    Partial<Record<OrderFilter, number>>
+  >({});
+  const [orderNotificationSeenCounts, setOrderNotificationSeenCounts] =
+    useState<Partial<Record<OrderFilter, number>>>(
+      readOrderNotificationSeenCounts
+    );
+  const [activeFilter, setActiveFilter] = useState<OrderFilter>(initialFilter);
   const [query, setQuery] = useState("");
   const [showReviewThankYou, setShowReviewThankYou] = useState(false);
   const [loadedTabs, setLoadedTabs] = useState<Set<OrderFilter>>(
@@ -1013,9 +1081,26 @@ export default function OrdersPage() {
   useEffect(() => {
     let cancelled = false;
 
-    void fetchActiveOrderCount()
-      .then((count) => {
-        if (!cancelled) setActiveOrderCount(count);
+    void fetchOrderNotificationCounts()
+      .then((counts) => {
+        if (cancelled) return;
+        setOrderNotificationCounts(counts);
+        setActiveOrderCount(
+          ORDER_NOTIFICATION_FILTERS.reduce(
+            (total, filter) => total + (counts[filter] ?? 0),
+            0
+          )
+        );
+        setOrderNotificationSeenCounts((current) => {
+          const next = { ...current };
+          for (const filter of ORDER_NOTIFICATION_FILTERS) {
+            const seenCount = next[filter] ?? 0;
+            const currentCount = counts[filter] ?? 0;
+            if (seenCount > currentCount) next[filter] = currentCount;
+          }
+          writeOrderNotificationSeenCounts(next);
+          return next;
+        });
       })
       .catch((countError: unknown) => {
         console.error("[orders] Failed to load active order count", countError);
@@ -1045,8 +1130,22 @@ export default function OrdersPage() {
 
   const normalizedQuery = query.trim().toLocaleLowerCase("th");
 
+  const markOrderNotificationSeen = (filter: OrderFilter) => {
+    if (!ORDER_NOTIFICATION_FILTERS.includes(filter)) return;
+
+    setOrderNotificationSeenCounts((current) => {
+      const next = {
+        ...current,
+        [filter]: orderNotificationCounts[filter] ?? 0,
+      };
+      writeOrderNotificationSeenCounts(next);
+      return next;
+    });
+  };
+
   const handleFilterChange = (filter: OrderFilter) => {
     const filterLoaded = loadedTabs.has(filter);
+    markOrderNotificationSeen(filter);
     setActiveFilter(filter);
     if (shouldReloadOrderFilter(filter)) {
       setLoadingTab(filter);
@@ -1148,6 +1247,9 @@ export default function OrdersPage() {
               <div className="no-scrollbar flex overflow-x-auto border-b border-black/[0.05] px-2 pt-1">
                 {orderTabs.map((filter) => {
                   const isActive = activeFilter === filter.value;
+                  const hasNotification =
+                    (orderNotificationCounts[filter.value] ?? 0) >
+                    (orderNotificationSeenCounts[filter.value] ?? 0);
                   return (
                     <button
                       key={filter.value}
@@ -1158,6 +1260,12 @@ export default function OrdersPage() {
                       }`}
                     >
                       {filter.label}
+                      {hasNotification && (
+                        <span
+                          className="absolute right-1.5 top-2 h-2 w-2 rounded-full bg-brand ring-2 ring-white"
+                          aria-label="มีรายการที่ต้องติดตาม"
+                        />
+                      )}
                       {isActive && (
                         <span className="absolute bottom-0 left-1/2 h-0.5 w-10 -translate-x-1/2 rounded-full bg-brand" />
                       )}

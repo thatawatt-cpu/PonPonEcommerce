@@ -8,7 +8,6 @@ import {
   type SelectHTMLAttributes,
 } from "react";
 import {
-  Bell,
   Building2,
   Check,
   Edit3,
@@ -574,16 +573,6 @@ export default function AddressesPage() {
       <header className="sticky top-0 z-30 border-b border-brand/10 bg-white/95 backdrop-blur">
         <div className="relative mx-auto flex h-16 w-full max-w-md items-center justify-center px-4 md:max-w-5xl md:px-8 xl:max-w-6xl">
           <h1 className="text-xl font-extrabold text-brand">ที่อยู่จัดส่ง</h1>
-          <button
-            type="button"
-            aria-label="การแจ้งเตือน"
-            className="absolute right-4 flex h-11 w-11 items-center justify-center rounded-full text-ink transition active:scale-95 hover:bg-brand-soft md:right-8"
-          >
-            <Bell className="h-7 w-7" />
-            <span className="absolute right-1 top-1 flex h-6 min-w-6 items-center justify-center rounded-full bg-brand px-1 text-xs font-extrabold text-white ring-2 ring-white">
-              2
-            </span>
-          </button>
         </div>
       </header>
 
@@ -793,15 +782,15 @@ export default function AddressesPage() {
         )}
       </PageContainer>
 
-      <div className="fixed inset-x-0 bottom-above-nav z-30 px-5 pb-3 md:px-8">
-        <div className="mx-auto max-w-md md:max-w-5xl xl:max-w-6xl">
+      <div className="promo-action-bar fixed inset-x-0 bottom-above-nav z-30 border-t border-black/[0.05] bg-white/95 backdrop-blur">
+        <div className="mx-auto max-w-md px-4 pb-3 pt-3 md:max-w-5xl md:px-8 xl:max-w-6xl">
           <Button
-            size="lg"
+            size="md"
             fullWidth
             onClick={openCreate}
-            className="h-[4.25rem] text-xl font-extrabold shadow-[0_18px_40px_rgba(237,23,28,0.28)] ring-1 ring-white/50"
+            className="h-12 text-base font-extrabold shadow-[0_10px_24px_rgba(237,23,28,0.2)]"
           >
-            <Plus className="h-7 w-7" />
+            <Plus className="h-5 w-5" />
             เพิ่มที่อยู่ใหม่
           </Button>
         </div>

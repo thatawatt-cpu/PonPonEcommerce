@@ -26,6 +26,7 @@ import { useCartHydrated, useCartStore } from "@/store/cart-store";
 import {
   formatNotificationContext,
   formatNotificationTime,
+  getNotificationLinkTarget,
   useNotificationStore,
   useNotificationsHydrated,
 } from "@/store/notification-store";
@@ -213,10 +214,11 @@ export function AppHeader({
                 {recentNotifications.map((notification) => {
                   const unread = notification.unread;
                   const context = formatNotificationContext(notification);
+                  const href = getNotificationLinkTarget(notification);
                   return (
                     <li key={notification.id}>
                       <Link
-                        href={notification.href}
+                        href={href}
                         onClick={() => {
                           void markRead(notification.id);
                           setNotificationsOpen(false);

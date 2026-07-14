@@ -71,18 +71,7 @@ export function LiffProfileCard({
           <p className="truncate text-base font-bold text-ink">
             {profile.displayName}
           </p>
-          <p className="truncate text-xs text-ink-soft">
-            Customer ID: {profile.lineUserId}
-          </p>
         </div>
-      </div>
-      <div className="mt-3 flex items-center gap-2">
-        <span className="rounded-full bg-brand-soft px-2.5 py-1 text-[10px] font-extrabold text-brand">
-          โหมดทดสอบ
-        </span>
-        <p className="text-[11px] font-medium text-ink-soft">
-          ข้อมูล LINE จำลองสำหรับทดสอบหน้าร้าน
-        </p>
       </div>
     </Card>
   );

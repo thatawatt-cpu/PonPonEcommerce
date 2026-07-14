@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 import {
   formatNotificationContext,
   formatNotificationTime,
+  getNotificationLinkTarget,
   type NotificationCategory,
   useNotificationStore,
   useNotificationsHydrated,
@@ -109,10 +110,11 @@ export default function NotificationsPage() {
             <ul className="divide-y divide-black/[0.05]">
               {filteredNotifications.map((notification) => {
                 const context = formatNotificationContext(notification);
+                const href = getNotificationLinkTarget(notification);
                 return (
                   <li key={notification.id}>
                     <Link
-                      href={notification.href}
+                      href={href}
                       onClick={() => void markRead(notification.id)}
                       className={cn(
                         "flex items-start gap-3 px-4 py-4 transition active:bg-brand-soft",

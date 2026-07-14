@@ -26,6 +26,7 @@ export interface ShopNotificationPayload {
   id?: string;
   type?: string;
   orderId?: string;
+  orderNo?: string;
   orderNumber?: string;
   title?: string;
   message?: string;
@@ -42,6 +43,7 @@ export interface NotificationItem {
   id: string;
   type?: string;
   orderId?: string;
+  orderNo?: string;
   orderNumber?: string;
   title: string;
   description: string;
@@ -151,14 +153,26 @@ export function getShopNotificationDescription(
 }
 
 function getNotificationHref(payload: ShopNotificationPayload): string {
-  if (payload.orderId) {
-    return `/orders/${encodeURIComponent(payload.orderId)}`;
+  const orderTarget = payload.orderId ?? payload.orderNumber ?? payload.orderNo;
+  if (orderTarget) {
+    return `/orders/${encodeURIComponent(orderTarget)}`;
   }
   if (payload.actionUrl) return payload.actionUrl;
-  if (payload.orderNumber) {
-    return `/orders/${encodeURIComponent(payload.orderNumber)}`;
-  }
   return "/notifications";
+}
+
+export function getNotificationLinkTarget(
+  notification: Pick<
+    NotificationItem,
+    "href" | "orderId" | "orderNumber" | "orderNo"
+  >
+): string {
+  const orderTarget =
+    notification.orderId ?? notification.orderNumber ?? notification.orderNo;
+  if (orderTarget) return `/orders/${encodeURIComponent(orderTarget)}`;
+  return notification.href && notification.href !== "#"
+    ? notification.href
+    : "/notifications";
 }
 
 function getNotificationId(payload: ShopNotificationPayload): string {
@@ -166,7 +180,7 @@ function getNotificationId(payload: ShopNotificationPayload): string {
 
   return [
     payload.type ?? "shop",
-    payload.orderId ?? payload.orderNumber ?? "order",
+    payload.orderId ?? payload.orderNumber ?? payload.orderNo ?? "order",
     payload.status ?? "status",
     payload.trackingNumber ?? "tracking",
     payload.createdAtUtc ?? Date.now(),
@@ -180,7 +194,8 @@ function toNotificationItem(
     id: getNotificationId(payload),
     type: payload.type,
     orderId: payload.orderId,
-    orderNumber: payload.orderNumber,
+    orderNo: payload.orderNo,
+    orderNumber: payload.orderNumber ?? payload.orderNo,
     title: getShopNotificationTitle(payload),
     description: getShopNotificationDescription(payload),
     amount: payload.amount,

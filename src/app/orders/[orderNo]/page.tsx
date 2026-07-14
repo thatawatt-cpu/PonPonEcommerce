@@ -31,6 +31,7 @@ import { ProductImage } from "@/components/product/product-image";
 import {
   fetchOrderById,
   cancelOrder,
+  confirmOrderReceived,
   createReturnRequest,
 } from "@/features/orders/order-api";
 import {
@@ -805,6 +806,10 @@ export default function OrderTrackingPage({
   const [cancelReasonDetail, setCancelReasonDetail] = useState("");
   const [cancelError, setCancelError] = useState<string | null>(null);
   const [cancelSuccess, setCancelSuccess] = useState<string | null>(null);
+  const [confirmingReceived, setConfirmingReceived] = useState(false);
+  const [confirmReceiveError, setConfirmReceiveError] = useState<string | null>(
+    null
+  );
   const [showReturnDialog, setShowReturnDialog] = useState(false);
   const [returnReason, setReturnReason] = useState("");
   const [returnReasonDetail, setReturnReasonDetail] = useState("");
@@ -919,6 +924,29 @@ export default function OrderTrackingPage({
     setCancelError(null);
     setCancelSuccess(null);
     setShowCancelDialog(true);
+  };
+
+  const handleConfirmReceived = async () => {
+    if (confirmingReceived || !apiOrder) return;
+
+    setConfirmingReceived(true);
+    setConfirmReceiveError(null);
+
+    try {
+      await confirmOrderReceived(apiOrder.id);
+      const refreshedOrder = await fetchOrderById(id);
+      const fallbackLookup = await buildOrderItemFallbacks(refreshedOrder.items);
+      setApiOrder(refreshedOrder);
+      setOrder(mapApiOrderToOrder(refreshedOrder, fallbackLookup));
+    } catch (error) {
+      setConfirmReceiveError(
+        error instanceof Error
+          ? error.message
+          : "ยืนยันรับสินค้าไม่สำเร็จ กรุณาลองใหม่"
+      );
+    } finally {
+      setConfirmingReceived(false);
+    }
   };
 
   const handleOpenReview = (
@@ -1286,6 +1314,8 @@ export default function OrderTrackingPage({
     REFUNDABLE_PAYMENT_STATUSES.includes(order.paymentStatus);
   const canPayNow =
     order.paymentStatus === "pending" && order.paymentMethod !== "cod";
+  const canConfirmReceived =
+    order.orderStatus === "shipping" && !apiOrder.receivedAtUtc;
   const hasShippingAddress = Boolean(order.address.trim());
   const pendingReviewItem =
     apiOrder.receivedAtUtc
@@ -1350,6 +1380,14 @@ export default function OrderTrackingPage({
             className="rounded-2xl border border-warning/20 bg-warning-soft px-4 py-3 text-sm font-bold leading-relaxed text-warning"
           >
             {cancelSuccess}
+          </div>
+        )}
+        {confirmReceiveError && (
+          <div
+            role="alert"
+            className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-bold leading-relaxed text-red-600"
+          >
+            {confirmReceiveError}
           </div>
         )}
         <section className="overflow-hidden rounded-card bg-white app-panel-shadow ring-1 ring-black/[0.04]">
@@ -1498,6 +1536,20 @@ export default function OrderTrackingPage({
               <QrCode className="h-4 w-4" />
               ชำระเงิน
             </Link>
+          ) : canConfirmReceived ? (
+            <button
+              type="button"
+              onClick={handleConfirmReceived}
+              disabled={confirmingReceived}
+              className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-brand text-sm font-extrabold text-white shadow-[0_10px_24px_rgba(237,23,28,0.22)] transition active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {confirmingReceived ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <PackageCheck className="h-4 w-4" />
+              )}
+              {confirmingReceived ? "กำลังยืนยัน..." : "ได้รับสินค้าแล้ว"}
+            </button>
           ) : canReviewOrder && pendingReviewItem ? (
             <button
               type="button"
