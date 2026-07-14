@@ -1330,12 +1330,14 @@ export default function OrderTrackingPage({
     );
   }
 
-  const canShowManualRefund = REFUNDABLE_PAYMENT_STATUSES.includes(
+  const hasRefundablePaymentStatus = REFUNDABLE_PAYMENT_STATUSES.includes(
     order.paymentStatus
   );
-  const manualRefundLabel = canShowManualRefund
-    ? getManualRefundLabel(apiOrder.omiseRefundStatus)
-    : null;
+  const hasPaidAmount = getApiPaidAmount(apiOrder) > 0;
+  const manualRefundLabel =
+    hasRefundablePaymentStatus || hasPaidAmount
+      ? getManualRefundLabel(apiOrder.omiseRefundStatus)
+      : null;
   const cancellable =
     !manualRefundLabel && CANCELLABLE_STATUSES.includes(order.orderStatus);
   const cancellationNeedsRefund =

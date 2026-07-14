@@ -370,14 +370,20 @@ function getOrderPaymentStatusValue(order: ApiOrderListItem): unknown {
   return Number.isFinite(paymentAmount) && paymentAmount > 0 ? "1" : paymentStatus;
 }
 
+function hasOrderPaymentAmount(order: ApiOrderListItem): boolean {
+  const paymentAmount = Number(order.paymentAmount);
+  return Number.isFinite(paymentAmount) && paymentAmount > 0;
+}
+
 function isRefundablePaymentStatus(status: unknown): boolean {
   return ["1", "3", "4"].includes(getPaymentStatusCode(status));
 }
 
 function hasManualRefundStatus(order: ApiOrderListItem): boolean {
   return (
-    isRefundablePaymentStatus(getOrderPaymentStatusValue(order)) &&
-    normalizeOmiseRefundStatus(order.omiseRefundStatus) != null
+    normalizeOmiseRefundStatus(order.omiseRefundStatus) != null &&
+    (isRefundablePaymentStatus(getOrderPaymentStatusValue(order)) ||
+      hasOrderPaymentAmount(order))
   );
 }
 
@@ -690,9 +696,7 @@ function OrderCard({
   const [selectedPromptRating, setSelectedPromptRating] = useState(0);
   const ratingPromptTimerRef = useRef<number | null>(null);
   const orderStatus = mapStatus(order.status);
-  const canShowManualRefund = isRefundablePaymentStatus(
-    getOrderPaymentStatusValue(order)
-  );
+  const canShowManualRefund = hasManualRefundStatus(order);
   const manualRefundStatus = canShowManualRefund
     ? normalizeOmiseRefundStatus(order.omiseRefundStatus)
     : null;
