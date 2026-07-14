@@ -59,7 +59,7 @@ import type {
 
 type ReviewMedia =
   | { type: "image"; imageUrl: string }
-  | { type: "video"; imageUrl: string; videoUrl: string };
+  | { type: "video"; thumbnailUrl?: string | null; videoUrl: string };
 
 type ReviewFilter = "all" | "media" | "5" | "4" | "3" | "2" | "1" | "latest";
 type DetailTab = "detail" | "shipping" | "review";
@@ -208,7 +208,7 @@ function getReviewMediaPreview(media: ProductReviewMedia): ReviewMedia | null {
   if (media.type === "video") {
     return {
       type: "video",
-      imageUrl: media.thumbnailUrl || media.url,
+      thumbnailUrl: media.thumbnailUrl,
       videoUrl: media.url,
     };
   }
@@ -217,6 +217,38 @@ function getReviewMediaPreview(media: ProductReviewMedia): ReviewMedia | null {
     type: "image",
     imageUrl: media.thumbnailUrl || media.url,
   };
+}
+
+function ReviewMediaThumbnail({
+  media,
+  product,
+  className,
+}: {
+  media: ReviewMedia;
+  product: Product;
+  className?: string;
+}) {
+  if (media.type === "video") {
+    return (
+      <video
+        src={media.videoUrl}
+        poster={media.thumbnailUrl ?? undefined}
+        preload="metadata"
+        muted
+        playsInline
+        className={cn("h-full w-full object-cover", className)}
+      />
+    );
+  }
+
+  return (
+    <ProductImage
+      imageUrl={media.imageUrl}
+      emoji={product.emoji}
+      size="sm"
+      className={cn("h-full w-full", className)}
+    />
+  );
 }
 
 function getReviewName(review: ProductReview): string {
@@ -1350,12 +1382,7 @@ export function ProductDetailClient({
                                 className="relative h-14 w-14 overflow-hidden rounded-xl ring-1 ring-black/[0.04]"
                                 aria-label={media.type === "video" ? "เปิดวิดีโอรีวิว" : "เปิดรูปรีวิว"}
                               >
-                                <ProductImage
-                                  imageUrl={media.imageUrl}
-                                  emoji={product.emoji}
-                                  size="sm"
-                                  className="h-full w-full"
-                                />
+                                <ReviewMediaThumbnail media={media} product={product} />
                                 {media.type === "video" && (
                                   <span className="absolute inset-0 flex items-center justify-center bg-black/20">
                                     <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white pl-0.5 text-[9px] font-bold text-brand">▶</span>
@@ -1557,16 +1584,17 @@ export function ProductDetailClient({
                             aria-label={media.type === "video" ? "เปิดวิดีโอรีวิว" : "เปิดรูปรีวิว"}
                           >
                             {media.type === "video" && "videoUrl" in media && media.videoUrl ? (
-                              <video
-                                src={media.videoUrl}
-                                poster={media.imageUrl}
-                                preload="metadata"
-                                muted
-                                playsInline
-                                className="h-full w-full rounded-2xl object-cover"
+                              <ReviewMediaThumbnail
+                                media={media}
+                                product={product}
+                                className="rounded-2xl"
                               />
                             ) : (
-                              <ProductImage imageUrl={media.imageUrl} emoji={product.emoji} size="sm" className="h-full w-full rounded-2xl" />
+                              <ReviewMediaThumbnail
+                                media={media}
+                                product={product}
+                                className="rounded-2xl"
+                              />
                             )}
                             {media.type === "video" && (
                               <span className="absolute inset-0 flex items-center justify-center bg-black/20">
@@ -1615,7 +1643,7 @@ export function ProductDetailClient({
               {activeReviewMedia.type === "video" ? (
                 <video
                   src={activeReviewMedia.videoUrl}
-                  poster={activeReviewMedia.imageUrl}
+                  poster={activeReviewMedia.thumbnailUrl ?? undefined}
                   controls
                   autoPlay
                   playsInline
