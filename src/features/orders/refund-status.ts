@@ -23,9 +23,9 @@ export function normalizeOmiseRefundStatus(
 export function getManualRefundLabel(status: unknown): string | null {
   switch (normalizeOmiseRefundStatus(status)) {
     case "manual_refund_pending":
-      return "รอร้านค้าคืนเงิน";
+      return "รอคืนเงิน";
     case "manual_refunded":
-      return "ร้านค้าคืนเงินเรียบร้อยแล้ว";
+      return "คืนเงินสำเร็จ";
     default:
       return null;
   }

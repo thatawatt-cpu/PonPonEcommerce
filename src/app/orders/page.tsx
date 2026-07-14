@@ -33,7 +33,10 @@ import { OrderStatusBadge } from "@/components/ui/status-badge";
 import { ProductImage } from "@/components/product/product-image";
 import { confirmOrderReceived, fetchOrders } from "@/features/orders/order-api";
 import { storeCartSelectionCheckout } from "@/features/checkout/cart-selection-checkout";
-import { getManualRefundLabel } from "@/features/orders/refund-status";
+import {
+  getManualRefundLabel,
+  normalizeOmiseRefundStatus,
+} from "@/features/orders/refund-status";
 import { formatBaht, formatDate } from "@/lib/format";
 import { getCartItemKey, useCartStore } from "@/store/cart-store";
 import type {
@@ -51,6 +54,7 @@ type OrderFilter =
   | "awaiting_receive"
   | "awaiting_review"
   | "completed"
+  | "canceled"
   | "return_refund";
 
 const orderTabs: {
@@ -100,11 +104,16 @@ const orderTabs: {
     apiFilter: "completed",
   },
   {
+    value: "canceled",
+    label: "ยกเลิก",
+    status: ["2"],
+    paymentstatus: null,
+  },
+  {
     value: "return_refund",
     label: "คืนเงิน/คืนสินค้า",
-    status: ["2", "4", "7"],
+    status: ["4", "7"],
     paymentstatus: null,
-    apiFilter: "return_refund",
   },
 ];
 
@@ -140,10 +149,12 @@ const ORDER_NOTIFICATION_FILTERS: OrderFilter[] = [
   "awaiting_receive",
   "return_refund",
 ];
+const ORDER_NOTIFICATION_COUNTS_KEY = "ponpon.orders.notificationCounts";
 const ORDER_NOTIFICATION_SEEN_KEY = "ponpon.orders.notificationSeenCounts";
 const LIVE_ORDER_FILTERS: OrderFilter[] = [
   "awaiting_receive",
   "completed",
+  "canceled",
   "return_refund",
   "awaiting_review",
 ];
@@ -173,41 +184,77 @@ function parseOrderFilter(value: string | null): OrderFilter {
     : "all";
 }
 
-function readOrderNotificationSeenCounts(): Partial<Record<OrderFilter, number>> {
+function sanitizeOrderNotificationCounts(
+  data: Partial<Record<OrderFilter, unknown>>
+): Partial<Record<OrderFilter, number>> {
+  return ORDER_NOTIFICATION_FILTERS.reduce<Partial<Record<OrderFilter, number>>>(
+    (counts, filter) => {
+      const value = data[filter];
+      if (typeof value === "number" && Number.isFinite(value) && value >= 0) {
+        counts[filter] = value;
+      }
+      return counts;
+    },
+    {}
+  );
+}
+
+function readOrderNotificationStorage(
+  key: string
+): Partial<Record<OrderFilter, number>> {
   if (typeof window === "undefined") return {};
 
   try {
-    const raw = window.localStorage.getItem(ORDER_NOTIFICATION_SEEN_KEY);
+    const raw = window.localStorage.getItem(key);
     if (!raw) return {};
-    const data = JSON.parse(raw) as Partial<Record<OrderFilter, unknown>>;
-    return ORDER_NOTIFICATION_FILTERS.reduce<Partial<Record<OrderFilter, number>>>(
-      (counts, filter) => {
-        const value = data[filter];
-        if (typeof value === "number" && Number.isFinite(value) && value >= 0) {
-          counts[filter] = value;
-        }
-        return counts;
-      },
-      {}
+    return sanitizeOrderNotificationCounts(
+      JSON.parse(raw) as Partial<Record<OrderFilter, unknown>>
     );
   } catch {
     return {};
   }
 }
 
-function writeOrderNotificationSeenCounts(
+function writeOrderNotificationStorage(
+  key: string,
   counts: Partial<Record<OrderFilter, number>>
 ): void {
   if (typeof window === "undefined") return;
 
   try {
-    window.localStorage.setItem(
-      ORDER_NOTIFICATION_SEEN_KEY,
-      JSON.stringify(counts)
-    );
+    window.localStorage.setItem(key, JSON.stringify(counts));
   } catch {
     // Ignore storage failures; the dots still work for the current session.
   }
+}
+
+function readOrderNotificationCounts(): Partial<Record<OrderFilter, number>> {
+  return readOrderNotificationStorage(ORDER_NOTIFICATION_COUNTS_KEY);
+}
+
+function writeOrderNotificationCounts(
+  counts: Partial<Record<OrderFilter, number>>
+): void {
+  writeOrderNotificationStorage(ORDER_NOTIFICATION_COUNTS_KEY, counts);
+}
+
+function readOrderNotificationSeenCounts(): Partial<Record<OrderFilter, number>> {
+  return readOrderNotificationStorage(ORDER_NOTIFICATION_SEEN_KEY);
+}
+
+function writeOrderNotificationSeenCounts(
+  counts: Partial<Record<OrderFilter, number>>
+): void {
+  writeOrderNotificationStorage(ORDER_NOTIFICATION_SEEN_KEY, counts);
+}
+
+function getOrderNotificationTotal(
+  counts: Partial<Record<OrderFilter, number>>
+): number {
+  return ORDER_NOTIFICATION_FILTERS.reduce(
+    (total, filter) => total + (counts[filter] ?? 0),
+    0
+  );
 }
 
 function shouldReloadOrderFilter(filter: OrderFilter): boolean {
@@ -312,6 +359,10 @@ function getOrderPaymentStatusValue(order: ApiOrderListItem): unknown {
 
   const paymentAmount = Number(order.paymentAmount);
   return Number.isFinite(paymentAmount) && paymentAmount > 0 ? "1" : paymentStatus;
+}
+
+function isRefundablePaymentStatus(status: unknown): boolean {
+  return ["1", "3", "4"].includes(getPaymentStatusCode(status));
 }
 
 function matchesOrderFilter(
@@ -454,12 +505,33 @@ function isOrderReviewed(order: ApiOrderListItem): boolean {
 
 function hasPendingReview(order: ApiOrderListItem): boolean {
   if (!order.receivedAtUtc) return false;
+  const source = order as ApiOrderListItem & {
+    hasPendingReview?: boolean | null;
+    pendingReviewCount?: number | null;
+    isReviewed?: boolean | null;
+  };
+
+  if (typeof source.hasPendingReview === "boolean") {
+    return source.hasPendingReview;
+  }
+  if (
+    typeof source.pendingReviewCount === "number" &&
+    Number.isFinite(source.pendingReviewCount)
+  ) {
+    return source.pendingReviewCount > 0;
+  }
+
   const items = order.itemsPreview ?? [];
   if (items.length > 0) {
     return items.some((item) => !isOrderPreviewItemReviewed(item));
   }
+
+  if (source.isReviewed === false && (order.itemsCount ?? 0) > 0) {
+    return true;
+  }
+
   if (isOrderReviewed(order)) return false;
-  return (order.itemsCount ?? 0) > 0;
+  return false;
 }
 
 function isAwaitingReceive(order: ApiOrderListItem): boolean {
@@ -587,7 +659,19 @@ function OrderCard({
   const [selectedPromptRating, setSelectedPromptRating] = useState(0);
   const ratingPromptTimerRef = useRef<number | null>(null);
   const orderStatus = mapStatus(order.status);
-  const manualRefundLabel = getManualRefundLabel(order.omiseRefundStatus);
+  const canShowManualRefund = isRefundablePaymentStatus(
+    getOrderPaymentStatusValue(order)
+  );
+  const manualRefundStatus = canShowManualRefund
+    ? normalizeOmiseRefundStatus(order.omiseRefundStatus)
+    : null;
+  const manualRefundLabel = canShowManualRefund
+    ? getManualRefundLabel(order.omiseRefundStatus)
+    : null;
+  const manualRefundBadgeClass =
+    manualRefundStatus === "manual_refunded"
+      ? "bg-success-soft text-success"
+      : "bg-warning-soft text-warning";
   const progress = progressByStatus[orderStatus];
   const isShipped = orderStatus === "shipping";
   const visiblePreviewItems = itemsExpanded ? previewItems : previewItems.slice(0, 1);
@@ -723,7 +807,9 @@ function OrderCard({
           </div>
           <div className="shrink-0 text-right">
             {manualRefundLabel ? (
-              <span className="inline-flex items-center justify-center whitespace-nowrap rounded-full bg-warning-soft px-3 py-1.5 text-[11px] font-bold leading-none text-warning shadow-sm ring-1 ring-current/10">
+              <span
+                className={`inline-flex items-center justify-center whitespace-nowrap rounded-full px-3 py-1.5 text-[11px] font-bold leading-none shadow-sm ring-1 ring-current/10 ${manualRefundBadgeClass}`}
+              >
                 <span className="block translate-y-px">
                   {manualRefundLabel}
                 </span>
@@ -975,18 +1061,34 @@ type TabPagination = { page: number; hasMore: boolean };
 function OrdersPageContent() {
   const searchParams = useSearchParams();
   const initialFilter = parseOrderFilter(searchParams.get("filter"));
+  const initialNotificationCounts = useMemo(
+    () => readOrderNotificationCounts(),
+    []
+  );
+  const initialNotificationSeenCounts = useMemo(
+    () => readOrderNotificationSeenCounts(),
+    []
+  );
+  const hasInitialNotificationCounts =
+    Object.keys(initialNotificationCounts).length > 0;
   const [ordersCache, setOrdersCache] = useState<Partial<Record<OrderFilter, ApiOrderListItem[]>>>({});
   const [paginationCache, setPaginationCache] = useState<Partial<Record<OrderFilter, TabPagination>>>({});
   const [loadingTab, setLoadingTab] = useState<OrderFilter | null>(initialFilter);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
-  const [activeOrderCount, setActiveOrderCount] = useState<number | null>(null);
+  const [activeOrderCount, setActiveOrderCount] = useState<number | null>(
+    hasInitialNotificationCounts
+      ? getOrderNotificationTotal(initialNotificationCounts)
+      : null
+  );
   const [orderNotificationCounts, setOrderNotificationCounts] = useState<
     Partial<Record<OrderFilter, number>>
-  >({});
+  >(initialNotificationCounts);
   const [orderNotificationSeenCounts, setOrderNotificationSeenCounts] =
-    useState<Partial<Record<OrderFilter, number>>>({});
+    useState<Partial<Record<OrderFilter, number>>>(
+      initialNotificationSeenCounts
+    );
   const [activeFilter, setActiveFilter] = useState<OrderFilter>(initialFilter);
   const [query, setQuery] = useState("");
   const [showReviewThankYou, setShowReviewThankYou] = useState(false);
@@ -994,6 +1096,9 @@ function OrdersPageContent() {
     () => new Set()
   );
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
+  const filterButtonRefs = useRef<Partial<Record<OrderFilter, HTMLButtonElement>>>(
+    {}
+  );
   const fetchingRef = useRef(false);
   const loadedTabsRef = useRef<Set<OrderFilter>>(new Set());
 
@@ -1063,7 +1168,15 @@ function OrdersPageContent() {
         setLoadingMore(false);
       }
     },
-    []
+    [
+      setError,
+      setLoadMoreError,
+      setLoadingMore,
+      setLoadingTab,
+      setLoadedTabs,
+      setOrdersCache,
+      setPaginationCache,
+    ]
   );
 
   useEffect(() => {
@@ -1078,18 +1191,26 @@ function OrdersPageContent() {
   }, [activeFilter, loadOrdersPage, loadedTabs]);
 
   useEffect(() => {
+    const timer = window.setTimeout(() => {
+      filterButtonRefs.current[activeFilter]?.scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+        inline: "center",
+      });
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [activeFilter]);
+
+  useEffect(() => {
     let cancelled = false;
 
     void fetchOrderNotificationCounts()
       .then((counts) => {
         if (cancelled) return;
         setOrderNotificationCounts(counts);
-        setActiveOrderCount(
-          ORDER_NOTIFICATION_FILTERS.reduce(
-            (total, filter) => total + (counts[filter] ?? 0),
-            0
-          )
-        );
+        writeOrderNotificationCounts(counts);
+        setActiveOrderCount(getOrderNotificationTotal(counts));
         const storedSeenCounts = readOrderNotificationSeenCounts();
         setOrderNotificationSeenCounts(() => {
           const next = { ...storedSeenCounts };
@@ -1253,6 +1374,13 @@ function OrdersPageContent() {
                   return (
                     <button
                       key={filter.value}
+                      ref={(node) => {
+                        if (node) {
+                          filterButtonRefs.current[filter.value] = node;
+                        } else {
+                          delete filterButtonRefs.current[filter.value];
+                        }
+                      }}
                       type="button"
                       onClick={() => handleFilterChange(filter.value)}
                       className={`relative flex shrink-0 items-center gap-1.5 px-3 py-3 text-xs font-bold transition ${

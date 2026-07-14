@@ -13,7 +13,7 @@ export function ReorderSection({ products }: { products: Product[] }) {
           ซื้ออีกครั้ง
         </h2>
         <Link
-          href="/orders"
+          href="/orders?filter=completed"
           className="rounded-full bg-white px-3 py-1 text-xs font-bold text-brand shadow-sm"
         >
           ดูประวัติ

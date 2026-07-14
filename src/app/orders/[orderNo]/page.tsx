@@ -862,12 +862,17 @@ export default function OrderTrackingPage({
       });
       setShowCancelDialog(false);
 
+      const shouldHandleRefund = order
+        ? REFUNDABLE_PAYMENT_STATUSES.includes(order.paymentStatus)
+        : false;
       const refreshedOrder = await fetchOrderById(id).catch(() => null);
-      const refundStatus = normalizeOmiseRefundStatus(
-        refreshedOrder?.omiseRefundStatus ??
-          cancelResult.omiseRefundStatus ??
-          cancelResult.order?.omiseRefundStatus
-      );
+      const refundStatus = shouldHandleRefund
+        ? normalizeOmiseRefundStatus(
+            refreshedOrder?.omiseRefundStatus ??
+              cancelResult.omiseRefundStatus ??
+              cancelResult.order?.omiseRefundStatus
+          )
+        : null;
 
       if (refundStatus) {
         if (refreshedOrder) {
@@ -900,6 +905,16 @@ export default function OrderTrackingPage({
         return;
       }
 
+      if (refreshedOrder) {
+        const fallbackLookup = await buildOrderItemFallbacks(
+          refreshedOrder.items
+        );
+        setApiOrder({
+          ...refreshedOrder,
+          omiseRefundStatus: null,
+        });
+        setOrder(mapApiOrderToOrder(refreshedOrder, fallbackLookup));
+      }
       setOrder((prev) =>
         prev
           ? {
@@ -907,9 +922,10 @@ export default function OrderTrackingPage({
               orderStatus: "voided",
               timeline: buildTimeline("voided"),
             }
-          : prev
+              : prev
       );
-      router.push("/orders");
+      setCancelSuccess("ยกเลิกคำสั่งซื้อของคุณเรียบร้อยแล้ว");
+      setCancelling(false);
     } catch (err) {
       setCancelError(
         err instanceof Error ? err.message : "ยกเลิกออเดอร์ไม่สำเร็จ"
@@ -1304,9 +1320,12 @@ export default function OrderTrackingPage({
     );
   }
 
-  const manualRefundLabel = getManualRefundLabel(
-    apiOrder.omiseRefundStatus
+  const canShowManualRefund = REFUNDABLE_PAYMENT_STATUSES.includes(
+    order.paymentStatus
   );
+  const manualRefundLabel = canShowManualRefund
+    ? getManualRefundLabel(apiOrder.omiseRefundStatus)
+    : null;
   const cancellable =
     !manualRefundLabel && CANCELLABLE_STATUSES.includes(order.orderStatus);
   const cancellationNeedsRefund =
