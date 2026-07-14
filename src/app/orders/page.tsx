@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Suspense,
   useCallback,
   useEffect,
   useMemo,
@@ -971,7 +972,7 @@ function OrderCard({
 
 type TabPagination = { page: number; hasMore: boolean };
 
-export default function OrdersPage() {
+function OrdersPageContent() {
   const searchParams = useSearchParams();
   const initialFilter = parseOrderFilter(searchParams.get("filter"));
   const [ordersCache, setOrdersCache] = useState<Partial<Record<OrderFilter, ApiOrderListItem[]>>>({});
@@ -1426,5 +1427,13 @@ export default function OrdersPage() {
         </div>
       )}
     </>
+  );
+}
+
+export default function OrdersPage() {
+  return (
+    <Suspense fallback={null}>
+      <OrdersPageContent />
+    </Suspense>
   );
 }
