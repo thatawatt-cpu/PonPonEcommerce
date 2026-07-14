@@ -167,14 +167,13 @@ export default function ProfilePage() {
   ];
 
   const markBenefitSeen = (key: ProfileBenefitKey) => {
-    setBenefitSeenCounts((current) => {
-      const next = {
-        ...current,
-        [key]: profileCounts?.[key] ?? 0,
-      };
-      writeProfileBenefitSeenCounts(next);
-      return next;
-    });
+    const next = {
+      ...readProfileBenefitSeenCounts(),
+      ...benefitSeenCounts,
+      [key]: profileCounts?.[key] ?? 0,
+    };
+    writeProfileBenefitSeenCounts(next);
+    setBenefitSeenCounts(next);
   };
 
   const handleRetryLogin = async () => {
@@ -219,6 +218,7 @@ export default function ProfilePage() {
                 <Link
                   key={label}
                   href={href}
+                  onPointerDown={() => markBenefitSeen(countKey)}
                   onClick={() => markBenefitSeen(countKey)}
                   className="flex min-w-0 flex-col items-center rounded-2xl bg-[#fff8f6] px-2 py-3 text-center transition active:scale-95"
                 >
