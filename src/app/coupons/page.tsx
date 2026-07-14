@@ -188,9 +188,13 @@ function mapApiCoupon(coupon: ApiCouponListItem): CouponItem | null {
 export default function CouponsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ returnTo?: string; selected?: string }>;
+  searchParams: Promise<{
+    returnTo?: string;
+    selected?: string;
+    mode?: string;
+  }>;
 }) {
-  const { returnTo, selected } = use(searchParams);
+  const { returnTo, selected, mode } = use(searchParams);
   const router = useRouter();
   const [activeFilter, setActiveFilter] = useState<CouponFilter>("available");
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
@@ -263,7 +267,9 @@ export default function CouponsPage({
       coupons: couponCodes.join(","),
     });
 
-    if (getStoredBuyNowCheckout()) {
+    if (mode === "buy-now" || mode === "cart-selection") {
+      params.set("mode", mode);
+    } else if (getStoredBuyNowCheckout()) {
       params.set("mode", "buy-now");
     } else if (getStoredCartSelectionCheckout().length > 0) {
       params.set("mode", "cart-selection");

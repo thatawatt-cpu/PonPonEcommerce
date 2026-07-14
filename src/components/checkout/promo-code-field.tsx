@@ -20,6 +20,7 @@ interface PromoCodeFieldProps {
   onChange: (value: string) => void;
   onApply: () => void;
   onRemove: (code: string) => void;
+  checkoutMode?: "buy-now" | "cart-selection";
   selectedCouponCodes?: string[];
   appliedCoupons?: AppliedCouponDisplay[];
   couponAvailabilityByCode?: Record<string, CouponAvailabilityDisplay>;
@@ -34,6 +35,7 @@ export function PromoCodeField({
   onChange,
   onApply,
   onRemove,
+  checkoutMode,
   selectedCouponCodes,
   appliedCoupons = [],
   couponAvailabilityByCode = {},
@@ -47,13 +49,12 @@ export function PromoCodeField({
   const appliedCouponByCode = new Map(
     appliedCoupons.map((coupon) => [coupon.code, coupon])
   );
-  const couponPickerHref =
-    selectedCodes.length > 0
-      ? `/coupons?${new URLSearchParams({
-          returnTo: "checkout",
-          selected: selectedCodes.join(","),
-        }).toString()}`
-      : "/coupons?returnTo=checkout";
+  const couponPickerParams = new URLSearchParams({ returnTo: "checkout" });
+  if (checkoutMode) couponPickerParams.set("mode", checkoutMode);
+  if (selectedCodes.length > 0) {
+    couponPickerParams.set("selected", selectedCodes.join(","));
+  }
+  const couponPickerHref = `/coupons?${couponPickerParams.toString()}`;
   const normalizedValue = value.trim().toUpperCase();
   const typedAvailability = normalizedValue
     ? couponAvailabilityByCode[normalizedValue]

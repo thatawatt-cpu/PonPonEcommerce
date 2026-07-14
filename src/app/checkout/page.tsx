@@ -416,6 +416,8 @@ export default function CheckoutPage({
   // const membershipHydrated = useMembershipHydrated();
   const isBuyNowCheckout = mode === "buy-now";
   const isCartSelectionCheckout = mode === "cart-selection";
+  const couponCheckoutMode =
+    isBuyNowCheckout || isCartSelectionCheckout ? mode : undefined;
 
   const cartItems = useCartStore((s) => s.items);
   const cartSubtotal = useCartStore((s) => s.subtotal());
@@ -1813,6 +1815,7 @@ export default function CheckoutPage({
               }}
               onApply={applyPromoCode}
               onRemove={removePromoCode}
+              checkoutMode={couponCheckoutMode}
               selectedCouponCodes={couponCodes}
               appliedCoupons={displayAppliedCoupons}
               couponAvailabilityByCode={couponAvailabilityByCode}
