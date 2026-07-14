@@ -184,6 +184,15 @@ function parseOrderFilter(value: string | null): OrderFilter {
     : "all";
 }
 
+function isPageReload(): boolean {
+  if (typeof window === "undefined") return false;
+
+  const navigation = window.performance.getEntriesByType("navigation")[0] as
+    | PerformanceNavigationTiming
+    | undefined;
+  return navigation?.type === "reload";
+}
+
 function sanitizeOrderNotificationCounts(
   data: Partial<Record<OrderFilter, unknown>>
 ): Partial<Record<OrderFilter, number>> {
@@ -1059,8 +1068,12 @@ function OrderCard({
 type TabPagination = { page: number; hasMore: boolean };
 
 function OrdersPageContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
-  const initialFilter = parseOrderFilter(searchParams.get("filter"));
+  const initialFilter = useMemo(() => {
+    if (isPageReload()) return "all";
+    return parseOrderFilter(searchParams.get("filter"));
+  }, [searchParams]);
   const initialNotificationCounts = useMemo(
     () => readOrderNotificationCounts(),
     []
@@ -1101,6 +1114,7 @@ function OrdersPageContent() {
   );
   const fetchingRef = useRef(false);
   const loadedTabsRef = useRef<Set<OrderFilter>>(new Set());
+  const reloadUrlResetRef = useRef(false);
 
   useEffect(() => {
     if (window.sessionStorage.getItem("ponpon.review.thank-you") !== "1") return;
@@ -1109,6 +1123,14 @@ function OrdersPageContent() {
     const timer = window.setTimeout(() => setShowReviewThankYou(true), 0);
     return () => window.clearTimeout(timer);
   }, []);
+
+  useEffect(() => {
+    if (reloadUrlResetRef.current) return;
+    if (!isPageReload() || !searchParams.has("filter")) return;
+
+    reloadUrlResetRef.current = true;
+    router.replace("/orders", { scroll: false });
+  }, [router, searchParams]);
 
   const orders = ordersCache[activeFilter] ?? EMPTY_ORDERS;
   const { page = 0, hasMore = true } = paginationCache[activeFilter] ?? {};

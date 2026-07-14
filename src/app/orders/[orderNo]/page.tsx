@@ -48,6 +48,7 @@ import {
   getManualRefundLabel,
   normalizeOmiseRefundStatus,
 } from "@/features/orders/refund-status";
+import { dispatchShopNotificationToast } from "@/lib/shop-notification-toast";
 import { openExternalWindow } from "@/lib/liff";
 import { LINE_OA_URL } from "@/lib/constants";
 import { formatBaht, formatDateTime } from "@/lib/format";
@@ -805,7 +806,6 @@ export default function OrderTrackingPage({
   const [cancelReason, setCancelReason] = useState("");
   const [cancelReasonDetail, setCancelReasonDetail] = useState("");
   const [cancelError, setCancelError] = useState<string | null>(null);
-  const [cancelSuccess, setCancelSuccess] = useState<string | null>(null);
   const [confirmingReceived, setConfirmingReceived] = useState(false);
   const [confirmReceiveError, setConfirmReceiveError] = useState<string | null>(
     null
@@ -898,9 +898,14 @@ export default function OrderTrackingPage({
               : prev
           );
         }
-        setCancelSuccess(
-          "ได้รับคำขอคืนเงินแล้ว ร้านค้าจะตรวจสอบและดำเนินการคืนเงินให้ภายหลัง"
-        );
+        dispatchShopNotificationToast({
+          type: "refund_requested",
+          orderId: id,
+          orderNumber: order?.orderNo,
+          message:
+            "ได้รับคำขอคืนเงินแล้ว ร้านค้าจะตรวจสอบและดำเนินการคืนเงินให้ภายหลัง",
+          createdAtUtc: new Date().toISOString(),
+        });
         setCancelling(false);
         return;
       }
@@ -924,7 +929,13 @@ export default function OrderTrackingPage({
             }
               : prev
       );
-      setCancelSuccess("ยกเลิกคำสั่งซื้อของคุณเรียบร้อยแล้ว");
+      dispatchShopNotificationToast({
+        type: "order_cancelled",
+        orderId: id,
+        orderNumber: order?.orderNo,
+        message: "ยกเลิกคำสั่งซื้อของคุณเรียบร้อยแล้ว",
+        createdAtUtc: new Date().toISOString(),
+      });
       setCancelling(false);
     } catch (err) {
       setCancelError(
@@ -938,7 +949,6 @@ export default function OrderTrackingPage({
     setCancelReason("");
     setCancelReasonDetail("");
     setCancelError(null);
-    setCancelSuccess(null);
     setShowCancelDialog(true);
   };
 
@@ -1393,14 +1403,6 @@ export default function OrderTrackingPage({
         </PageContainer>
       ) : (
       <PageContainer className="space-y-3 pt-4 pb-36 md:max-w-5xl md:px-8 xl:max-w-6xl">
-        {cancelSuccess && (
-          <div
-            role="status"
-            className="rounded-2xl border border-warning/20 bg-warning-soft px-4 py-3 text-sm font-bold leading-relaxed text-warning"
-          >
-            {cancelSuccess}
-          </div>
-        )}
         {confirmReceiveError && (
           <div
             role="alert"

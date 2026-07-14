@@ -32,7 +32,9 @@ interface ToastNotification {
 
 const TOAST_DURATION_MS = 6000;
 const IMPORTANT_TOAST_TYPES = new Set<ShopNotificationType>([
+  "order_cancelled",
   "payment_succeeded",
+  "refund_requested",
   "shipping_booked",
   "shipping_status",
   "refund_completed",

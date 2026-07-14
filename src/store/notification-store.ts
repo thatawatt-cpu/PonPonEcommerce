@@ -8,6 +8,7 @@ import { parseApiTime } from "@/lib/date-time";
 
 export type ShopNotificationType =
   | "order_created"
+  | "order_cancelled"
   | "payment_created"
   | "payment_succeeded"
   | "payment_expired"
@@ -72,6 +73,7 @@ const MAX_NOTIFICATIONS = 50;
 
 const NOTIFICATION_TITLE_BY_TYPE: Record<ShopNotificationType, string> = {
   order_created: "สร้างคำสั่งซื้อแล้ว",
+  order_cancelled: "ยกเลิกคำสั่งซื้อสำเร็จ",
   payment_created: "พร้อมชำระเงิน",
   payment_succeeded: "ชำระเงินสำเร็จ",
   payment_expired: "หมดเวลาชำระเงิน",
@@ -114,6 +116,10 @@ export function getShopNotificationDescription(
 
   if (payload.type === "payment_created") {
     return "คำสั่งซื้อพร้อมสำหรับการชำระเงินแล้ว";
+  }
+
+  if (payload.type === "order_cancelled") {
+    return "ยกเลิกคำสั่งซื้อของคุณเรียบร้อยแล้ว";
   }
 
   if (payload.type === "payment_succeeded") {
