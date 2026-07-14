@@ -985,9 +985,7 @@ export default function OrdersPage() {
     Partial<Record<OrderFilter, number>>
   >({});
   const [orderNotificationSeenCounts, setOrderNotificationSeenCounts] =
-    useState<Partial<Record<OrderFilter, number>>>(
-      readOrderNotificationSeenCounts
-    );
+    useState<Partial<Record<OrderFilter, number>>>({});
   const [activeFilter, setActiveFilter] = useState<OrderFilter>(initialFilter);
   const [query, setQuery] = useState("");
   const [showReviewThankYou, setShowReviewThankYou] = useState(false);
@@ -1091,8 +1089,9 @@ export default function OrdersPage() {
             0
           )
         );
-        setOrderNotificationSeenCounts((current) => {
-          const next = { ...current };
+        const storedSeenCounts = readOrderNotificationSeenCounts();
+        setOrderNotificationSeenCounts(() => {
+          const next = { ...storedSeenCounts };
           for (const filter of ORDER_NOTIFICATION_FILTERS) {
             const seenCount = next[filter] ?? 0;
             const currentCount = counts[filter] ?? 0;

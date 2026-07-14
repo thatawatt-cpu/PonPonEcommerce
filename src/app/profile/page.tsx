@@ -99,7 +99,7 @@ export default function ProfilePage() {
   );
   const [benefitSeenCounts, setBenefitSeenCounts] = useState<
     Partial<Record<ProfileBenefitKey, number>>
-  >(readProfileBenefitSeenCounts);
+  >({});
 
   useEffect(() => {
     let cancelled = false;
@@ -113,8 +113,9 @@ export default function ProfilePage() {
             recentlyViewedCount: me.recentlyViewedCount,
           };
           setProfileCounts(nextCounts);
-          setBenefitSeenCounts((current) => {
-            const next = { ...current };
+          const storedSeenCounts = readProfileBenefitSeenCounts();
+          setBenefitSeenCounts(() => {
+            const next = { ...storedSeenCounts };
             for (const key of profileBenefitKeys) {
               const seenCount = next[key] ?? 0;
               const currentCount = nextCounts[key];
