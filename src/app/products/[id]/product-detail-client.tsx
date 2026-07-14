@@ -229,10 +229,20 @@ function ReviewMediaThumbnail({
   className?: string;
 }) {
   if (media.type === "video") {
+    if (media.thumbnailUrl) {
+      return (
+        <ProductImage
+          imageUrl={media.thumbnailUrl}
+          emoji={product.emoji}
+          size="sm"
+          className={cn("h-full w-full", className)}
+        />
+      );
+    }
+
     return (
       <video
         src={media.videoUrl}
-        poster={media.thumbnailUrl ?? undefined}
         preload="metadata"
         muted
         playsInline
@@ -1583,19 +1593,11 @@ export function ProductDetailClient({
                             className="relative h-16 w-16 shrink-0 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-black/[0.04]"
                             aria-label={media.type === "video" ? "เปิดวิดีโอรีวิว" : "เปิดรูปรีวิว"}
                           >
-                            {media.type === "video" && "videoUrl" in media && media.videoUrl ? (
-                              <ReviewMediaThumbnail
-                                media={media}
-                                product={product}
-                                className="rounded-2xl"
-                              />
-                            ) : (
-                              <ReviewMediaThumbnail
-                                media={media}
-                                product={product}
-                                className="rounded-2xl"
-                              />
-                            )}
+                            <ReviewMediaThumbnail
+                              media={media}
+                              product={product}
+                              className="rounded-2xl"
+                            />
                             {media.type === "video" && (
                               <span className="absolute inset-0 flex items-center justify-center bg-black/20">
                                 <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white pl-0.5 text-xs font-extrabold text-brand shadow-sm">▶</span>
