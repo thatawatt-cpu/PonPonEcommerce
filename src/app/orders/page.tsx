@@ -112,7 +112,7 @@ const orderTabs: {
   {
     value: "return_refund",
     label: "คืนเงิน/คืนสินค้า",
-    status: ["4", "7"],
+    status: ["2", "4", "7"],
     paymentstatus: null,
   },
 ];
@@ -374,6 +374,22 @@ function isRefundablePaymentStatus(status: unknown): boolean {
   return ["1", "3", "4"].includes(getPaymentStatusCode(status));
 }
 
+function hasManualRefundStatus(order: ApiOrderListItem): boolean {
+  return (
+    isRefundablePaymentStatus(getOrderPaymentStatusValue(order)) &&
+    normalizeOmiseRefundStatus(order.omiseRefundStatus) != null
+  );
+}
+
+function isReturnRefundOrder(order: ApiOrderListItem): boolean {
+  const orderStatus = getOrderStatusCode(order.status);
+  return (
+    orderStatus === "4" ||
+    orderStatus === "7" ||
+    (orderStatus === "2" && hasManualRefundStatus(order))
+  );
+}
+
 function matchesOrderFilter(
   order: ApiOrderListItem,
   filterName: OrderFilter,
@@ -387,7 +403,9 @@ function matchesOrderFilter(
     (!filter.paymentstatus || filter.paymentstatus.includes(paymentStatus)) &&
     (filterName !== "awaiting_receive" || isAwaitingReceive(order)) &&
     (filterName !== "completed" || Boolean(order.receivedAtUtc)) &&
-    (filterName !== "awaiting_review" || hasPendingReview(order))
+    (filterName !== "awaiting_review" || hasPendingReview(order)) &&
+    (filterName !== "canceled" || !hasManualRefundStatus(order)) &&
+    (filterName !== "return_refund" || isReturnRefundOrder(order))
   );
 }
 
@@ -429,7 +447,11 @@ async function fetchOrdersWithClientFallback(
     };
   }
 
-  if (["awaiting_receive", "completed", "awaiting_review"].includes(filter)) {
+  if (
+    ["awaiting_receive", "completed", "awaiting_review", "canceled", "return_refund"].includes(
+      filter
+    )
+  ) {
     const filteredItems = response.items.filter((order) =>
       matchesOrderFilter(order, filter, filterParams)
     );
