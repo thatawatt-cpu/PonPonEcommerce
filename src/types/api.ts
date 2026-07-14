@@ -274,8 +274,14 @@ export interface ApiCouponListItem {
   endsAtUtc?: string | null;
   expiresAt?: string | null;
   remainingTotalUses?: number | null;
+  remainingCustomerUses?: number | null;
   isClaimed?: boolean | null;
   canClaim?: boolean | null;
+  canUse?: boolean | null;
+  isExpired?: boolean | null;
+  isQuotaExhausted?: boolean | null;
+  unavailableReasonCode?: string | null;
+  unavailableReason?: string | null;
   claimedAtUtc?: string | null;
   scopeLabels?: string[];
   conditionLabels?: string[];

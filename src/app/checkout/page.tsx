@@ -60,6 +60,7 @@ import {
 // import { calculateEarnedPoints, getTierBySpend } from "@/lib/membership";
 import { formatBaht } from "@/lib/format";
 import { SHIPPING_FEE } from "@/lib/constants";
+import { fetchMyCoupons } from "@/features/coupons/coupon-api";
 import { consumePendingCouponCode } from "@/features/coupons/pending-coupon";
 // import {
 //   useMembershipHydrated,
@@ -72,6 +73,7 @@ import type {
   ApiCreditCardPaymentResponse,
   ApiMobileBankingPaymentResponse,
   ApiMobileBankingType,
+  ApiCouponListItem,
   ApiPricingPreviewResponse,
   ApiPromptPayPaymentResponse,
 } from "@/types/api";
@@ -82,6 +84,11 @@ interface CreditCardFormState {
   number: string;
   expiry: string;
   securityCode: string;
+}
+
+interface CouponAvailability {
+  canUse: boolean;
+  unavailableReason?: string | null;
 }
 
 const PENDING_PAYMENT_STORAGE_KEY = "ponpon.pendingPayment";
@@ -378,6 +385,26 @@ function parseCouponCodesParam(value?: string): string[] {
   ].slice(0, 2);
 }
 
+function getCouponUnavailableReason(coupon: ApiCouponListItem): string | null {
+  return coupon.unavailableReason ?? null;
+}
+
+function buildCouponAvailability(
+  coupons: ApiCouponListItem[]
+): Record<string, CouponAvailability> {
+  return Object.fromEntries(
+    coupons
+      .filter((coupon) => coupon.code)
+      .map((coupon) => [
+        coupon.code.trim().toUpperCase(),
+        {
+          canUse: coupon.canUse !== false,
+          unavailableReason: getCouponUnavailableReason(coupon),
+        },
+      ])
+  );
+}
+
 export default function CheckoutPage({
   searchParams,
 }: {
@@ -410,6 +437,11 @@ export default function CheckoutPage({
     useState<CreditCardFormState>(emptyCardForm);
   const [promoCode, setPromoCode] = useState("");
   const [couponCodes, setCouponCodes] = useState<string[]>([]);
+  const [couponAvailabilityByCode, setCouponAvailabilityByCode] = useState<
+    Record<string, CouponAvailability>
+  >({});
+  const [couponAvailabilityLoaded, setCouponAvailabilityLoaded] =
+    useState(false);
   const [promoMessage, setPromoMessage] = useState("");
   const [promoError, setPromoError] = useState(false);
   const [pricingPreview, setPricingPreview] =
@@ -572,6 +604,27 @@ export default function CheckoutPage({
   }, [router]);
 
   useEffect(() => {
+    let cancelled = false;
+
+    fetchMyCoupons()
+      .then((items) => {
+        if (!cancelled) {
+          setCouponAvailabilityByCode(buildCouponAvailability(items));
+        }
+      })
+      .catch((error: unknown) => {
+        console.info("[checkout] Coupon availability sync skipped", error);
+      })
+      .finally(() => {
+        if (!cancelled) setCouponAvailabilityLoaded(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
     if (method !== "credit_card") return;
 
     const timer = window.setTimeout(() => {
@@ -684,6 +737,31 @@ export default function CheckoutPage({
 
     return () => window.clearTimeout(timer);
   }, [coupons, promo]);
+
+  useEffect(() => {
+    if (!couponAvailabilityLoaded || couponCodes.length === 0) return;
+
+    const unavailableCodes = couponCodes.filter(
+      (code) => couponAvailabilityByCode[code]?.canUse === false
+    );
+    if (unavailableCodes.length === 0) return;
+
+    const timer = window.setTimeout(() => {
+      const firstUnavailable = couponAvailabilityByCode[unavailableCodes[0]];
+      setCouponCodes((current) =>
+        current.filter(
+          (code) => couponAvailabilityByCode[code]?.canUse !== false
+        )
+      );
+      setPromoMessage(
+        firstUnavailable?.unavailableReason ??
+          `คูปอง ${unavailableCodes.join(", ")} ใช้ไม่ได้`
+      );
+      setPromoError(true);
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [couponAvailabilityByCode, couponAvailabilityLoaded, couponCodes]);
 
   useEffect(() => {
     if (!usesStoredCheckoutItems) return;
@@ -983,6 +1061,12 @@ export default function CheckoutPage({
   const applyPromoCode = () => {
     const nextCode = promoCode.trim().toUpperCase();
     if (!nextCode) return;
+    const availability = couponAvailabilityByCode[nextCode];
+    if (availability?.canUse === false) {
+      setPromoMessage(availability.unavailableReason ?? "คูปองนี้ใช้ไม่ได้");
+      setPromoError(true);
+      return;
+    }
     if (couponCodes.includes(nextCode)) {
       setPromoMessage("คูปองนี้ถูกใช้แล้ว");
       setPromoError(true);
@@ -1731,6 +1815,7 @@ export default function CheckoutPage({
               onRemove={removePromoCode}
               selectedCouponCodes={couponCodes}
               appliedCoupons={displayAppliedCoupons}
+              couponAvailabilityByCode={couponAvailabilityByCode}
               couponCodeCount={couponCodes.length}
               message={promoMessage}
               error={promoError}

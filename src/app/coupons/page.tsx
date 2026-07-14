@@ -24,7 +24,7 @@ import { parseApiDate, parseApiTime } from "@/lib/date-time";
 import { cn } from "@/lib/utils";
 import type { ApiCouponListItem } from "@/types/api";
 
-type CouponStatus = "available" | "used" | "expired";
+type CouponStatus = "available" | "used" | "expired" | "unavailable";
 type CouponKind = "discount" | "shipping" | "gift";
 type CouponFilter = "all" | CouponStatus;
 
@@ -40,23 +40,28 @@ interface CouponItem {
   status: CouponStatus;
   kind: CouponKind;
   icon: LucideIcon;
+  canUse: boolean;
+  unavailableReason: string | null;
 }
 
 const filters: { value: CouponFilter; label: string }[] = [
   { value: "all", label: "ทั้งหมด" },
   { value: "available", label: "พร้อมใช้" },
+  { value: "unavailable", label: "ใช้ไม่ได้" },
   { value: "used", label: "ใช้แล้ว" },
   { value: "expired", label: "หมดอายุ" },
 ];
 
 const statusLabel: Record<CouponStatus, string> = {
   available: "พร้อมใช้",
+  unavailable: "ใช้ไม่ได้",
   used: "ใช้แล้ว",
   expired: "หมดอายุ",
 };
 
 const statusClass: Record<CouponStatus, string> = {
   available: "bg-success-soft text-success",
+  unavailable: "bg-warning-soft text-warning",
   used: "bg-surface-muted text-ink-soft",
   expired: "bg-black/[0.06] text-ink-soft",
 };
@@ -143,11 +148,19 @@ function mapApiCoupon(coupon: ApiCouponListItem): CouponItem | null {
         ? "gift"
         : "discount";
   const endsAt = coupon.endsAtUtc || coupon.expiresAt || coupon.endAt;
+  const isExpired =
+    coupon.isExpired === true ||
+    Boolean(
+      endsAt &&
+        parseApiTime(endsAt, { utc: Boolean(coupon.endsAtUtc) }) < Date.now()
+    );
+  const canUse = coupon.canUse !== false && !isExpired;
   const status: CouponStatus =
-    endsAt &&
-    parseApiTime(endsAt, { utc: Boolean(coupon.endsAtUtc) }) < Date.now()
+    isExpired
       ? "expired"
-      : "available";
+      : canUse
+        ? "available"
+        : "unavailable";
 
   return {
     id: coupon.id || coupon.code,
@@ -167,6 +180,8 @@ function mapApiCoupon(coupon: ApiCouponListItem): CouponItem | null {
     status,
     kind,
     icon: getCouponIcon(kind),
+    canUse,
+    unavailableReason: coupon.unavailableReason ?? null,
   };
 }
 
@@ -224,7 +239,10 @@ export default function CouponsPage({
     }
   };
 
-  const applyCouponNow = (code: string) => {
+  const applyCouponNow = (coupon: CouponItem) => {
+    if (!coupon.canUse) return;
+
+    const code = coupon.code;
     setApplyingCode(code);
 
     if (returnTo !== "checkout") {
@@ -316,7 +334,7 @@ export default function CouponsPage({
           <div className="space-y-3">
           {filteredCoupons.map((coupon) => {
             const Icon = coupon.icon;
-            const isAvailable = coupon.status === "available";
+            const isAvailable = coupon.status === "available" && coupon.canUse;
             const isCopied = copiedCode === coupon.code;
             const isApplying = applyingCode === coupon.code;
 
@@ -351,7 +369,9 @@ export default function CouponsPage({
                           {coupon.title}
                         </h2>
                         <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-ink-soft">
-                          {coupon.description}
+                          {coupon.canUse
+                            ? coupon.description
+                            : coupon.unavailableReason ?? coupon.description}
                         </p>
                       </div>
                       <span
@@ -394,7 +414,7 @@ export default function CouponsPage({
                           </button>
                           <button
                             type="button"
-                            onClick={() => applyCouponNow(coupon.code)}
+                            onClick={() => applyCouponNow(coupon)}
                             disabled={Boolean(applyingCode)}
                             className="brand-button flex h-8 items-center rounded-full px-3 text-xs font-extrabold text-white disabled:opacity-70"
                           >

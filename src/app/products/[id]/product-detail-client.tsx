@@ -77,6 +77,8 @@ interface ProductCoupon {
   code: string;
   isClaimed: boolean;
   canClaim: boolean;
+  canUse: boolean;
+  unavailableReason?: string | null;
   remainingTotalUses?: number | null;
   maximumUsesPerCustomer?: number | null;
   customerUsedCount?: number | null;
@@ -157,6 +159,8 @@ function mapApiCoupon(coupon: ApiCouponListItem): ProductCoupon | null {
     code: coupon.code,
     isClaimed: coupon.isClaimed === true,
     canClaim: coupon.canClaim !== false,
+    canUse: coupon.canUse !== false,
+    unavailableReason: coupon.unavailableReason ?? null,
     remainingTotalUses: asNumber(coupon.remainingTotalUses),
     maximumUsesPerCustomer: asNumber(
       coupon.maximumUsesPerCustomer ?? coupon.maxUsesPerCustomer
@@ -171,6 +175,7 @@ function mapApiCoupon(coupon: ApiCouponListItem): ProductCoupon | null {
 }
 
 function canShowAvailableCoupon(coupon: ProductCoupon): boolean {
+  if (!coupon.canUse) return false;
   if (coupon.remainingTotalUses === 0) return false;
   if (
     coupon.maximumUsesPerCustomer != null &&
@@ -424,6 +429,8 @@ export function ProductDetailClient({
   };
 
   const handleUseProductCoupon = (coupon: ProductCoupon) => {
+    if (!coupon.canUse) return;
+
     storePendingCouponCode(coupon.code);
     router.push(`/products?coupon=${encodeURIComponent(coupon.code)}`);
   };

@@ -10,6 +10,11 @@ interface AppliedCouponDisplay {
   discountAmount: number;
 }
 
+interface CouponAvailabilityDisplay {
+  canUse: boolean;
+  unavailableReason?: string | null;
+}
+
 interface PromoCodeFieldProps {
   value: string;
   onChange: (value: string) => void;
@@ -17,6 +22,7 @@ interface PromoCodeFieldProps {
   onRemove: (code: string) => void;
   selectedCouponCodes?: string[];
   appliedCoupons?: AppliedCouponDisplay[];
+  couponAvailabilityByCode?: Record<string, CouponAvailabilityDisplay>;
   couponCodeCount?: number;
   message?: string;
   error?: boolean;
@@ -30,6 +36,7 @@ export function PromoCodeField({
   onRemove,
   selectedCouponCodes,
   appliedCoupons = [],
+  couponAvailabilityByCode = {},
   couponCodeCount = selectedCouponCodes?.length ?? appliedCoupons.length,
   message,
   error,
@@ -47,6 +54,12 @@ export function PromoCodeField({
           selected: selectedCodes.join(","),
         }).toString()}`
       : "/coupons?returnTo=checkout";
+  const normalizedValue = value.trim().toUpperCase();
+  const typedAvailability = normalizedValue
+    ? couponAvailabilityByCode[normalizedValue]
+    : undefined;
+  const typedUnavailable =
+    typedAvailability != null && typedAvailability.canUse === false;
 
   return (
     <div>
@@ -67,10 +80,14 @@ export function PromoCodeField({
         <div className="mb-3 space-y-1.5">
           {selectedCodes.map((code) => {
             const coupon = appliedCouponByCode.get(code);
+            const availability = couponAvailabilityByCode[code];
             const isFreeShipping = coupon?.type === "free_shipping";
             const isApplied = Boolean(coupon);
+            const isUnavailable = availability?.canUse === false;
             const toneClass = !isApplied
-              ? "border-black/10 bg-[#f7f4f1] text-ink-soft"
+              ? isUnavailable
+                ? "border-warning/20 bg-warning-soft text-warning"
+                : "border-black/10 bg-[#f7f4f1] text-ink-soft"
               : isFreeShipping
                 ? "border-emerald-200 bg-emerald-50 text-emerald-800"
                 : "border-brand/15 bg-brand-soft text-brand";
@@ -82,7 +99,7 @@ export function PromoCodeField({
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex min-w-0 items-center gap-1.5">
-                    {!isApplied ? (
+                    {!isApplied && !isUnavailable ? (
                       <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
                     ) : null}
                     <p className="truncate text-sm font-extrabold leading-tight">
@@ -90,7 +107,11 @@ export function PromoCodeField({
                     </p>
                   </div>
                   <p className="mt-0.5 text-[10px] font-bold opacity-70">
-                    {isApplied ? "ใช้คูปองแล้ว" : "กำลังตรวจสอบคูปอง"}
+                    {isApplied
+                      ? "ใช้คูปองแล้ว"
+                      : isUnavailable
+                        ? availability?.unavailableReason ?? "คูปองนี้ใช้ไม่ได้"
+                        : "กำลังตรวจสอบคูปอง"}
                   </p>
                 </div>
                 <button
@@ -127,13 +148,19 @@ export function PromoCodeField({
           <button
             type="button"
             onClick={onApply}
-            disabled={!value.trim() || applying}
+            disabled={!value.trim() || applying || typedUnavailable}
             className="brand-button h-11 shrink-0 rounded-full px-5 text-sm font-extrabold text-white disabled:cursor-not-allowed disabled:opacity-45"
           >
             ใช้โค้ด
           </button>
         </div>
       )}
+
+      {typedUnavailable && typedAvailability?.unavailableReason ? (
+        <p className="mt-2 text-xs font-bold text-warning">
+          {typedAvailability.unavailableReason}
+        </p>
+      ) : null}
 
       {message && (
         <p
