@@ -15,6 +15,7 @@ import type { ApiCouponListItem } from "@/types/api";
 
 interface HomeCoupon {
   id: string;
+  kind: "discount" | "shipping";
   value: string;
   title: string;
   detail: string;
@@ -92,6 +93,7 @@ function mapApiCoupon(coupon: ApiCouponListItem): HomeCoupon | null {
 
   return {
     id: coupon.id || coupon.code,
+    kind: type === "free_shipping" ? "shipping" : "discount",
     value: getCouponValue(coupon),
     title,
     detail: coupon.description || getMinimumSpendText(coupon),
@@ -251,12 +253,30 @@ export function CouponSection({ coupons: apiCoupons = [] }: CouponSectionProps) 
         {displayCoupons.map((coupon) => {
           const isClaimed = coupon.isClaimed;
           const canClaim = coupon.canClaim && !isClaimed;
+          const isFreeShipping = coupon.kind === "shipping";
+          const couponAccentClass = isFreeShipping
+            ? "bg-success"
+            : "bg-brand";
+          const couponRingClass = isFreeShipping
+            ? "ring-success/15"
+            : "ring-brand/10";
+          const couponButtonClass = isFreeShipping
+            ? "bg-success text-white shadow-[0_8px_18px_rgba(25,135,84,0.22)] hover:bg-success/90"
+            : "brand-button text-white";
           return (
             <article
               key={coupon.id}
-              className="home-panel-shadow relative flex min-w-[18rem] flex-1 overflow-hidden rounded-card bg-white ring-1 ring-brand/10 md:min-w-0"
+              className={cn(
+                "home-panel-shadow relative flex min-w-[18rem] flex-1 overflow-hidden rounded-card bg-white ring-1 md:min-w-0",
+                couponRingClass
+              )}
             >
-              <div className="flex w-24 shrink-0 flex-col items-center justify-center bg-brand px-2 py-4 text-center text-white">
+              <div
+                className={cn(
+                  "flex w-24 shrink-0 flex-col items-center justify-center px-2 py-4 text-center text-white",
+                  couponAccentClass
+                )}
+              >
                 <span className="text-xl font-extrabold leading-none">
                   {coupon.value}
                 </span>
@@ -285,9 +305,9 @@ export function CouponSection({ coupons: apiCoupons = [] }: CouponSectionProps) 
                   className={cn(
                     "flex h-9 shrink-0 items-center justify-center rounded-full px-3 text-xs font-bold transition",
                     isClaimed
-                      ? "brand-button text-white"
+                      ? couponButtonClass
                       : canClaim
-                        ? "brand-button text-white"
+                        ? couponButtonClass
                         : "bg-surface-muted text-ink-soft"
                   )}
                   aria-label={isClaimed ? "ใช้คูปอง" : "เก็บคูปอง"}

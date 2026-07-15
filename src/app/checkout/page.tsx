@@ -450,6 +450,9 @@ export default function CheckoutPage({
     useState<ApiPricingPreviewResponse | null>(null);
   const [pricingPreviewSignature, setPricingPreviewSignature] = useState("");
   const [pricingPreviewLoading, setPricingPreviewLoading] = useState(false);
+  const [pricingPreviewError, setPricingPreviewError] = useState<string | null>(
+    null
+  );
   const [quoteTime, setQuoteTime] = useState(() => Date.now());
   const pricingPreviewCacheRef = useRef(
     new Map<string, ApiPricingPreviewResponse>()
@@ -864,11 +867,13 @@ export default function CheckoutPage({
   const shippingPreviewPending = canLoadShippingRates && !shippingQuoteResolved;
   const waitingForFinalQuote =
     previewCanLoad &&
+    !pricingPreviewError &&
     !manualShippingRequired &&
     (pricingPreviewLoading || !currentQuoteId || !finalPricingQuote);
   const summaryRecalculating = shippingPreviewPending || waitingForFinalQuote;
   const paymentBlocked =
     summaryRecalculating ||
+    Boolean(pricingPreviewError) ||
     manualShippingRequired ||
     !currentQuoteId ||
     !finalPricingQuote ||
@@ -955,6 +960,7 @@ export default function CheckoutPage({
         setPricingPreview(null);
         setPricingPreviewSignature("");
         setPricingPreviewLoading(false);
+        setPricingPreviewError(null);
       }, 0);
       return () => window.clearTimeout(resetTimer);
     }
@@ -975,6 +981,7 @@ export default function CheckoutPage({
       setPricingPreview(cachedPreview);
       setPricingPreviewSignature(requestSignature);
       setPricingPreviewLoading(false);
+      setPricingPreviewError(null);
       return () => {
         cancelled = true;
         controller.abort();
@@ -987,6 +994,7 @@ export default function CheckoutPage({
 
     const timer = window.setTimeout(() => {
       setPricingPreviewLoading(true);
+      setPricingPreviewError(null);
 
       fetchPricingPreview({
         customerEmail: selectedAddress?.email || null,
@@ -1006,6 +1014,7 @@ export default function CheckoutPage({
           pricingPreviewCacheRef.current.set(requestSignature, preview);
           setPricingPreview(preview);
           setPricingPreviewSignature(requestSignature);
+          setPricingPreviewError(null);
           setQuoteTime(Date.now());
           if (couponCodes.length > 0) {
             const appliedCodes = preview.appliedCoupons.map(
@@ -1028,9 +1037,12 @@ export default function CheckoutPage({
         .catch((err) => {
           if (cancelled) return;
           if (err instanceof DOMException && err.name === "AbortError") return;
+          const message = getCouponErrorMessage(err);
           setPricingPreview(null);
+          setPricingPreviewSignature(requestSignature);
+          setPricingPreviewError(message);
           setPromoError(true);
-          setPromoMessage(getCouponErrorMessage(err));
+          setPromoMessage(message);
         })
         .finally(() => {
           if (!cancelled) {
@@ -1081,6 +1093,7 @@ export default function CheckoutPage({
       setPromoError(true);
       return;
     }
+    setPricingPreviewError(null);
     setCouponCodes((current) => [...current, nextCode]);
     setPromoCode("");
     setPromoMessage("");
@@ -1088,6 +1101,7 @@ export default function CheckoutPage({
   };
 
   const removePromoCode = (code: string) => {
+    setPricingPreviewError(null);
     setCouponCodes((current) => current.filter((item) => item !== code));
     setPromoMessage("");
     setPromoError(false);
@@ -2021,6 +2035,11 @@ export default function CheckoutPage({
                 กรุณาติดต่อร้านหรือรอร้านแจ้งค่าส่ง
               </div>
             )}
+            {pricingPreviewError && (
+              <div className="rounded-2xl bg-red-50 px-3 py-2 text-xs font-semibold leading-relaxed text-red-600">
+                {pricingPreviewError}
+              </div>
+            )}
             <div className="border-t border-dashed border-black/10 pt-3">
               <SummaryLine
                 label="ยอดชำระเงินทั้งหมด"
@@ -2050,6 +2069,14 @@ export default function CheckoutPage({
               className="mb-2 rounded-2xl bg-red-50 px-3 py-2 text-center text-xs font-semibold text-red-600"
             >
               {placeError}
+            </p>
+          )}
+          {pricingPreviewError && !placeError && (
+            <p
+              role="alert"
+              className="mb-2 rounded-2xl bg-red-50 px-3 py-2 text-center text-xs font-semibold text-red-600"
+            >
+              {pricingPreviewError}
             </p>
           )}
           <div className="flex items-center justify-between gap-3">
@@ -2089,6 +2116,8 @@ export default function CheckoutPage({
                   <Loader2 className="h-5 w-5 animate-spin" />
                   กำลังดำเนินการ
                 </>
+              ) : pricingPreviewError ? (
+                "ตรวจสอบคูปอง"
               ) : manualShippingRequired ? (
                 "รอร้านยืนยันค่าส่ง"
               ) : waitingForFinalQuote ? (
