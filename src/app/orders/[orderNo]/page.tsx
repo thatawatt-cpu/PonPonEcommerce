@@ -46,6 +46,7 @@ import {
 import { buildTimeline } from "@/features/orders/order-utils";
 import {
   getManualRefundLabel,
+  getReturnRefundText,
   normalizeOmiseRefundStatus,
 } from "@/features/orders/refund-status";
 import { dispatchShopNotificationToast } from "@/lib/shop-notification-toast";
@@ -1338,6 +1339,15 @@ export default function OrderTrackingPage({
     hasRefundablePaymentStatus || hasPaidAmount
       ? getManualRefundLabel(apiOrder.omiseRefundStatus)
       : null;
+  const returnRefundText = getReturnRefundText({
+    omiseRefundStatus: apiOrder.omiseRefundStatus,
+    returnRequestStatus: apiOrder.returnRequestStatus,
+    assumeReturnRefund:
+      Boolean(manualRefundLabel) ||
+      order.orderStatus === "returned" ||
+      order.orderStatus === "failed_shipment",
+  });
+  const returnRefundStatusText = returnRefundText ?? manualRefundLabel;
   const cancellable =
     !manualRefundLabel && CANCELLABLE_STATUSES.includes(order.orderStatus);
   const cancellationNeedsRefund =
@@ -1346,7 +1356,7 @@ export default function OrderTrackingPage({
   const canPayNow =
     order.paymentStatus === "pending" && order.paymentMethod !== "cod";
   const canConfirmReceived =
-    order.orderStatus === "shipping" && !apiOrder.receivedAtUtc;
+    order.orderStatus === "success" && !apiOrder.receivedAtUtc;
   const hasShippingAddress = Boolean(order.address.trim());
   const pendingReviewItem =
     apiOrder.receivedAtUtc
@@ -1429,11 +1439,11 @@ export default function OrderTrackingPage({
           <div className="bg-brand px-4 py-5 text-white">
             <p className="text-xs font-bold text-white/75">สถานะคำสั่งซื้อ</p>
             <h1 className="mt-1 text-xl font-extrabold leading-tight">
-              {manualRefundLabel ?? getStatusTitle(order.orderStatus)}
+              {returnRefundStatusText ?? getStatusTitle(order.orderStatus)}
             </h1>
             <p className="mt-1 text-sm font-semibold text-white/85">
-              {manualRefundLabel
-                ? manualRefundLabel
+              {returnRefundStatusText
+                ? returnRefundStatusText
                 : getStatusDescription(order.orderStatus)}
             </p>
           </div>

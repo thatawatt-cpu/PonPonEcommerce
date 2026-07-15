@@ -56,6 +56,10 @@ function canUseStorage(): boolean {
 
 let refreshSessionPromise: Promise<PonPonSession> | null = null;
 
+function isRefreshTokenRejected(status: number): boolean {
+  return status === 400 || status === 401 || status === 403;
+}
+
 export function getStoredPonPonJwt(): string | null {
   if (!canUseStorage()) return null;
   return window.localStorage.getItem(JWT_STORAGE_KEY);
@@ -221,7 +225,6 @@ export async function refreshPonPonSession(): Promise<PonPonSession> {
       });
 
       if (!response.ok) {
-        clearStoredPonPonSession();
         const errBody = (await response.json().catch(() => null)) as Record<
           string,
           unknown
@@ -232,6 +235,9 @@ export async function refreshPonPonSession(): Promise<PonPonSession> {
             errBody.title ??
             JSON.stringify(errBody))
           : null;
+        if (isRefreshTokenRejected(response.status)) {
+          clearStoredPonPonSession();
+        }
         throw new Error(
           `PonPon auth refresh failed with status ${response.status}${detail ? `: ${detail}` : ""}`
         );
@@ -243,7 +249,6 @@ export async function refreshPonPonSession(): Promise<PonPonSession> {
 
       return buildSessionFromPayload(payload);
     } catch (error) {
-      clearStoredPonPonSession();
       throw error;
     }
   })().finally(() => {
@@ -257,6 +262,14 @@ export async function ponponFetch(
   input: RequestInfo | URL,
   init: RequestInit = {}
 ): Promise<Response> {
+  if (!isStoredJwtValid() && getStoredLineRefreshToken()) {
+    try {
+      await refreshPonPonSession();
+    } catch (error) {
+      console.warn("[ponpon-auth] refresh failed before request", error);
+    }
+  }
+
   const requestInit: RequestInit = {
     ...init,
     credentials: init.credentials ?? "include",

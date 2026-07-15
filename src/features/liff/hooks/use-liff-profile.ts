@@ -64,6 +64,14 @@ function isLoginFlowFresh(): boolean {
   return true;
 }
 
+function isAuthRejection(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    (error.message.includes("status 401") ||
+      error.message.includes("status 403"))
+  );
+}
+
 /**
  * Loads the authenticated PonPon profile on mount.
  */
@@ -170,7 +178,16 @@ export function useLiffProfile(): UseLiffProfileResult {
         });
       } catch (err) {
         if (!cancelled) {
-          startLineLogin(err);
+          if (isAuthRejection(err)) {
+            startLineLogin(err);
+          } else {
+            const message =
+              err instanceof Error
+                ? err.message
+                : "ไม่สามารถโหลดข้อมูลผู้ใช้ได้";
+            console.warn("[ponpon-auth] profile load failed without re-login", err);
+            setError(message);
+          }
         }
       } finally {
         if (!cancelled) setLoading(false);

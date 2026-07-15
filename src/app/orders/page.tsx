@@ -35,6 +35,8 @@ import { confirmOrderReceived, fetchOrders } from "@/features/orders/order-api";
 import { storeCartSelectionCheckout } from "@/features/checkout/cart-selection-checkout";
 import {
   getManualRefundLabel,
+  getReturnRefundText,
+  normalizeReturnRequestStatus,
   normalizeOmiseRefundStatus,
 } from "@/features/orders/refund-status";
 import { formatBaht, formatDate } from "@/lib/format";
@@ -366,11 +368,16 @@ function hasManualRefundStatus(order: ApiOrderListItem): boolean {
   );
 }
 
+function hasReturnRequestStatus(order: ApiOrderListItem): boolean {
+  return normalizeReturnRequestStatus(order.returnRequestStatus) != null;
+}
+
 function isReturnRefundOrder(order: ApiOrderListItem): boolean {
   const orderStatus = getOrderStatusCode(order.status);
   return (
     orderStatus === "4" ||
     orderStatus === "7" ||
+    hasReturnRequestStatus(order) ||
     (orderStatus === "2" && hasManualRefundStatus(order))
   );
 }
@@ -513,6 +520,10 @@ function isAwaitingReceive(order: ApiOrderListItem): boolean {
   return ["6", "1"].includes(status) && !order.receivedAtUtc;
 }
 
+function canConfirmOrderReceived(order: ApiOrderListItem): boolean {
+  return getOrderStatusCode(order.status) === "1" && !order.receivedAtUtc;
+}
+
 function mapOrderItemToPreview(item: ApiOrderPreviewItem): OrderPreviewItem {
   return {
     id: item.id,
@@ -640,8 +651,14 @@ function OrderCard({
   const manualRefundLabel = canShowManualRefund
     ? getManualRefundLabel(order.omiseRefundStatus)
     : null;
+  const returnRefundText = getReturnRefundText({
+    omiseRefundStatus: order.omiseRefundStatus,
+    returnRequestStatus: order.returnRequestStatus,
+    assumeReturnRefund: isReturnRefundOrder(order),
+  });
+  const returnRefundBadgeText = returnRefundText ?? manualRefundLabel;
   const manualRefundBadgeClass =
-    manualRefundStatus === "manual_refunded"
+    returnRefundText === "สำเร็จ" || manualRefundStatus === "manual_refunded"
       ? "bg-success-soft text-success"
       : "bg-warning-soft text-warning";
   const progress = progressByStatus[orderStatus];
@@ -651,14 +668,17 @@ function OrderCard({
   const previewHiddenCount = Math.max(previewItems.length - visiblePreviewItems.length, 0);
   const hasMoreItems = Math.max(itemsCount, previewItems.length) > 1;
   const awaitingReceive = isAwaitingReceive(order);
+  const canConfirmReceived = canConfirmOrderReceived(order);
   const isAwaitingReview = hasPendingReview(order);
   const orderHref = isAwaitingReview
     ? `/orders/${order.id}/review`
     : `/orders/${order.id}`;
   const actionLabel = isAwaitingReview
     ? "เขียนรีวิว"
-    : awaitingReceive
+    : canConfirmReceived
       ? "ได้รับสินค้าแล้ว"
+    : awaitingReceive
+      ? "ติดตามออเดอร์"
     : order.receivedAtUtc
       ? "ดูรายละเอียด"
       : "ติดตามออเดอร์";
@@ -778,12 +798,12 @@ function OrderCard({
             </div>
           </div>
           <div className="shrink-0 text-right">
-            {manualRefundLabel ? (
+            {returnRefundBadgeText ? (
               <span
                 className={`inline-flex items-center justify-center whitespace-nowrap rounded-full px-3 py-1.5 text-[11px] font-bold leading-none shadow-sm ring-1 ring-current/10 ${manualRefundBadgeClass}`}
               >
                 <span className="block translate-y-px">
-                  {manualRefundLabel}
+                  {returnRefundBadgeText}
                 </span>
               </span>
             ) : (
@@ -887,7 +907,7 @@ function OrderCard({
           <div className="mt-4">
             <div className="mb-1.5 flex items-center justify-between gap-3">
               <p className="truncate text-[11px] font-semibold text-ink-soft">
-                {manualRefundLabel ?? helperByStatus[orderStatus]}
+                {returnRefundBadgeText ?? helperByStatus[orderStatus]}
               </p>
               <span className="shrink-0 text-[10px] font-bold text-brand">
                 {progress}%
@@ -918,7 +938,7 @@ function OrderCard({
               </p>
             )}
           </div>
-          {awaitingReceive ? (
+          {canConfirmReceived ? (
             <button
               type="button"
               onClick={handleConfirmReceived}

@@ -349,6 +349,7 @@ export interface ApiOrderListItem {
   paymentStatus: string;
   receivedAtUtc?: string | null;
   omiseRefundStatus?: string | null;
+  returnRequestStatus?: string | null;
   amount: number;
   paymentAmount: number;
   shippingChannel: string | null;
@@ -452,6 +453,7 @@ export interface ApiOrderDetail {
   paymentStatus: string;
   receivedAtUtc?: string | null;
   omiseRefundStatus?: string | null;
+  returnRequestStatus?: string | null;
   amount: number;
   vatAmount: number;
   shippingAmount: number;
