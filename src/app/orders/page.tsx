@@ -80,12 +80,12 @@ const orderTabs: {
     label: "ที่ต้องได้รับ",
   },
   {
-    value: "awaiting_review",
-    label: "รอรีวิว",
-  },
-  {
     value: "completed",
     label: "สำเร็จ",
+  },
+  {
+    value: "awaiting_review",
+    label: "รอรีวิว",
   },
   {
     value: "cancelled",
@@ -626,11 +626,13 @@ function OrderCardSkeleton() {
 
 function OrderCard({
   order,
+  activeFilter,
   previewItems = [],
   isPreviewLoading = false,
   itemsCount,
 }: {
   order: ApiOrderListItem;
+  activeFilter: OrderFilter;
   previewItems?: OrderPreviewItem[];
   isPreviewLoading?: boolean;
   itemsCount: number;
@@ -654,7 +656,8 @@ function OrderCard({
   const returnRefundText = getReturnRefundText({
     omiseRefundStatus: order.omiseRefundStatus,
     returnRequestStatus: order.returnRequestStatus,
-    assumeReturnRefund: isReturnRefundOrder(order),
+    assumeReturnRefund:
+      activeFilter === "return_refund" || isReturnRefundOrder(order),
   });
   const returnRefundBadgeText = returnRefundText ?? manualRefundLabel;
   const manualRefundBadgeClass =
@@ -1442,6 +1445,7 @@ function OrdersPageContent() {
                   <OrderCard
                     key={order.id}
                     order={order}
+                    activeFilter={activeFilter}
                     previewItems={(order.itemsPreview ?? []).map(mapOrderItemToPreview)}
                     itemsCount={order.itemsCount ?? order.itemsPreview?.length ?? 0}
                   />

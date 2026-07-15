@@ -66,12 +66,12 @@ export function getReturnRefundText({
   returnRequestStatus?: unknown;
   assumeReturnRefund?: boolean;
 }): string | null {
-  if (normalizeOmiseRefundStatus(omiseRefundStatus) === "manual_refunded") {
-    return "สำเร็จ";
+  if (normalizeReturnRequestStatus(returnRequestStatus) === "completed") {
+    return "คืนสินค้าสำเร็จ";
   }
 
-  if (normalizeReturnRequestStatus(returnRequestStatus) === "completed") {
-    return "สำเร็จ";
+  if (normalizeOmiseRefundStatus(omiseRefundStatus) === "manual_refunded") {
+    return "คืนเงินสำเร็จ";
   }
 
   if (
