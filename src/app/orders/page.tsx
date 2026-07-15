@@ -42,6 +42,7 @@ import {
 import { formatBaht, formatDate } from "@/lib/format";
 import { getCartItemKey, useCartStore } from "@/store/cart-store";
 import type {
+  ApiOrderDetail,
   ApiOrderListItem,
   ApiOrderPreviewItem,
 } from "@/types/api";
@@ -309,8 +310,11 @@ type OrderRefundFields = {
   return_request_status?: unknown;
 };
 
-function getOrderOmiseRefundStatus(order: ApiOrderListItem): unknown {
-  const source = order as ApiOrderListItem & OrderRefundFields;
+function getOrderOmiseRefundStatus(
+  order: ApiOrderListItem | ApiOrderDetail
+): unknown {
+  const source = order as (ApiOrderListItem | ApiOrderDetail) &
+    OrderRefundFields;
   return (
     source.omiseRefundStatus ??
     source.OmiseRefundStatus ??
@@ -322,8 +326,11 @@ function getOrderOmiseRefundStatus(order: ApiOrderListItem): unknown {
   );
 }
 
-function getOrderReturnRequestStatus(order: ApiOrderListItem): unknown {
-  const source = order as ApiOrderListItem & OrderRefundFields;
+function getOrderReturnRequestStatus(
+  order: ApiOrderListItem | ApiOrderDetail
+): unknown {
+  const source = order as (ApiOrderListItem | ApiOrderDetail) &
+    OrderRefundFields;
   return (
     source.returnRequestStatus ??
     source.ReturnRequestStatus ??
@@ -681,9 +688,13 @@ function OrderCard({
   const [selectedPromptRating, setSelectedPromptRating] = useState(0);
   const ratingPromptTimerRef = useRef<number | null>(null);
   const orderStatus = mapStatus(order.status);
-  const canShowManualRefund = hasManualRefundStatus(order);
   const omiseRefundStatus = getOrderOmiseRefundStatus(order);
   const returnRequestStatus = getOrderReturnRequestStatus(order);
+  const canShowManualRefund = Boolean(
+    normalizeOmiseRefundStatus(omiseRefundStatus) &&
+      (isRefundablePaymentStatus(getOrderPaymentStatusValue(order)) ||
+        hasOrderPaymentAmount(order))
+  );
   const normalizedRefundStatus = normalizeOmiseRefundStatus(omiseRefundStatus);
   const manualRefundStatus = canShowManualRefund
     ? normalizedRefundStatus
@@ -691,7 +702,16 @@ function OrderCard({
   const manualRefundLabel = canShowManualRefund
     ? getManualRefundLabel(omiseRefundStatus)
     : null;
-  const returnRefundText = getReturnRefundText({
+  const backendReturnRefundText = order.returnRefundText?.trim() || null;
+  const backendReturnRefundStatusText =
+    order.returnRefundStatus === "completed"
+      ? "สำเร็จ"
+      : order.returnRefundStatus === "pending"
+        ? "รอพิจารณา"
+        : null;
+  const returnRefundText = backendReturnRefundText ??
+    backendReturnRefundStatusText ??
+    getReturnRefundText({
     omiseRefundStatus,
     returnRequestStatus,
     assumeReturnRefund:
@@ -729,6 +749,7 @@ function OrderCard({
     if (target instanceof Element && target.closest("a, button")) return;
     router.push(orderHref);
   };
+
   const handleConfirmReceived = async (event: MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
     if (confirmingReceived) return;

@@ -350,6 +350,8 @@ export interface ApiOrderListItem {
   receivedAtUtc?: string | null;
   omiseRefundStatus?: string | null;
   returnRequestStatus?: string | null;
+  returnRefundStatus?: "pending" | "completed" | null;
+  returnRefundText?: string | null;
   amount: number;
   paymentAmount: number;
   shippingChannel: string | null;
