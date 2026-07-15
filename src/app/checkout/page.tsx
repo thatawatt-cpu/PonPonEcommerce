@@ -385,6 +385,13 @@ function isCouponValidationError(err: unknown): boolean {
   );
 }
 
+function isZeroTotalCouponPreview(
+  preview: ApiPricingPreviewResponse,
+  selectedCouponCodes: string[]
+): boolean {
+  return selectedCouponCodes.length > 0 && preview.grandTotal <= 0;
+}
+
 function parseCouponCodesParam(value?: string): string[] {
   if (!value) return [];
   return [
@@ -894,6 +901,9 @@ export default function CheckoutPage({
       : null;
   const manualShippingRequired =
     currentPricingPreview?.calculationStatus === "manual_shipping_required";
+  const zeroTotalCouponBlocked =
+    currentPricingPreview != null &&
+    isZeroTotalCouponPreview(currentPricingPreview, couponCodes);
   const shippingPreviewPending = canLoadShippingRates && !shippingQuoteResolved;
   const waitingForFinalQuote =
     previewCanLoad &&
@@ -904,6 +914,7 @@ export default function CheckoutPage({
   const paymentBlocked =
     summaryRecalculating ||
     Boolean(pricingPreviewError) ||
+    zeroTotalCouponBlocked ||
     manualShippingRequired ||
     !currentQuoteId ||
     !finalPricingQuote ||
@@ -1031,6 +1042,21 @@ export default function CheckoutPage({
       })
         .then((preview) => {
           if (cancelled) return;
+          if (isZeroTotalCouponPreview(preview, couponCodes)) {
+            const rejectedCode = couponCodes[couponCodes.length - 1];
+            const message =
+              "ยอดชำระต้องมากกว่า 0 บาท กรุณาเลือกคูปองอื่น";
+            if (rejectedCode) {
+              setCouponCodes((current) =>
+                current.filter((code) => code !== rejectedCode)
+              );
+            }
+            setPricingPreviewError(null);
+            setPromoError(true);
+            setPromoMessage("");
+            showCouponPopup(message);
+            return;
+          }
           pricingPreviewCacheRef.current.set(requestSignature, preview);
           setPricingPreview(preview);
           setPricingPreviewSignature(requestSignature);
@@ -1151,6 +1177,11 @@ export default function CheckoutPage({
         if (!appliedCodes.includes(nextCode)) {
           throw new Error(`คูปอง ${nextCode} ยังไม่ได้ถูกใช้กับออเดอร์นี้`);
         }
+        if (isZeroTotalCouponPreview(preview, nextCouponCodes)) {
+          throw new Error(
+            "ยอดชำระต้องมากกว่า 0 บาท กรุณาเลือกคูปองอื่น"
+          );
+        }
 
         pricingPreviewCacheRef.current.set(requestSignature, preview);
         setCouponCodes(nextCouponCodes);
@@ -1238,7 +1269,12 @@ export default function CheckoutPage({
   };
 
   const handleConfirm = async () => {
-    if (!validate() || placing || redirecting || paymentBlocked) return;
+    if (!validate() || placing || redirecting) return;
+    if (payableTotal <= 0) {
+      showCouponPopup("ยอดชำระต้องมากกว่า 0 บาท กรุณาเลือกคูปองอื่น");
+      return;
+    }
+    if (paymentBlocked) return;
     const quoteId = currentQuoteId;
     if (manualShippingRequired) {
       setPlaceError("ออเดอร์นี้ต้องให้ร้านยืนยันค่าจัดส่งก่อนชำระเงิน");
