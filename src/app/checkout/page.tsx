@@ -374,6 +374,16 @@ function getCouponErrorMessage(
     : fallbackMessage;
 }
 
+function isCouponValidationError(err: unknown): boolean {
+  return (
+    err instanceof ApiRequestError &&
+    (err.code === "coupon_minimum_subtotal_not_met" ||
+      err.code === "coupon_inactive_or_quota_exhausted" ||
+      err.code === "coupon_quota_no_longer_available" ||
+      err.code?.startsWith("coupon_") === true)
+  );
+}
+
 function parseCouponCodesParam(value?: string): string[] {
   if (!value) return [];
   return [
@@ -1017,11 +1027,19 @@ export default function CheckoutPage({
           setQuoteTime(Date.now());
           if (couponCodes.length > 0) {
             const appliedCodes = preview.appliedCoupons.map(
-              (coupon) => coupon.code
+              (coupon) => coupon.code.toUpperCase()
             );
             const missingCodes = couponCodes.filter(
-              (code) => !appliedCodes.includes(code)
+              (code) => !appliedCodes.includes(code.toUpperCase())
             );
+            if (missingCodes.length > 0) {
+              setCouponCodes((current) =>
+                current.filter((code) => !missingCodes.includes(code))
+              );
+              setPricingPreviewError(
+                `คูปอง ${missingCodes.join(", ")} ยังไม่ได้ถูกใช้กับออเดอร์นี้`
+              );
+            }
             setPromoError(missingCodes.length > 0);
             setPromoMessage(
               missingCodes.length > 0
@@ -1037,6 +1055,11 @@ export default function CheckoutPage({
           if (cancelled) return;
           if (err instanceof DOMException && err.name === "AbortError") return;
           const message = getCouponErrorMessage(err);
+          if (couponCodes.length > 0 && isCouponValidationError(err)) {
+            setCouponCodes((current) =>
+              current.filter((code) => !couponCodes.includes(code))
+            );
+          }
           setPricingPreview(null);
           setPricingPreviewSignature(requestSignature);
           setPricingPreviewError(message);
