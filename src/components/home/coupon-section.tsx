@@ -261,7 +261,7 @@ export function CouponSection({ coupons: apiCoupons = [] }: CouponSectionProps) 
             ? "ring-success/15"
             : "ring-brand/10";
           const couponButtonClass = isFreeShipping
-            ? "bg-success text-white shadow-[0_8px_18px_rgba(25,135,84,0.22)] hover:bg-success/90"
+            ? "success-button text-white"
             : "brand-button text-white";
           return (
             <article
