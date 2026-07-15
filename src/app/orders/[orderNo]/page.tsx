@@ -83,6 +83,45 @@ const RETURN_REASON_OPTIONS = [
   "เปลี่ยนใจหรือสินค้าไม่เหมาะสม",
   "อื่น ๆ",
 ];
+
+type OrderRefundFields = {
+  omiseRefundStatus?: unknown;
+  OmiseRefundStatus?: unknown;
+  omise_refund_status?: unknown;
+  refundStatus?: unknown;
+  RefundStatus?: unknown;
+  manualRefundStatus?: unknown;
+  ManualRefundStatus?: unknown;
+  returnRequestStatus?: unknown;
+  ReturnRequestStatus?: unknown;
+  return_request_status?: unknown;
+};
+
+function getApiOmiseRefundStatus(order: ApiOrderDetail): unknown {
+  const source = order as ApiOrderDetail & OrderRefundFields;
+  return (
+    source.omiseRefundStatus ??
+    source.OmiseRefundStatus ??
+    source.omise_refund_status ??
+    source.refundStatus ??
+    source.RefundStatus ??
+    source.manualRefundStatus ??
+    source.ManualRefundStatus
+  );
+}
+
+function getApiReturnRequestStatus(order: ApiOrderDetail): unknown {
+  const source = order as ApiOrderDetail & OrderRefundFields;
+  return (
+    source.returnRequestStatus ??
+    source.ReturnRequestStatus ??
+    source.return_request_status
+  );
+}
+
+function isCompletedRefundOrderStatus(status: OrderStatus): boolean {
+  return status === "returned";
+}
 const MAX_RETURN_IMAGES = 5;
 const MAX_RETURN_IMAGE_SIZE = 10 * 1024 * 1024;
 const ALLOWED_RETURN_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
@@ -1335,15 +1374,17 @@ export default function OrderTrackingPage({
     order.paymentStatus
   );
   const hasPaidAmount = getApiPaidAmount(apiOrder) > 0;
+  const omiseRefundStatus = getApiOmiseRefundStatus(apiOrder);
+  const returnRequestStatus = getApiReturnRequestStatus(apiOrder);
   const manualRefundLabel =
     hasRefundablePaymentStatus || hasPaidAmount
-      ? getManualRefundLabel(apiOrder.omiseRefundStatus)
+      ? getManualRefundLabel(omiseRefundStatus)
       : null;
   const returnRefundText = getReturnRefundText({
-    omiseRefundStatus: apiOrder.omiseRefundStatus,
-    returnRequestStatus: apiOrder.returnRequestStatus,
+    omiseRefundStatus,
+    returnRequestStatus,
     isCompletedRefundOrder:
-      order.orderStatus === "returned" && !apiOrder.returnRequestStatus,
+      isCompletedRefundOrderStatus(order.orderStatus) && !returnRequestStatus,
     assumeReturnRefund:
       Boolean(manualRefundLabel) ||
       order.orderStatus === "returned" ||

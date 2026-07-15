@@ -296,6 +296,52 @@ function normalizeStatusValue(status: unknown): string {
     .replace(/[\s-]+/g, "_");
 }
 
+type OrderRefundFields = {
+  omiseRefundStatus?: unknown;
+  OmiseRefundStatus?: unknown;
+  omise_refund_status?: unknown;
+  refundStatus?: unknown;
+  RefundStatus?: unknown;
+  manualRefundStatus?: unknown;
+  ManualRefundStatus?: unknown;
+  returnRequestStatus?: unknown;
+  ReturnRequestStatus?: unknown;
+  return_request_status?: unknown;
+};
+
+function getOrderOmiseRefundStatus(order: ApiOrderListItem): unknown {
+  const source = order as ApiOrderListItem & OrderRefundFields;
+  return (
+    source.omiseRefundStatus ??
+    source.OmiseRefundStatus ??
+    source.omise_refund_status ??
+    source.refundStatus ??
+    source.RefundStatus ??
+    source.manualRefundStatus ??
+    source.ManualRefundStatus
+  );
+}
+
+function getOrderReturnRequestStatus(order: ApiOrderListItem): unknown {
+  const source = order as ApiOrderListItem & OrderRefundFields;
+  return (
+    source.returnRequestStatus ??
+    source.ReturnRequestStatus ??
+    source.return_request_status
+  );
+}
+
+function isCompletedRefundStatusValue(status: unknown): boolean {
+  const normalized = normalizeStatusValue(status);
+  return [
+    "refunded",
+    "refund_completed",
+    "manual_refunded",
+    "manual_refund_completed",
+    "returned",
+  ].includes(normalized);
+}
+
 function getOrderStatusCode(status: unknown): string {
   const normalized = normalizeStatusValue(status);
   const map: Record<string, string> = {
@@ -362,14 +408,14 @@ function isRefundablePaymentStatus(status: unknown): boolean {
 
 function hasManualRefundStatus(order: ApiOrderListItem): boolean {
   return (
-    normalizeOmiseRefundStatus(order.omiseRefundStatus) != null &&
+    normalizeOmiseRefundStatus(getOrderOmiseRefundStatus(order)) != null &&
     (isRefundablePaymentStatus(getOrderPaymentStatusValue(order)) ||
       hasOrderPaymentAmount(order))
   );
 }
 
 function hasReturnRequestStatus(order: ApiOrderListItem): boolean {
-  return normalizeReturnRequestStatus(order.returnRequestStatus) != null;
+  return normalizeReturnRequestStatus(getOrderReturnRequestStatus(order)) != null;
 }
 
 function isReturnRefundOrder(order: ApiOrderListItem): boolean {
@@ -647,17 +693,21 @@ function OrderCard({
   const ratingPromptTimerRef = useRef<number | null>(null);
   const orderStatus = mapStatus(order.status);
   const canShowManualRefund = hasManualRefundStatus(order);
+  const omiseRefundStatus = getOrderOmiseRefundStatus(order);
+  const returnRequestStatus = getOrderReturnRequestStatus(order);
   const manualRefundStatus = canShowManualRefund
-    ? normalizeOmiseRefundStatus(order.omiseRefundStatus)
+    ? normalizeOmiseRefundStatus(omiseRefundStatus)
     : null;
   const manualRefundLabel = canShowManualRefund
-    ? getManualRefundLabel(order.omiseRefundStatus)
+    ? getManualRefundLabel(omiseRefundStatus)
     : null;
   const returnRefundText = getReturnRefundText({
-    omiseRefundStatus: order.omiseRefundStatus,
-    returnRequestStatus: order.returnRequestStatus,
+    omiseRefundStatus,
+    returnRequestStatus,
     isCompletedRefundOrder:
-      getOrderStatusCode(order.status) === "4" && !order.returnRequestStatus,
+      (getOrderStatusCode(order.status) === "4" ||
+        isCompletedRefundStatusValue(order.status)) &&
+      !returnRequestStatus,
     assumeReturnRefund:
       activeFilter === "return_refund" || isReturnRefundOrder(order),
   });
