@@ -1259,7 +1259,7 @@ export default function OrderTrackingPage({
       setReturnError("กรุณาเลือกเหตุผลในการขอคืนสินค้า");
       return;
     }
-    if (order?.orderStatus !== "success") {
+    if (!apiOrder?.receivedAtUtc && order?.orderStatus !== "success") {
       setReturnError("ขอคืนสินค้าได้หลังออเดอร์สำเร็จแล้วเท่านั้น");
       return;
     }
@@ -1356,6 +1356,10 @@ export default function OrderTrackingPage({
   const orderReviewed = Boolean(
     apiOrder.receivedAtUtc && apiOrder.items.length > 0 && !pendingReviewItem
   );
+  const canRequestReturn =
+    Boolean(apiOrder.receivedAtUtc || order.orderStatus === "success") &&
+    !manualRefundLabel &&
+    !["voided", "returned", "failed_shipment"].includes(order.orderStatus);
   const reviewRouteBlockedMessage = orderReviewed
     ? "ออเดอร์นี้รีวิวแล้ว"
     : !apiOrder.receivedAtUtc
@@ -1377,6 +1381,14 @@ export default function OrderTrackingPage({
   )}&orderNo=${encodeURIComponent(order.orderNo)}&amount=${encodeURIComponent(
     String(order.total)
   )}`;
+  const handleOpenReturn = () => {
+    setReturnReason("");
+    setReturnReasonDetail("");
+    setReturnImages([]);
+    setReturnError(null);
+    setReturnInfo(null);
+    setShowReturnDialog(true);
+  };
 
   return (
     <>
@@ -1520,6 +1532,17 @@ export default function OrderTrackingPage({
           </Link>
         )}
 
+        {canRequestReturn && (
+          <button
+            type="button"
+            onClick={handleOpenReturn}
+            className="flex w-full items-center justify-center gap-2 rounded-full border border-brand/25 bg-brand-soft py-3 text-sm font-bold text-brand transition active:scale-[0.98] hover:bg-brand-soft/80"
+          >
+            <RotateCcw className="h-4 w-4" />
+            ขอคืนเงิน/คืนสินค้า
+          </button>
+        )}
+
         <Link href="/orders" className="block">
           <Button variant="ghost" fullWidth>
             ดูออเดอร์ทั้งหมด
@@ -1586,6 +1609,15 @@ export default function OrderTrackingPage({
             >
               <Star className="h-4 w-4" />
               เขียนรีวิว
+            </button>
+          ) : canRequestReturn ? (
+            <button
+              type="button"
+              onClick={handleOpenReturn}
+              className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-brand text-sm font-extrabold text-white shadow-[0_10px_24px_rgba(237,23,28,0.22)] transition active:scale-[0.97]"
+            >
+              <RotateCcw className="h-4 w-4" />
+              คืนสินค้า
             </button>
           ) : (
             <button
