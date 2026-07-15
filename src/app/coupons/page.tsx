@@ -196,7 +196,7 @@ export default function CouponsPage({
 }) {
   const { returnTo, selected, mode } = use(searchParams);
   const router = useRouter();
-  const [activeFilter, setActiveFilter] = useState<CouponFilter>("available");
+  const [activeFilter, setActiveFilter] = useState<CouponFilter>("all");
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [applyingCode, setApplyingCode] = useState<string | null>(null);
   const [remoteCoupons, setRemoteCoupons] = useState<ApiCouponListItem[]>([]);
@@ -227,6 +227,42 @@ export default function CouponsPage({
     if (activeFilter === "all") return coupons;
     return coupons.filter((coupon) => coupon.status === activeFilter);
   }, [activeFilter, coupons]);
+  const availableCoupons = useMemo(
+    () =>
+      coupons.filter((coupon) => coupon.status === "available" && coupon.canUse),
+    [coupons],
+  );
+  const unavailableCoupons = useMemo(
+    () =>
+      coupons.filter(
+        (coupon) => coupon.status !== "available" || !coupon.canUse,
+      ),
+    [coupons],
+  );
+  const couponSections = useMemo(() => {
+    if (activeFilter !== "all") {
+      return [
+        {
+          title: null,
+          description: null,
+          coupons: filteredCoupons,
+        },
+      ];
+    }
+
+    return [
+      {
+        title: "คูปองพร้อมใช้",
+        description: "เลือกคูปองที่เข้าเงื่อนไขเพื่อใช้กับคำสั่งซื้อ",
+        coupons: availableCoupons,
+      },
+      {
+        title: "คูปองที่ยังใช้ไม่ได้",
+        description: "ตรวจสอบเงื่อนไขคูปองเพื่อใช้งาน",
+        coupons: unavailableCoupons,
+      },
+    ].filter((section) => section.coupons.length > 0);
+  }, [activeFilter, availableCoupons, filteredCoupons, unavailableCoupons]);
 
   const availableCount = coupons.filter(
     (coupon) => coupon.status === "available",
@@ -337,26 +373,49 @@ export default function CouponsPage({
         ) : null}
 
         {couponsLoaded ? (
-          <div className="space-y-3">
-          {filteredCoupons.map((coupon) => {
+          <div className="space-y-5">
+            {couponSections.map((section) => (
+              <section
+                key={section.title ?? activeFilter}
+                className="space-y-2.5"
+              >
+                {section.title ? (
+                  <div>
+                    <h2 className="text-base font-extrabold text-ink">
+                      {section.title}
+                    </h2>
+                    <p className="text-xs font-semibold text-ink-soft">
+                      {section.description}
+                    </p>
+                  </div>
+                ) : null}
+                <div className="space-y-3">
+          {section.coupons.map((coupon) => {
             const Icon = coupon.icon;
             const isAvailable = coupon.status === "available" && coupon.canUse;
             const isCopied = copiedCode === coupon.code;
             const isApplying = applyingCode === coupon.code;
+            const isShippingCoupon = coupon.kind === "shipping";
+            const unavailableText =
+              !isAvailable ? coupon.unavailableReason ?? coupon.description : null;
 
             return (
               <Card
                 key={coupon.id}
                 className={cn(
                   "relative overflow-hidden",
-                  !isAvailable && "opacity-75",
+                  !isAvailable && "opacity-85",
                 )}
               >
                 <div className="flex">
                   <div
                     className={cn(
                       "flex w-24 shrink-0 flex-col items-center justify-center px-3 py-5 text-center text-white",
-                      isAvailable ? "bg-brand" : "bg-ink-soft",
+                      isAvailable
+                        ? isShippingCoupon
+                          ? "bg-success"
+                          : "bg-brand"
+                        : "bg-ink-soft",
                     )}
                   >
                     <Icon className="mb-2 h-5 w-5" />
@@ -375,9 +434,7 @@ export default function CouponsPage({
                           {coupon.title}
                         </h2>
                         <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-ink-soft">
-                          {coupon.canUse
-                            ? coupon.description
-                            : coupon.unavailableReason ?? coupon.description}
+                          {coupon.description}
                         </p>
                       </div>
                       <span
@@ -390,7 +447,14 @@ export default function CouponsPage({
                       </span>
                     </div>
 
-                    <div className="mt-3 flex items-center justify-between gap-2 rounded-2xl bg-[#fff8f6] px-3 py-2">
+                    <div
+                      className={cn(
+                        "mt-3 flex items-center justify-between gap-2 rounded-2xl px-3 py-2",
+                        isAvailable && isShippingCoupon
+                          ? "bg-success-soft/70"
+                          : "bg-[#fff8f6]",
+                      )}
+                    >
                       <div className="min-w-0">
                         <p className="text-[10px] font-bold text-ink-soft">
                           CODE
@@ -409,7 +473,9 @@ export default function CouponsPage({
                               "flex h-8 w-8 items-center justify-center rounded-full transition",
                               isCopied
                                 ? "bg-success-soft text-success"
-                                : "bg-white text-brand shadow-sm ring-1 ring-brand/10",
+                                : isShippingCoupon
+                                  ? "bg-white text-success shadow-sm ring-1 ring-success/15"
+                                  : "bg-white text-brand shadow-sm ring-1 ring-brand/10",
                             )}
                           >
                             {isCopied ? (
@@ -422,7 +488,12 @@ export default function CouponsPage({
                             type="button"
                             onClick={() => applyCouponNow(coupon)}
                             disabled={Boolean(applyingCode)}
-                            className="brand-button flex h-8 items-center rounded-full px-3 text-xs font-extrabold text-white disabled:opacity-70"
+                            className={cn(
+                              "flex h-8 items-center rounded-full px-3 text-xs font-extrabold text-white disabled:opacity-70",
+                              isShippingCoupon
+                                ? "success-button"
+                                : "brand-button",
+                            )}
                           >
                             {isApplying ? (
                               <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -434,20 +505,29 @@ export default function CouponsPage({
                       ) : null}
                     </div>
 
-                    <p className="mt-2 flex items-center gap-1 text-[10px] font-semibold text-ink-soft">
-                      <Clock3 className="h-3.5 w-3.5" />
-                      {coupon.expireAt}
-                    </p>
+                    {unavailableText ? (
+                      <div className="mt-2 rounded-2xl bg-red-50 px-3 py-2 text-xs font-semibold leading-relaxed text-red-600">
+                        {unavailableText}
+                      </div>
+                    ) : (
+                      <p className="mt-2 flex items-center gap-1 text-[10px] font-semibold text-ink-soft">
+                        <Clock3 className="h-3.5 w-3.5" />
+                        {coupon.expireAt}
+                      </p>
+                    )}
                   </div>
                 </div>
                 <span className="absolute -left-2 top-1/2 h-4 w-4 -translate-y-1/2 rounded-full bg-surface-muted" />
               </Card>
             );
           })}
+                </div>
+              </section>
+            ))}
           </div>
         ) : null}
 
-        {couponsLoaded && filteredCoupons.length === 0 ? (
+        {couponsLoaded && couponSections.length === 0 ? (
           <Card className="px-4 py-10 text-center">
             <TicketPercent className="mx-auto h-8 w-8 text-ink-soft/40" />
             <p className="mt-3 text-sm font-extrabold text-ink">
