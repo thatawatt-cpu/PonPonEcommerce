@@ -133,11 +133,13 @@ const ORDER_NOTIFICATION_FILTERS: OrderFilter[] = [
 const ORDER_NOTIFICATION_COUNTS_KEY = "ponpon.orders.notificationCounts";
 const ORDER_NOTIFICATION_SEEN_KEY = "ponpon.orders.notificationSeenCounts";
 const LIVE_ORDER_FILTERS: OrderFilter[] = [
+  "pending_payment",
+  "preparing",
   "awaiting_receive",
   "completed",
+  "awaiting_review",
   "cancelled",
   "return_refund",
-  "awaiting_review",
 ];
 
 const orderFilterFallbackRules: Record<
@@ -414,14 +416,23 @@ function hasReturnRequestStatus(order: ApiOrderListItem): boolean {
   return normalizeReturnRequestStatus(getOrderReturnRequestStatus(order)) != null;
 }
 
+function hasBackendReturnRefundStatus(order: ApiOrderListItem): boolean {
+  return Boolean(order.returnRefundStatus || order.returnRefundText?.trim());
+}
+
 function isReturnRefundOrder(order: ApiOrderListItem): boolean {
   const orderStatus = getOrderStatusCode(order.status);
   return (
     orderStatus === "4" ||
     orderStatus === "7" ||
+    hasBackendReturnRefundStatus(order) ||
     hasReturnRequestStatus(order) ||
     (orderStatus === "2" && hasManualRefundStatus(order))
   );
+}
+
+function isCancelledOnlyOrder(order: ApiOrderListItem): boolean {
+  return getOrderStatusCode(order.status) === "2" && !isReturnRefundOrder(order);
 }
 
 function matchesOrderFilter(
@@ -438,7 +449,7 @@ function matchesOrderFilter(
     (filterName !== "awaiting_receive" || isAwaitingReceive(order)) &&
     (filterName !== "completed" || Boolean(order.receivedAtUtc)) &&
     (filterName !== "awaiting_review" || hasPendingReview(order)) &&
-    (filterName !== "cancelled" || !hasManualRefundStatus(order)) &&
+    (filterName !== "cancelled" || isCancelledOnlyOrder(order)) &&
     (filterName !== "return_refund" || isReturnRefundOrder(order))
   );
 }
@@ -454,6 +465,19 @@ async function fetchOrdersWithClientFallback(
     page: nextPage,
     pageSize,
   });
+
+  if (filter === "cancelled") {
+    const filteredItems = response.items.filter((order) =>
+      matchesOrderFilter(order, filter, filterParams)
+    );
+
+    return {
+      ...response,
+      items: filteredItems,
+      total: nextPage === 1 ? filteredItems.length : response.total,
+      hasMore: response.hasMore,
+    };
+  }
 
   if (filter === "all" || response.items.length > 0 || nextPage !== 1) {
     return response;
