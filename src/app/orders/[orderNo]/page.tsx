@@ -1342,6 +1342,8 @@ export default function OrderTrackingPage({
   const returnRefundText = getReturnRefundText({
     omiseRefundStatus: apiOrder.omiseRefundStatus,
     returnRequestStatus: apiOrder.returnRequestStatus,
+    isCompletedRefundOrder:
+      order.orderStatus === "returned" && !apiOrder.returnRequestStatus,
     assumeReturnRefund:
       Boolean(manualRefundLabel) ||
       order.orderStatus === "returned" ||

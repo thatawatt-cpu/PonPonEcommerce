@@ -656,12 +656,15 @@ function OrderCard({
   const returnRefundText = getReturnRefundText({
     omiseRefundStatus: order.omiseRefundStatus,
     returnRequestStatus: order.returnRequestStatus,
+    isCompletedRefundOrder:
+      getOrderStatusCode(order.status) === "4" && !order.returnRequestStatus,
     assumeReturnRefund:
       activeFilter === "return_refund" || isReturnRefundOrder(order),
   });
   const returnRefundBadgeText = returnRefundText ?? manualRefundLabel;
   const manualRefundBadgeClass =
-    returnRefundText === "สำเร็จ" || manualRefundStatus === "manual_refunded"
+    returnRefundText?.endsWith("สำเร็จ") ||
+    manualRefundStatus === "manual_refunded"
       ? "bg-success-soft text-success"
       : "bg-warning-soft text-warning";
   const progress = progressByStatus[orderStatus];

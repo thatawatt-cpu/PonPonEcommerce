@@ -60,17 +60,22 @@ export function normalizeReturnRequestStatus(
 export function getReturnRefundText({
   omiseRefundStatus,
   returnRequestStatus,
+  isCompletedRefundOrder = false,
   assumeReturnRefund = false,
 }: {
   omiseRefundStatus?: unknown;
   returnRequestStatus?: unknown;
+  isCompletedRefundOrder?: boolean;
   assumeReturnRefund?: boolean;
 }): string | null {
   if (normalizeReturnRequestStatus(returnRequestStatus) === "completed") {
     return "คืนสินค้าสำเร็จ";
   }
 
-  if (normalizeOmiseRefundStatus(omiseRefundStatus) === "manual_refunded") {
+  if (
+    normalizeOmiseRefundStatus(omiseRefundStatus) === "manual_refunded" ||
+    isCompletedRefundOrder
+  ) {
     return "คืนเงินสำเร็จ";
   }
 
