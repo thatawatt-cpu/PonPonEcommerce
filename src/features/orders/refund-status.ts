@@ -11,16 +11,29 @@ export type ReturnRequestStatus =
 export function normalizeOmiseRefundStatus(
   status: unknown
 ): OmiseRefundStatus | null {
-  const normalized = String(status ?? "")
+  const raw = String(status ?? "").trim();
+  const normalized = raw
     .trim()
     .toLowerCase()
     .replace(/[\s-]+/g, "_");
+  const compact = raw.toLowerCase().replace(/[^a-z0-9]+/g, "");
 
   if (
     normalized === "manual_refund_pending" ||
-    normalized === "manual_refunded"
+    compact === "manualrefundpending" ||
+    compact === "refundpending"
   ) {
-    return normalized;
+    return "manual_refund_pending";
+  }
+
+  if (
+    normalized === "manual_refunded" ||
+    compact === "manualrefunded" ||
+    compact === "manualrefundcompleted" ||
+    compact === "refundcompleted" ||
+    compact === "refunded"
+  ) {
+    return "manual_refunded";
   }
 
   return null;
