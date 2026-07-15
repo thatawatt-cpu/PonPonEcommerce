@@ -59,6 +59,7 @@ import {
 } from "@/lib/address-storage";
 // import { calculateEarnedPoints, getTierBySpend } from "@/lib/membership";
 import { formatBaht } from "@/lib/format";
+import { dispatchShopNotificationToast } from "@/lib/shop-notification-toast";
 import { SHIPPING_FEE } from "@/lib/constants";
 import { fetchMyCoupons } from "@/features/coupons/coupon-api";
 import { consumePendingCouponCode } from "@/features/coupons/pending-coupon";
@@ -475,6 +476,16 @@ export default function CheckoutPage({
   const [placing, setPlacing] = useState(false);
   const [redirecting, setRedirecting] = useState(false);
   const [placeError, setPlaceError] = useState<string | null>(null);
+
+  const showCouponPopup = useCallback((message: string) => {
+    dispatchShopNotificationToast({
+      type: "coupon_error",
+      id: `coupon-error:${Date.now()}`,
+      title: "คูปองใช้ไม่ได้",
+      message,
+      createdAtUtc: new Date().toISOString(),
+    });
+  }, []);
   const [shippingRates, setShippingRates] = useState<ShippingRateOption[]>([]);
   const [shippingRatesLoading, setShippingRatesLoading] = useState(false);
   const [shippingRatesError, setShippingRatesError] = useState<string | null>(null);
@@ -1033,17 +1044,17 @@ export default function CheckoutPage({
               (code) => !appliedCodes.includes(code.toUpperCase())
             );
             if (missingCodes.length > 0) {
+              const message = `คูปอง ${missingCodes.join(", ")} ยังไม่ได้ถูกใช้กับออเดอร์นี้`;
               setCouponCodes((current) =>
                 current.filter((code) => !missingCodes.includes(code))
               );
-              setPricingPreviewError(
-                `คูปอง ${missingCodes.join(", ")} ยังไม่ได้ถูกใช้กับออเดอร์นี้`
-              );
+              setPricingPreviewError(null);
+              showCouponPopup(message);
             }
             setPromoError(missingCodes.length > 0);
             setPromoMessage(
               missingCodes.length > 0
-                ? `คูปอง ${missingCodes.join(", ")} ยังไม่ได้ถูกใช้กับออเดอร์นี้`
+                ? ""
                 : "ใช้คูปองเรียบร้อย"
             );
           } else {
@@ -1055,16 +1066,18 @@ export default function CheckoutPage({
           if (cancelled) return;
           if (err instanceof DOMException && err.name === "AbortError") return;
           const message = getCouponErrorMessage(err);
-          if (couponCodes.length > 0 && isCouponValidationError(err)) {
+          const couponValidationError = isCouponValidationError(err);
+          if (couponCodes.length > 0 && couponValidationError) {
             setCouponCodes((current) =>
               current.filter((code) => !couponCodes.includes(code))
             );
+            showCouponPopup(message);
           }
           setPricingPreview(null);
           setPricingPreviewSignature(requestSignature);
-          setPricingPreviewError(message);
+          setPricingPreviewError(couponValidationError ? null : message);
           setPromoError(true);
-          setPromoMessage(message);
+          setPromoMessage(couponValidationError ? "" : message);
         })
         .finally(() => {
           if (!cancelled) {
@@ -1085,6 +1098,7 @@ export default function CheckoutPage({
     currentPricingPreviewSignature,
     previewCanLoad,
     quoteTime,
+    showCouponPopup,
   ]);
 
   const applyPromoCode = () => {
@@ -1093,24 +1107,29 @@ export default function CheckoutPage({
     if (!nextCode) return;
     const availability = couponAvailabilityByCode[nextCode];
     if (availability?.canUse === false) {
-      setPromoMessage(availability.unavailableReason ?? "คูปองนี้ใช้ไม่ได้");
+      const message = availability.unavailableReason ?? "คูปองนี้ใช้ไม่ได้";
+      showCouponPopup(message);
+      setPromoMessage("");
       setPromoError(true);
       return;
     }
     if (couponCodes.includes(nextCode)) {
-      setPromoMessage("คูปองนี้ถูกใช้แล้ว");
+      showCouponPopup("คูปองนี้ถูกใช้แล้ว");
+      setPromoMessage("");
       setPromoError(true);
       return;
     }
     if (couponCodes.length >= 2) {
-      setPromoMessage(
+      showCouponPopup(
         "ใช้คูปองได้สูงสุด 2 ใบ: คูปองส่วนลด 1 ใบ และคูปองส่งฟรี 1 ใบ"
       );
+      setPromoMessage("");
       setPromoError(true);
       return;
     }
     if (!previewCanLoad) {
-      setPromoMessage("กรุณาเลือกที่อยู่และขนส่งก่อนใช้คูปอง");
+      showCouponPopup("กรุณาเลือกที่อยู่และขนส่งก่อนใช้คูปอง");
+      setPromoMessage("");
       setPromoError(true);
       return;
     }
@@ -1144,9 +1163,10 @@ export default function CheckoutPage({
       })
       .catch((err) => {
         const message = getCouponErrorMessage(err);
-        setPromoMessage(message);
+        showCouponPopup(message);
+        setPromoMessage("");
         setPromoError(true);
-        setPricingPreviewError(message);
+        setPricingPreviewError(null);
       })
       .finally(() => {
         setCouponApplying(false);
@@ -2089,11 +2109,6 @@ export default function CheckoutPage({
                 กรุณาติดต่อร้านหรือรอร้านแจ้งค่าส่ง
               </div>
             )}
-            {pricingPreviewError && (
-              <div className="rounded-2xl bg-red-50 px-3 py-2 text-xs font-semibold leading-relaxed text-red-600">
-                {pricingPreviewError}
-              </div>
-            )}
             <div className="border-t border-dashed border-black/10 pt-3">
               <SummaryLine
                 label="ยอดชำระเงินทั้งหมด"
@@ -2123,14 +2138,6 @@ export default function CheckoutPage({
               className="mb-2 rounded-2xl bg-red-50 px-3 py-2 text-center text-xs font-semibold text-red-600"
             >
               {placeError}
-            </p>
-          )}
-          {pricingPreviewError && !placeError && (
-            <p
-              role="alert"
-              className="mb-2 rounded-2xl bg-red-50 px-3 py-2 text-center text-xs font-semibold text-red-600"
-            >
-              {pricingPreviewError}
             </p>
           )}
           <div className="flex items-center justify-between gap-3">

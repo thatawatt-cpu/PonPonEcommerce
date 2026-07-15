@@ -7,7 +7,7 @@ import {
   LogLevel,
   type HubConnection,
 } from "@microsoft/signalr";
-import { CheckCircle2, X } from "lucide-react";
+import { AlertCircle, CheckCircle2, X } from "lucide-react";
 import {
   getStoredPonPonJwt,
   isStoredJwtValid,
@@ -28,10 +28,11 @@ interface ToastNotification {
   title: string;
   message: string;
   orderNumber?: string;
+  tone: "success" | "error";
 }
 
 const TOAST_DURATION_MS = 6000;
-const IMPORTANT_TOAST_TYPES = new Set<ShopNotificationType>([
+const IMPORTANT_TOAST_TYPES = new Set<string>([
   "order_cancelled",
   "payment_succeeded",
   "refund_requested",
@@ -39,6 +40,7 @@ const IMPORTANT_TOAST_TYPES = new Set<ShopNotificationType>([
   "shipping_status",
   "refund_completed",
   "return_refund_completed",
+  "coupon_error",
 ]);
 
 function shouldShowToast(payload: ShopNotificationPayload): boolean {
@@ -56,6 +58,7 @@ function buildToast(payload: ShopNotificationPayload): ToastNotification {
     title: getShopNotificationTitle(payload),
     message: getShopNotificationDescription(payload),
     orderNumber: payload.orderNumber,
+    tone: payload.type === "coupon_error" ? "error" : "success",
   };
 }
 
@@ -230,8 +233,19 @@ export function ShopNotificationListener({ hubUrl }: { hubUrl: string }) {
             "animate-fade-up"
           )}
         >
-          <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-success-soft text-success">
-            <CheckCircle2 className="h-5 w-5" />
+          <span
+            className={cn(
+              "mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full",
+              toast.tone === "error"
+                ? "bg-red-50 text-red-600"
+                : "bg-success-soft text-success"
+            )}
+          >
+            {toast.tone === "error" ? (
+              <AlertCircle className="h-5 w-5" />
+            ) : (
+              <CheckCircle2 className="h-5 w-5" />
+            )}
           </span>
           <span className="min-w-0 flex-1">
             <span className="block text-sm font-extrabold">{toast.title}</span>
