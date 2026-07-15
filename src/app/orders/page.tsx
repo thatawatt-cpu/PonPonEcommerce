@@ -49,71 +49,49 @@ import type { OrderStatus } from "@/types/order";
 
 type OrderFilter =
   | "all"
-  | "payment"
+  | "pending_payment"
   | "preparing"
   | "awaiting_receive"
   | "awaiting_review"
   | "completed"
-  | "canceled"
+  | "cancelled"
   | "return_refund";
 
 const orderTabs: {
   value: OrderFilter;
   label: string;
-  status: string[] | null;
-  paymentstatus: string[] | null;
-  apiFilter?: string;
 }[] = [
   {
     value: "all",
     label: "ทั้งหมด",
-    status: null,
-    paymentstatus: null,
   },
   {
-    value: "payment",
+    value: "pending_payment",
     label: "รอชำระ",
-    status: ["0"],
-    paymentstatus: ["0"],
   },
   {
     value: "preparing",
     label: "เตรียมสินค้า",
-    status: ["3", "5"],
-    paymentstatus: ["1"],
   },
   {
     value: "awaiting_receive",
     label: "ที่ต้องได้รับ",
-    status: ["6"],
-    paymentstatus: ["1"],
-    apiFilter: "awaiting_receive",
   },
   {
     value: "awaiting_review",
     label: "รอรีวิว",
-    status: ["1"],
-    paymentstatus: ["1"],
-    apiFilter: "awaiting_review",
   },
   {
     value: "completed",
     label: "สำเร็จ",
-    status: ["1"],
-    paymentstatus: ["1"],
-    apiFilter: "completed",
   },
   {
-    value: "canceled",
+    value: "cancelled",
     label: "ยกเลิก",
-    status: ["2"],
-    paymentstatus: null,
   },
   {
     value: "return_refund",
     label: "คืนเงิน/คืนสินค้า",
-    status: ["2", "4", "7"],
-    paymentstatus: null,
   },
 ];
 
@@ -144,7 +122,7 @@ const ORDER_PAGE_SIZE = 10;
 const EMPTY_ORDERS: ApiOrderListItem[] = [];
 const FALLBACK_ORDER_PAGE_SIZE = 100;
 const ORDER_NOTIFICATION_FILTERS: OrderFilter[] = [
-  "payment",
+  "pending_payment",
   "preparing",
   "awaiting_receive",
   "return_refund",
@@ -154,31 +132,32 @@ const ORDER_NOTIFICATION_SEEN_KEY = "ponpon.orders.notificationSeenCounts";
 const LIVE_ORDER_FILTERS: OrderFilter[] = [
   "awaiting_receive",
   "completed",
-  "canceled",
+  "cancelled",
   "return_refund",
   "awaiting_review",
 ];
 
-const orderFilterParams = orderTabs.reduce(
-  (params, filter) => {
-    params[filter.value] = {
-      status: filter.status,
-      paymentstatus: filter.paymentstatus,
-      apiFilter: filter.apiFilter,
-    };
-    return params;
-  },
-  {} as Record<
-    OrderFilter,
-    { status: string[] | null; paymentstatus: string[] | null; apiFilter?: string }
-  >
-);
+const orderFilterFallbackRules: Record<
+  OrderFilter,
+  { status: string[] | null; paymentstatus: string[] | null }
+> = {
+  all: { status: null, paymentstatus: null },
+  pending_payment: { status: ["0"], paymentstatus: ["0"] },
+  preparing: { status: ["3", "5"], paymentstatus: ["1"] },
+  awaiting_receive: { status: ["6"], paymentstatus: ["1"] },
+  completed: { status: ["1"], paymentstatus: ["1"] },
+  awaiting_review: { status: ["1"], paymentstatus: ["1"] },
+  cancelled: { status: ["2"], paymentstatus: null },
+  return_refund: { status: ["2", "4", "7"], paymentstatus: null },
+};
 
 const orderFilterValues = new Set<OrderFilter>(
   orderTabs.map((filter) => filter.value)
 );
 
 function parseOrderFilter(value: string | null): OrderFilter {
+  if (value === "payment") return "pending_payment";
+  if (value === "canceled") return "cancelled";
   return value && orderFilterValues.has(value as OrderFilter)
     ? (value as OrderFilter)
     : "all";
@@ -399,7 +378,7 @@ function isReturnRefundOrder(order: ApiOrderListItem): boolean {
 function matchesOrderFilter(
   order: ApiOrderListItem,
   filterName: OrderFilter,
-  filter: { status: string[] | null; paymentstatus: string[] | null; apiFilter?: string }
+  filter: { status: string[] | null; paymentstatus: string[] | null }
 ): boolean {
   const orderStatus = getOrderStatusCode(order.status);
   const paymentStatus = getPaymentStatusCode(getOrderPaymentStatusValue(order));
@@ -410,7 +389,7 @@ function matchesOrderFilter(
     (filterName !== "awaiting_receive" || isAwaitingReceive(order)) &&
     (filterName !== "completed" || Boolean(order.receivedAtUtc)) &&
     (filterName !== "awaiting_review" || hasPendingReview(order)) &&
-    (filterName !== "canceled" || !hasManualRefundStatus(order)) &&
+    (filterName !== "cancelled" || !hasManualRefundStatus(order)) &&
     (filterName !== "return_refund" || isReturnRefundOrder(order))
   );
 }
@@ -420,54 +399,12 @@ async function fetchOrdersWithClientFallback(
   nextPage: number,
   pageSize: number
 ) {
-  const filterParams = orderFilterParams[filter];
+  const filterParams = orderFilterFallbackRules[filter];
   const response = await fetchOrders({
-    filter: filterParams.apiFilter,
+    filter: filter === "all" ? undefined : filter,
     page: nextPage,
     pageSize,
-    status: filterParams.apiFilter ? undefined : filterParams.status ?? undefined,
-    paymentstatus: filterParams.apiFilter
-      ? undefined
-      : filterParams.paymentstatus ?? undefined,
   });
-
-  if (filterParams.apiFilter && (response.items.length > 0 || nextPage !== 1)) {
-    return response;
-  }
-
-  if (filterParams.apiFilter && nextPage === 1 && response.items.length === 0) {
-    const fallbackResponse = await fetchOrders({
-      page: 1,
-      pageSize: FALLBACK_ORDER_PAGE_SIZE,
-    });
-    const fallbackItems = fallbackResponse.items.filter((order) =>
-      matchesOrderFilter(order, filter, filterParams)
-    );
-
-    return {
-      items: fallbackItems.slice(0, pageSize),
-      page: 1,
-      pageSize,
-      total: fallbackItems.length,
-      hasMore: fallbackItems.length > pageSize,
-    };
-  }
-
-  if (
-    ["awaiting_receive", "completed", "awaiting_review", "canceled", "return_refund"].includes(
-      filter
-    )
-  ) {
-    const filteredItems = response.items.filter((order) =>
-      matchesOrderFilter(order, filter, filterParams)
-    );
-    return {
-      ...response,
-      items: filteredItems,
-      total: filteredItems.length,
-      hasMore: response.hasMore,
-    };
-  }
 
   if (filter === "all" || response.items.length > 0 || nextPage !== 1) {
     return response;

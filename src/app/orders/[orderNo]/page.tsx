@@ -1532,6 +1532,22 @@ export default function OrderTrackingPage({
           </Link>
         )}
 
+        {canReviewOrder && pendingReviewItem && (
+          <button
+            type="button"
+            onClick={() =>
+              handleOpenReview({
+                item: pendingReviewItem,
+                existingReview: getExistingReview(pendingReviewItem),
+              })
+            }
+            className="flex w-full items-center justify-center gap-2 rounded-full bg-brand py-3 text-sm font-bold text-white shadow-[0_10px_24px_rgba(237,23,28,0.18)] transition active:scale-[0.98]"
+          >
+            <Star className="h-4 w-4" />
+            เขียนรีวิว
+          </button>
+        )}
+
         {canRequestReturn && (
           <button
             type="button"
