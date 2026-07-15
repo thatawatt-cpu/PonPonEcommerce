@@ -143,9 +143,6 @@ export function ShopNotificationListener({ hubUrl }: { hubUrl: string }) {
 
   useEffect(() => {
     if (!getStoredPonPonJwt() || !isStoredJwtValid()) {
-      console.info("[shop-notifications] SignalR skipped: missing or expired JWT", {
-        hubUrl,
-      });
       return;
     }
 
@@ -153,8 +150,6 @@ export function ShopNotificationListener({ hubUrl }: { hubUrl: string }) {
     let cancelled = false;
 
     const startConnection = async () => {
-      console.info("[shop-notifications] SignalR connecting", { hubUrl });
-
       connection = new HubConnectionBuilder()
         .withUrl(hubUrl, {
           accessTokenFactory: () => getStoredPonPonJwt() ?? "",
@@ -167,36 +162,9 @@ export function ShopNotificationListener({ hubUrl }: { hubUrl: string }) {
         )
         .build();
 
-      connection.onreconnecting((error) => {
-        console.warn("[shop-notifications] SignalR reconnecting", {
-          hubUrl,
-          error,
-        });
-      });
-
-      connection.onreconnected((connectionId) => {
-        console.info("[shop-notifications] SignalR reconnected", {
-          hubUrl,
-          connectionId,
-        });
-      });
-
-      connection.onclose((error) => {
-        console.warn("[shop-notifications] SignalR closed", {
-          hubUrl,
-          error,
-        });
-      });
-
       connection.on(
         "shopNotification",
         (payload: ShopNotificationPayload) => {
-          console.info("[shop-notifications] SignalR shopNotification received", {
-            id: payload.id,
-            type: payload.type,
-            orderId: payload.orderId,
-            orderNumber: payload.orderNumber ?? payload.orderNo,
-          });
           addFromShopNotification(payload);
           if (shouldShowToast(payload)) {
             showToast(payload);
@@ -206,11 +174,6 @@ export function ShopNotificationListener({ hubUrl }: { hubUrl: string }) {
 
       try {
         await connection.start();
-        console.info("[shop-notifications] SignalR connected", {
-          hubUrl,
-          connectionId: connection.connectionId,
-          state: connection.state,
-        });
       } catch (error) {
         if (!cancelled) {
           console.warn("[shop-notifications] SignalR connection failed", error);
@@ -233,10 +196,6 @@ export function ShopNotificationListener({ hubUrl }: { hubUrl: string }) {
         connection &&
         connection.state !== HubConnectionState.Disconnected
       ) {
-        console.info("[shop-notifications] SignalR stopping", {
-          hubUrl,
-          state: connection.state,
-        });
         void connection.stop();
       }
     };
