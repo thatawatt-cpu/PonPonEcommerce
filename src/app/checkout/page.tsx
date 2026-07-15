@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useMemo, useRef, useState } from "react";
+import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -74,6 +74,7 @@ import type {
   ApiMobileBankingPaymentResponse,
   ApiMobileBankingType,
   ApiCouponListItem,
+  ApiPricingPreviewRequest,
   ApiPricingPreviewResponse,
   ApiPromptPayPaymentResponse,
 } from "@/types/api";
@@ -446,6 +447,7 @@ export default function CheckoutPage({
     useState(false);
   const [promoMessage, setPromoMessage] = useState("");
   const [promoError, setPromoError] = useState(false);
+  const [couponApplying, setCouponApplying] = useState(false);
   const [pricingPreview, setPricingPreview] =
     useState<ApiPricingPreviewResponse | null>(null);
   const [pricingPreviewSignature, setPricingPreviewSignature] = useState("");
@@ -536,15 +538,14 @@ export default function CheckoutPage({
     ]
   );
   const previewCanLoad = canLoadShippingRates && shippingQuoteResolved;
-  const currentPricingPreviewSignature = useMemo(
-    () =>
-      JSON.stringify({
+  const buildPricingPreviewRequest = useCallback(
+    (nextCouponCodes: string[]): ApiPricingPreviewRequest => ({
         customerEmail: selectedAddress?.email || null,
         shippingName: shipping.customerName.trim(),
         shippingPhone: shipping.phone.trim(),
         shippingAddress: shipping.address.trim(),
         shippingChannel: selectedShippingRate?.courierCode ?? null,
-        couponCodes,
+        couponCodes: nextCouponCodes,
         items: items.map((item) => ({
           productId: item.productId,
           variantId: item.variantId ?? null,
@@ -552,7 +553,6 @@ export default function CheckoutPage({
         })),
       }),
     [
-      couponCodes,
       items,
       selectedAddress?.email,
       selectedShippingRate?.courierCode,
@@ -560,6 +560,15 @@ export default function CheckoutPage({
       shipping.customerName,
       shipping.phone,
     ]
+  );
+  const getPricingPreviewSignature = useCallback(
+    (nextCouponCodes: string[]) =>
+      JSON.stringify(buildPricingPreviewRequest(nextCouponCodes)),
+    [buildPricingPreviewRequest]
+  );
+  const currentPricingPreviewSignature = useMemo(
+    () => getPricingPreviewSignature(couponCodes),
+    [couponCodes, getPricingPreviewSignature]
   );
 
   useEffect(() => {
@@ -996,19 +1005,9 @@ export default function CheckoutPage({
       setPricingPreviewLoading(true);
       setPricingPreviewError(null);
 
-      fetchPricingPreview({
-        customerEmail: selectedAddress?.email || null,
-        shippingName: shipping.customerName.trim(),
-        shippingPhone: shipping.phone.trim(),
-        shippingAddress: shipping.address.trim(),
-        shippingChannel: selectedShippingRate?.courierCode ?? null,
-        couponCodes,
-        items: items.map((item) => ({
-          productId: item.productId,
-          variantId: item.variantId ?? null,
-          quantity: item.quantity,
-        })),
-      }, { signal: controller.signal })
+      fetchPricingPreview(buildPricingPreviewRequest(couponCodes), {
+        signal: controller.signal,
+      })
         .then((preview) => {
           if (cancelled) return;
           pricingPreviewCacheRef.current.set(requestSignature, preview);
@@ -1057,23 +1056,17 @@ export default function CheckoutPage({
       window.clearTimeout(timer);
     };
   }, [
+    buildPricingPreviewRequest,
     checkoutSourceLoaded,
     couponCodes,
     currentPricingPreviewSignature,
-    hydrated,
-    items,
     previewCanLoad,
     quoteTime,
-    selectedAddress?.email,
-    selectedShippingRate?.courierCode,
-    shipping.address,
-    shipping.customerName,
-    shipping.phone,
-    usesStoredCheckoutItems,
   ]);
 
   const applyPromoCode = () => {
     const nextCode = promoCode.trim().toUpperCase();
+    if (couponApplying) return;
     if (!nextCode) return;
     const availability = couponAvailabilityByCode[nextCode];
     if (availability?.canUse === false) {
@@ -1093,11 +1086,48 @@ export default function CheckoutPage({
       setPromoError(true);
       return;
     }
+    if (!previewCanLoad) {
+      setPromoMessage("กรุณาเลือกที่อยู่และขนส่งก่อนใช้คูปอง");
+      setPromoError(true);
+      return;
+    }
+
+    const nextCouponCodes = [...couponCodes, nextCode];
+    setCouponApplying(true);
     setPricingPreviewError(null);
-    setCouponCodes((current) => [...current, nextCode]);
-    setPromoCode("");
-    setPromoMessage("");
+    setPromoMessage("กำลังตรวจสอบคูปอง");
     setPromoError(false);
+
+    const request = buildPricingPreviewRequest(nextCouponCodes);
+    const requestSignature = getPricingPreviewSignature(nextCouponCodes);
+
+    fetchPricingPreview(request)
+      .then((preview) => {
+        const appliedCodes = preview.appliedCoupons.map((coupon) =>
+          coupon.code.toUpperCase()
+        );
+        if (!appliedCodes.includes(nextCode)) {
+          throw new Error(`คูปอง ${nextCode} ยังไม่ได้ถูกใช้กับออเดอร์นี้`);
+        }
+
+        pricingPreviewCacheRef.current.set(requestSignature, preview);
+        setCouponCodes(nextCouponCodes);
+        setPromoCode("");
+        setPromoMessage("ใช้คูปองเรียบร้อย");
+        setPromoError(false);
+        setPricingPreview(preview);
+        setPricingPreviewSignature(requestSignature);
+        setQuoteTime(Date.now());
+      })
+      .catch((err) => {
+        const message = getCouponErrorMessage(err);
+        setPromoMessage(message);
+        setPromoError(true);
+        setPricingPreviewError(message);
+      })
+      .finally(() => {
+        setCouponApplying(false);
+      });
   };
 
   const removePromoCode = (code: string) => {
@@ -1826,6 +1856,7 @@ export default function CheckoutPage({
                 setPromoCode(value);
                 setPromoMessage("");
                 setPromoError(false);
+                setPricingPreviewError(null);
               }}
               onApply={applyPromoCode}
               onRemove={removePromoCode}
@@ -1836,7 +1867,7 @@ export default function CheckoutPage({
               couponCodeCount={couponCodes.length}
               message={promoMessage}
               error={promoError}
-              applying={pricingPreviewLoading}
+              applying={pricingPreviewLoading || couponApplying}
             />
           </div>
         </Card>
