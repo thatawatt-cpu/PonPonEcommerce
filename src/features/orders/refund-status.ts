@@ -1,6 +1,7 @@
 export type OmiseRefundStatus =
   | "manual_refund_pending"
-  | "manual_refunded";
+  | "manual_refunded"
+  | "closed";
 
 export type ReturnRequestStatus =
   | "requested"
@@ -20,20 +21,20 @@ export function normalizeOmiseRefundStatus(
 
   if (
     normalized === "manual_refund_pending" ||
-    compact === "manualrefundpending" ||
-    compact === "refundpending"
+    compact === "manualrefundpending"
   ) {
     return "manual_refund_pending";
   }
 
   if (
     normalized === "manual_refunded" ||
-    compact === "manualrefunded" ||
-    compact === "manualrefundcompleted" ||
-    compact === "refundcompleted" ||
-    compact === "refunded"
+    compact === "manualrefunded"
   ) {
     return "manual_refunded";
+  }
+
+  if (normalized === "closed" || compact === "closed") {
+    return "closed";
   }
 
   return null;
@@ -44,6 +45,7 @@ export function getManualRefundLabel(status: unknown): string | null {
     case "manual_refund_pending":
       return "รอคืนเงิน";
     case "manual_refunded":
+    case "closed":
       return "คืนเงินสำเร็จ";
     default:
       return null;
@@ -86,7 +88,9 @@ export function getReturnRefundText({
   }
 
   if (
-    normalizeOmiseRefundStatus(omiseRefundStatus) === "manual_refunded" ||
+    ["manual_refunded", "closed"].includes(
+      normalizeOmiseRefundStatus(omiseRefundStatus) ?? ""
+    ) ||
     isCompletedRefundOrder
   ) {
     return "คืนเงินสำเร็จ";

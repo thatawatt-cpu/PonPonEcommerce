@@ -119,9 +119,6 @@ function getApiReturnRequestStatus(order: ApiOrderDetail): unknown {
   );
 }
 
-function isCompletedRefundOrderStatus(status: OrderStatus): boolean {
-  return status === "returned";
-}
 const MAX_RETURN_IMAGES = 5;
 const MAX_RETURN_IMAGE_SIZE = 10 * 1024 * 1024;
 const ALLOWED_RETURN_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
@@ -1383,8 +1380,6 @@ export default function OrderTrackingPage({
   const returnRefundText = getReturnRefundText({
     omiseRefundStatus,
     returnRequestStatus,
-    isCompletedRefundOrder:
-      isCompletedRefundOrderStatus(order.orderStatus) && !returnRequestStatus,
     assumeReturnRefund:
       Boolean(manualRefundLabel) ||
       order.orderStatus === "returned" ||
