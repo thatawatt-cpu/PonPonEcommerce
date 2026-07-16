@@ -11,7 +11,10 @@ import { ReorderSection } from "@/components/home/reorder-section";
 import { CouponSection } from "@/components/home/coupon-section";
 import { getCategoriesServer } from "@/features/products/product-service.server";
 import { getShopHomeServer } from "@/features/shop-home/shop-home-service.server";
-import { buildFlashSaleProducts } from "@/features/flash-sales/flash-sale-products";
+import {
+  buildFlashSaleProducts,
+  mergeFlashSaleProducts,
+} from "@/features/flash-sales/flash-sale-products";
 
 export default async function HomePage() {
   const [home, rawCategories] = await Promise.all([
@@ -20,18 +23,18 @@ export default async function HomePage() {
   ]);
 
   const products = home.featuredProducts;
+  const flashSaleProducts = buildFlashSaleProducts(products, home.flashSale);
+  const displayProducts = mergeFlashSaleProducts(products, flashSaleProducts);
   const categories = rawCategories.filter((c) => c.id !== "all");
-  const bestSellers = products.filter((p) => p.isBestSeller);
-  const featured = products.filter((p) => p.isFeatured);
+  const bestSellers = displayProducts.filter((p) => p.isBestSeller);
+  const featured = displayProducts.filter((p) => p.isFeatured);
 
   const displayBestSellers =
-    bestSellers.length > 0 ? bestSellers : products.slice(0, 6);
+    bestSellers.length > 0 ? bestSellers : displayProducts.slice(0, 6);
   const displayFeatured =
-    featured.length > 0 ? featured : products.slice(0, 6);
+    featured.length > 0 ? featured : displayProducts.slice(0, 6);
 
-  const flashSaleProducts = buildFlashSaleProducts(products, home.flashSale);
-
-  const reorderProducts = products.slice(0, 3);
+  const reorderProducts = displayProducts.slice(0, 3);
 
   return (
     <>

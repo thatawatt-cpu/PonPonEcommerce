@@ -232,6 +232,14 @@ export default function CouponsPage({
       coupons.filter((coupon) => coupon.status === "available" && coupon.canUse),
     [coupons],
   );
+  const availableShippingCoupons = useMemo(
+    () => availableCoupons.filter((coupon) => coupon.kind === "shipping"),
+    [availableCoupons],
+  );
+  const availableDiscountCoupons = useMemo(
+    () => availableCoupons.filter((coupon) => coupon.kind !== "shipping"),
+    [availableCoupons],
+  );
   const unavailableCoupons = useMemo(
     () =>
       coupons.filter(
@@ -240,6 +248,21 @@ export default function CouponsPage({
     [coupons],
   );
   const couponSections = useMemo(() => {
+    if (activeFilter === "available") {
+      return [
+        {
+          title: "โค้ดส่งฟรี",
+          description: "เลือกโค้ดส่งฟรีที่เข้าเงื่อนไขกับคำสั่งซื้อนี้",
+          coupons: filteredCoupons.filter((coupon) => coupon.kind === "shipping"),
+        },
+        {
+          title: "โค้ดส่วนลดและโปรโมชัน",
+          description: "เลือกส่วนลดสินค้า หรือโปรโมชันที่ใช้ได้",
+          coupons: filteredCoupons.filter((coupon) => coupon.kind !== "shipping"),
+        },
+      ].filter((section) => section.coupons.length > 0);
+    }
+
     if (activeFilter !== "all") {
       return [
         {
@@ -252,9 +275,14 @@ export default function CouponsPage({
 
     return [
       {
-        title: "คูปองพร้อมใช้",
-        description: "เลือกคูปองที่เข้าเงื่อนไขเพื่อใช้กับคำสั่งซื้อ",
-        coupons: availableCoupons,
+        title: "โค้ดส่งฟรี",
+        description: "เลือกโค้ดส่งฟรีก่อนชำระเงิน",
+        coupons: availableShippingCoupons,
+      },
+      {
+        title: "โค้ดส่วนลดและโปรโมชัน",
+        description: "เลือกส่วนลดสินค้า หรือโปรโมชันที่ใช้ได้",
+        coupons: availableDiscountCoupons,
       },
       {
         title: "คูปองที่ยังใช้ไม่ได้",
@@ -262,7 +290,13 @@ export default function CouponsPage({
         coupons: unavailableCoupons,
       },
     ].filter((section) => section.coupons.length > 0);
-  }, [activeFilter, availableCoupons, filteredCoupons, unavailableCoupons]);
+  }, [
+    activeFilter,
+    availableDiscountCoupons,
+    availableShippingCoupons,
+    filteredCoupons,
+    unavailableCoupons,
+  ]);
 
   const availableCount = coupons.filter(
     (coupon) => coupon.status === "available",
