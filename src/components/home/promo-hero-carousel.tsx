@@ -67,7 +67,6 @@ export function PromoHeroCarousel({ slides }: Props) {
             src={slide.image}
             alt=""
             fill
-            priority={index === 0}
             sizes="(max-width: 768px) 100vw, (max-width: 1280px) 960px, 1152px"
             className="object-cover object-center"
           />
