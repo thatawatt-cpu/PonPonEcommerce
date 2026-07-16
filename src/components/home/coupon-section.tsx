@@ -30,6 +30,8 @@ interface HomeCoupon {
   customerUsedCount?: number | null;
 }
 
+const HOME_COUPON_LIMIT = 4;
+
 function asNumber(value: unknown): number | null {
   if (typeof value === "number" && Number.isFinite(value)) return value;
   if (typeof value === "string") {
@@ -188,6 +190,7 @@ export function CouponSection({ coupons: apiCoupons = [] }: CouponSectionProps) 
   const displayCoupons = couponsLoaded
     ? coupons.filter(canShowAvailableCoupon)
     : [];
+  const visibleCoupons = displayCoupons.slice(0, HOME_COUPON_LIMIT);
 
   useEffect(() => {
     let cancelled = false;
@@ -253,7 +256,7 @@ export function CouponSection({ coupons: apiCoupons = [] }: CouponSectionProps) 
       </div>
 
       <div className="no-scrollbar -mx-3.5 flex gap-2.5 overflow-x-auto px-3.5 pb-1 md:mx-0 md:grid md:grid-cols-2 md:gap-3 md:overflow-visible md:px-0">
-        {displayCoupons.map((coupon) => {
+        {visibleCoupons.map((coupon) => {
           const isClaimed = coupon.isClaimed;
           const canClaim = coupon.canClaim && !isClaimed;
           const isFreeShipping = coupon.kind === "shipping";
