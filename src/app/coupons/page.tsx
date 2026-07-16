@@ -419,7 +419,7 @@ export default function CouponsPage({
         showNotifications={false}
       />
       <PageContainer
-        className={cn("space-y-4 pt-4", isCheckoutPicker && "pb-28")}
+        className={cn("space-y-4 pt-4", isCheckoutPicker && "pb-56")}
       >
         <section className="overflow-hidden rounded-card bg-brand p-4 text-white shadow-[0_14px_32px_rgba(190,9,14,0.24)]">
           <div className="flex items-start justify-between gap-4">
@@ -503,27 +503,10 @@ export default function CouponsPage({
             return (
               <Card
                 key={coupon.id}
-                role={isCheckoutPicker && isAvailable ? "button" : undefined}
-                tabIndex={isCheckoutPicker && isAvailable ? 0 : undefined}
-                onClick={() => {
-                  if (isCheckoutPicker && isAvailable) {
-                    toggleCheckoutCoupon(coupon);
-                  }
-                }}
-                onKeyDown={(event) => {
-                  if (!isCheckoutPicker || !isAvailable) return;
-                  if (event.key === "Enter" || event.key === " ") {
-                    event.preventDefault();
-                    toggleCheckoutCoupon(coupon);
-                  }
-                }}
                 className={cn(
                   "relative overflow-hidden",
                   !isAvailable && "opacity-85",
                   isCheckoutPicker && isSelected && "ring-2 ring-brand/35",
-                  isCheckoutPicker &&
-                    isAvailable &&
-                    "cursor-pointer transition active:scale-[0.99]",
                 )}
               >
                 <div className="flex">
@@ -582,81 +565,84 @@ export default function CouponsPage({
                           {coupon.code}
                         </p>
                       </div>
-                      {isAvailable ? (
-                        <div className="flex shrink-0 items-center gap-1.5">
-                          {isCheckoutPicker ? (
-                            <button
-                              type="button"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                toggleCheckoutCoupon(coupon);
-                              }}
-                              aria-label={
-                                isSelected
-                                  ? `ยกเลิกคูปอง ${coupon.code}`
-                                  : `เลือกคูปอง ${coupon.code}`
-                              }
-                              className={cn(
-                                "flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition",
-                                isSelected
-                                  ? isShippingCoupon
-                                    ? "bg-success text-white shadow-sm"
-                                    : "bg-brand text-white shadow-sm"
-                                  : "bg-white text-ink-soft ring-1 ring-black/15",
-                              )}
-                            >
-                              {isSelected ? (
-                                <CheckCircle2 className="h-5 w-5" />
-                              ) : (
-                                <Circle className="h-5 w-5" />
-                              )}
-                            </button>
-                          ) : (
-                            <>
-                              <button
-                                type="button"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  copyCode(coupon.code);
-                                }}
-                                aria-label={`คัดลอกโค้ด ${coupon.code}`}
-                                className={cn(
-                                  "flex h-8 w-8 items-center justify-center rounded-full transition",
-                                  isCopied
-                                    ? "bg-success-soft text-success"
-                                    : isShippingCoupon
-                                      ? "bg-white text-success shadow-sm ring-1 ring-success/15"
-                                      : "bg-white text-brand shadow-sm ring-1 ring-brand/10",
-                                )}
-                              >
-                                {isCopied ? (
-                                  <Check className="h-3.5 w-3.5" />
-                                ) : (
-                                  <Copy className="h-3.5 w-3.5" />
-                                )}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  applyCouponNow(coupon);
-                                }}
-                                disabled={Boolean(applyingCode)}
-                                className={cn(
-                                  "flex h-8 items-center rounded-full px-3 text-xs font-extrabold text-white disabled:opacity-70",
-                                  isShippingCoupon
-                                    ? "success-button"
-                                    : "brand-button",
-                                )}
-                              >
-                                {isApplying ? (
-                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                ) : (
-                                  "ใช้เลย"
-                                )}
-                              </button>
-                            </>
+                      {isCheckoutPicker ? (
+                        <button
+                          type="button"
+                          onClick={() => toggleCheckoutCoupon(coupon)}
+                          disabled={!isAvailable}
+                          aria-label={
+                            isSelected
+                              ? `ยกเลิกคูปอง ${coupon.code}`
+                              : `เลือกคูปอง ${coupon.code}`
+                          }
+                          className={cn(
+                            "flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3 text-xs font-extrabold transition disabled:cursor-not-allowed",
+                            isSelected
+                              ? isShippingCoupon
+                                ? "bg-success text-white shadow-sm"
+                                : "bg-brand text-white shadow-sm"
+                              : isAvailable
+                                ? "bg-white text-ink ring-1 ring-black/15"
+                                : "bg-surface-muted text-ink-soft opacity-70",
                           )}
+                        >
+                          {isSelected ? (
+                            <CheckCircle2 className="h-4 w-4" />
+                          ) : (
+                            <Circle className="h-4 w-4" />
+                          )}
+                          <span>
+                            {isSelected
+                              ? "เลือกแล้ว"
+                              : isAvailable
+                                ? "เลือก"
+                                : "ใช้ไม่ได้"}
+                          </span>
+                        </button>
+                      ) : isAvailable ? (
+                        <div className="flex shrink-0 items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              copyCode(coupon.code);
+                            }}
+                            aria-label={`คัดลอกโค้ด ${coupon.code}`}
+                            className={cn(
+                              "flex h-8 w-8 items-center justify-center rounded-full transition",
+                              isCopied
+                                ? "bg-success-soft text-success"
+                                : isShippingCoupon
+                                  ? "bg-white text-success shadow-sm ring-1 ring-success/15"
+                                  : "bg-white text-brand shadow-sm ring-1 ring-brand/10",
+                            )}
+                          >
+                            {isCopied ? (
+                              <Check className="h-3.5 w-3.5" />
+                            ) : (
+                              <Copy className="h-3.5 w-3.5" />
+                            )}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              applyCouponNow(coupon);
+                            }}
+                            disabled={Boolean(applyingCode)}
+                            className={cn(
+                              "flex h-8 items-center rounded-full px-3 text-xs font-extrabold text-white disabled:opacity-70",
+                              isShippingCoupon
+                                ? "success-button"
+                                : "brand-button",
+                            )}
+                          >
+                            {isApplying ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              "ใช้เลย"
+                            )}
+                          </button>
                         </div>
                       ) : null}
                     </div>

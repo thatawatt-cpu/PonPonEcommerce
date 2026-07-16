@@ -25,8 +25,14 @@ function getSoldCount(product: ApiProductListItem | ApiProductDetail): number | 
   return product.soldCount > 0 ? product.soldCount : undefined;
 }
 
-function mapShopBadges(badges: string[] = []): ProductBadge[] {
-  return badges.includes("flash_sale") ? ["ลดราคา"] : [];
+function mapShopBadges(product: ApiShopProductListItem): ProductBadge[] {
+  const badges: ProductBadge[] = [];
+  if (product.isBestSeller) badges.push("ขายดี");
+  if (product.isFeatured) badges.push("แนะนำ");
+  if (product.promotionBadge || product.badges?.includes("flash_sale")) {
+    badges.push("ลดราคา");
+  }
+  return badges;
 }
 
 function getDetailDisplayPrice(api: ApiProductDetail): number {
@@ -85,7 +91,7 @@ export function mapApiShopProductToProduct(api: ApiShopProductListItem): Product
     emoji: "📦",
     categoryId: api.categoryName ?? "",
     categoryName: api.categoryName ?? "",
-    badges: mapShopBadges(api.badges),
+    badges: mapShopBadges(api),
     stock: api.availableStock ?? api.stock ?? 0,
     soldCount: api.soldCount > 0 ? api.soldCount : undefined,
     rating: api.rating,

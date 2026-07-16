@@ -39,6 +39,7 @@ export interface ApiShopProductListItem {
   categoryName?: string | null;
   isFeatured?: boolean | null;
   isBestSeller?: boolean | null;
+  promotionBadge?: string | null;
 }
 
 export interface ApiShopHomeResponse {
