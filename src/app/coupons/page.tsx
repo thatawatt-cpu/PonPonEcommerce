@@ -5,9 +5,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Check,
+  CheckCircle2,
   Clock3,
   Copy,
   Loader2,
+  Circle,
   Sparkles,
   TicketPercent,
   Truck,
@@ -185,6 +187,19 @@ function mapApiCoupon(coupon: ApiCouponListItem): CouponItem | null {
   };
 }
 
+function parseSelectedCouponCodes(value?: string): string[] {
+  if (!value) return [];
+
+  return [
+    ...new Set(
+      value
+        .split(",")
+        .map((item) => item.trim().toUpperCase())
+        .filter(Boolean),
+    ),
+  ].slice(0, 2);
+}
+
 export default function CouponsPage({
   searchParams,
 }: {
@@ -199,8 +214,12 @@ export default function CouponsPage({
   const [activeFilter, setActiveFilter] = useState<CouponFilter>("all");
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [applyingCode, setApplyingCode] = useState<string | null>(null);
+  const [selectedCouponCodes, setSelectedCouponCodes] = useState<string[]>(() =>
+    parseSelectedCouponCodes(selected)
+  );
   const [remoteCoupons, setRemoteCoupons] = useState<ApiCouponListItem[]>([]);
   const [couponsLoaded, setCouponsLoaded] = useState(false);
+  const isCheckoutPicker = returnTo === "checkout";
   const coupons = useMemo(() => {
     return remoteCoupons
       .map(mapApiCoupon)
@@ -301,6 +320,26 @@ export default function CouponsPage({
   const availableCount = coupons.filter(
     (coupon) => coupon.status === "available",
   ).length;
+  const availableCouponCodes = useMemo(
+    () =>
+      new Set(
+        availableCoupons.map((coupon) => coupon.code.trim().toUpperCase()),
+      ),
+    [availableCoupons],
+  );
+  const checkoutSelectedCouponCodes = useMemo(() => {
+    const current = selectedCouponCodes.slice(0, 2);
+    if (!isCheckoutPicker || !couponsLoaded) return current;
+
+    return current.filter((code) =>
+      availableCouponCodes.has(code.trim().toUpperCase()),
+    );
+  }, [
+    availableCouponCodes,
+    couponsLoaded,
+    isCheckoutPicker,
+    selectedCouponCodes,
+  ]);
 
   const copyCode = async (code: string) => {
     try {
@@ -311,6 +350,44 @@ export default function CouponsPage({
       setCopiedCode(code);
       window.setTimeout(() => setCopiedCode(null), 1600);
     }
+  };
+
+  const buildCheckoutParams = (couponCodes: string[]) => {
+    const params = new URLSearchParams({
+      coupons: couponCodes.join(","),
+    });
+
+    if (mode === "buy-now" || mode === "cart-selection") {
+      params.set("mode", mode);
+    } else if (getStoredBuyNowCheckout()) {
+      params.set("mode", "buy-now");
+    } else if (getStoredCartSelectionCheckout().length > 0) {
+      params.set("mode", "cart-selection");
+    }
+
+    return params;
+  };
+
+  const confirmCheckoutCoupons = () => {
+    const params = buildCheckoutParams(checkoutSelectedCouponCodes);
+    router.push(`/checkout?${params.toString()}#checkout-coupon-section`);
+  };
+
+  const toggleCheckoutCoupon = (coupon: CouponItem) => {
+    if (!isCheckoutPicker || !coupon.canUse) return;
+
+    const code = coupon.code.trim().toUpperCase();
+    setSelectedCouponCodes((current) => {
+      const validCurrent = current
+        .filter((item) => availableCouponCodes.has(item.trim().toUpperCase()))
+        .slice(0, 2);
+
+      if (validCurrent.includes(code)) {
+        return validCurrent.filter((item) => item !== code);
+      }
+
+      return [...validCurrent, code].slice(0, 2);
+    });
   };
 
   const applyCouponNow = (coupon: CouponItem) => {
@@ -325,25 +402,10 @@ export default function CouponsPage({
       return;
     }
 
-    const selectedCodes =
-      selected
-        ?.split(",")
-        .map((item) => item.trim().toUpperCase())
-        .filter(Boolean) ?? [];
     const couponCodes = [
-      ...new Set([...selectedCodes, code.trim().toUpperCase()]),
+      ...new Set([...checkoutSelectedCouponCodes, code.trim().toUpperCase()]),
     ].slice(0, 2);
-    const params = new URLSearchParams({
-      coupons: couponCodes.join(","),
-    });
-
-    if (mode === "buy-now" || mode === "cart-selection") {
-      params.set("mode", mode);
-    } else if (getStoredBuyNowCheckout()) {
-      params.set("mode", "buy-now");
-    } else if (getStoredCartSelectionCheckout().length > 0) {
-      params.set("mode", "cart-selection");
-    }
+    const params = buildCheckoutParams(couponCodes);
 
     router.push(`/checkout?${params.toString()}#checkout-coupon-section`);
   };
@@ -356,7 +418,9 @@ export default function CouponsPage({
         showCart={false}
         showNotifications={false}
       />
-      <PageContainer className="space-y-4 pt-4">
+      <PageContainer
+        className={cn("space-y-4 pt-4", isCheckoutPicker && "pb-28")}
+      >
         <section className="overflow-hidden rounded-card bg-brand p-4 text-white shadow-[0_14px_32px_rgba(190,9,14,0.24)]">
           <div className="flex items-start justify-between gap-4">
             <div>
@@ -430,15 +494,36 @@ export default function CouponsPage({
             const isCopied = copiedCode === coupon.code;
             const isApplying = applyingCode === coupon.code;
             const isShippingCoupon = coupon.kind === "shipping";
+            const normalizedCode = coupon.code.trim().toUpperCase();
+            const isSelected =
+              checkoutSelectedCouponCodes.includes(normalizedCode);
             const unavailableText =
               !isAvailable ? coupon.unavailableReason ?? coupon.description : null;
 
             return (
               <Card
                 key={coupon.id}
+                role={isCheckoutPicker && isAvailable ? "button" : undefined}
+                tabIndex={isCheckoutPicker && isAvailable ? 0 : undefined}
+                onClick={() => {
+                  if (isCheckoutPicker && isAvailable) {
+                    toggleCheckoutCoupon(coupon);
+                  }
+                }}
+                onKeyDown={(event) => {
+                  if (!isCheckoutPicker || !isAvailable) return;
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    toggleCheckoutCoupon(coupon);
+                  }
+                }}
                 className={cn(
                   "relative overflow-hidden",
                   !isAvailable && "opacity-85",
+                  isCheckoutPicker && isSelected && "ring-2 ring-brand/35",
+                  isCheckoutPicker &&
+                    isAvailable &&
+                    "cursor-pointer transition active:scale-[0.99]",
                 )}
               >
                 <div className="flex">
@@ -499,42 +584,79 @@ export default function CouponsPage({
                       </div>
                       {isAvailable ? (
                         <div className="flex shrink-0 items-center gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => copyCode(coupon.code)}
-                            aria-label={`คัดลอกโค้ด ${coupon.code}`}
-                            className={cn(
-                              "flex h-8 w-8 items-center justify-center rounded-full transition",
-                              isCopied
-                                ? "bg-success-soft text-success"
-                                : isShippingCoupon
-                                  ? "bg-white text-success shadow-sm ring-1 ring-success/15"
-                                  : "bg-white text-brand shadow-sm ring-1 ring-brand/10",
-                            )}
-                          >
-                            {isCopied ? (
-                              <Check className="h-3.5 w-3.5" />
-                            ) : (
-                              <Copy className="h-3.5 w-3.5" />
-                            )}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => applyCouponNow(coupon)}
-                            disabled={Boolean(applyingCode)}
-                            className={cn(
-                              "flex h-8 items-center rounded-full px-3 text-xs font-extrabold text-white disabled:opacity-70",
-                              isShippingCoupon
-                                ? "success-button"
-                                : "brand-button",
-                            )}
-                          >
-                            {isApplying ? (
-                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            ) : (
-                              "ใช้เลย"
-                            )}
-                          </button>
+                          {isCheckoutPicker ? (
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                toggleCheckoutCoupon(coupon);
+                              }}
+                              aria-label={
+                                isSelected
+                                  ? `ยกเลิกคูปอง ${coupon.code}`
+                                  : `เลือกคูปอง ${coupon.code}`
+                              }
+                              className={cn(
+                                "flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition",
+                                isSelected
+                                  ? isShippingCoupon
+                                    ? "bg-success text-white shadow-sm"
+                                    : "bg-brand text-white shadow-sm"
+                                  : "bg-white text-ink-soft ring-1 ring-black/15",
+                              )}
+                            >
+                              {isSelected ? (
+                                <CheckCircle2 className="h-5 w-5" />
+                              ) : (
+                                <Circle className="h-5 w-5" />
+                              )}
+                            </button>
+                          ) : (
+                            <>
+                              <button
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  copyCode(coupon.code);
+                                }}
+                                aria-label={`คัดลอกโค้ด ${coupon.code}`}
+                                className={cn(
+                                  "flex h-8 w-8 items-center justify-center rounded-full transition",
+                                  isCopied
+                                    ? "bg-success-soft text-success"
+                                    : isShippingCoupon
+                                      ? "bg-white text-success shadow-sm ring-1 ring-success/15"
+                                      : "bg-white text-brand shadow-sm ring-1 ring-brand/10",
+                                )}
+                              >
+                                {isCopied ? (
+                                  <Check className="h-3.5 w-3.5" />
+                                ) : (
+                                  <Copy className="h-3.5 w-3.5" />
+                                )}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  applyCouponNow(coupon);
+                                }}
+                                disabled={Boolean(applyingCode)}
+                                className={cn(
+                                  "flex h-8 items-center rounded-full px-3 text-xs font-extrabold text-white disabled:opacity-70",
+                                  isShippingCoupon
+                                    ? "success-button"
+                                    : "brand-button",
+                                )}
+                              >
+                                {isApplying ? (
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                ) : (
+                                  "ใช้เลย"
+                                )}
+                              </button>
+                            </>
+                          )}
                         </div>
                       ) : null}
                     </div>
@@ -573,12 +695,34 @@ export default function CouponsPage({
           </Card>
         ) : null}
 
-        <Link
-          href="/products"
-          className="brand-button flex h-12 items-center justify-center rounded-full text-sm font-extrabold text-white"
-        >
-          ไปเลือกสินค้าเพื่อใช้คูปอง
-        </Link>
+        {isCheckoutPicker ? (
+          <div className="fixed inset-x-0 bottom-above-nav z-30 border-t border-black/[0.05] bg-white/95 px-4 pb-3 pt-3 shadow-[0_-12px_35px_rgba(0,0,0,0.08)] backdrop-blur">
+            <div className="mx-auto flex max-w-md items-center gap-3 md:max-w-5xl md:px-8 xl:max-w-6xl">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-bold text-ink-soft">
+                  เลือกคูปองแล้ว {checkoutSelectedCouponCodes.length} ใบ
+                </p>
+                <p className="text-[11px] font-semibold text-ink-soft">
+                  ระบบจะตรวจเงื่อนไขซ้ำใน checkout
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={confirmCheckoutCoupons}
+                className="brand-button h-11 shrink-0 rounded-full px-8 text-sm font-extrabold text-white"
+              >
+                ตกลง
+              </button>
+            </div>
+          </div>
+        ) : (
+          <Link
+            href="/products"
+            className="brand-button flex h-12 items-center justify-center rounded-full text-sm font-extrabold text-white"
+          >
+            ไปเลือกสินค้าเพื่อใช้คูปอง
+          </Link>
+        )}
       </PageContainer>
     </>
   );
