@@ -538,7 +538,8 @@ export default function CouponsPage({
             const isShippingCoupon = coupon.kind === "shipping";
             const normalizedCode = coupon.code.trim().toUpperCase();
             const isUsableNow = canUseCouponNow(coupon);
-            const canClaimCoupon = !coupon.isClaimed && coupon.canClaim;
+            const canClaimCoupon =
+              !isMyCouponsPage && !coupon.isClaimed && coupon.canClaim;
             const isClaiming = claimingId === coupon.id;
             const isSelected =
               checkoutSelectedCouponCodes.includes(normalizedCode);
