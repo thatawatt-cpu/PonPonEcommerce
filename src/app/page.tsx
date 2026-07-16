@@ -29,11 +29,6 @@ export default async function HomePage() {
   const bestSellers = displayProducts.filter((p) => p.isBestSeller);
   const featured = displayProducts.filter((p) => p.isFeatured);
 
-  const displayBestSellers =
-    bestSellers.length > 0 ? bestSellers : displayProducts.slice(0, 6);
-  const displayFeatured =
-    featured.length > 0 ? featured : displayProducts.slice(0, 6);
-
   const reorderProducts = displayProducts.slice(0, 3);
 
   return (
@@ -73,47 +68,51 @@ export default async function HomePage() {
         <CouponSection coupons={home.availableCoupons} />
         <ShopBenefits />
 
-        <section className="mt-5">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="promo-section-title flex items-center gap-1.5">
-              <Flame className="h-5 w-5 fill-brand text-brand" />
-              สินค้าขายดี
-            </h2>
-            <Link
-              href="/products"
-              className="rounded-full bg-white px-3 py-1 text-xs font-bold text-brand shadow-sm"
-            >
-              ดูทั้งหมด
-            </Link>
-          </div>
-          <div className="grid grid-cols-2 gap-2.5 md:grid-cols-3 md:gap-4 lg:grid-cols-4">
-            {displayBestSellers.map((product, index) => (
-              <ProductCard key={product.id} product={product} index={index} />
-            ))}
-          </div>
-        </section>
+        {bestSellers.length > 0 && (
+          <section className="mt-5">
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="promo-section-title flex items-center gap-1.5">
+                <Flame className="h-5 w-5 fill-brand text-brand" />
+                สินค้าขายดี
+              </h2>
+              <Link
+                href="/products"
+                className="rounded-full bg-white px-3 py-1 text-xs font-bold text-brand shadow-sm"
+              >
+                ดูทั้งหมด
+              </Link>
+            </div>
+            <div className="grid grid-cols-2 gap-2.5 md:grid-cols-3 md:gap-4 lg:grid-cols-4">
+              {bestSellers.map((product, index) => (
+                <ProductCard key={product.id} product={product} index={index} />
+              ))}
+            </div>
+          </section>
+        )}
 
         <ReorderSection products={reorderProducts} />
 
-        <section className="mt-6">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="promo-section-title flex items-center gap-1.5">
-              <Sparkles className="h-5 w-5 text-amber-500" />
-              แนะนำสำหรับคุณ
-            </h2>
-            <Link
-              href="/products"
-              className="rounded-full bg-white px-3 py-1 text-xs font-bold text-brand shadow-sm"
-            >
-              ดูทั้งหมด
-            </Link>
-          </div>
-          <div className="grid grid-cols-2 gap-2.5 md:grid-cols-3 md:gap-4 lg:grid-cols-4">
-            {displayFeatured.map((product, index) => (
-              <ProductCard key={product.id} product={product} index={index} />
-            ))}
-          </div>
-        </section>
+        {featured.length > 0 && (
+          <section className="mt-6">
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="promo-section-title flex items-center gap-1.5">
+                <Sparkles className="h-5 w-5 text-amber-500" />
+                แนะนำสำหรับคุณ
+              </h2>
+              <Link
+                href="/products"
+                className="rounded-full bg-white px-3 py-1 text-xs font-bold text-brand shadow-sm"
+              >
+                ดูทั้งหมด
+              </Link>
+            </div>
+            <div className="grid grid-cols-2 gap-2.5 md:grid-cols-3 md:gap-4 lg:grid-cols-4">
+              {featured.map((product, index) => (
+                <ProductCard key={product.id} product={product} index={index} />
+              ))}
+            </div>
+          </section>
+        )}
       </PageContainer>
     </>
   );
