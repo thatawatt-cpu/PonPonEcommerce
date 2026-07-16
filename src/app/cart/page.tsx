@@ -23,7 +23,6 @@ import {
   useCartStore,
 } from "@/store/cart-store";
 import { storeCartSelectionCheckout } from "@/features/checkout/cart-selection-checkout";
-import { SHIPPING_FEE } from "@/lib/constants";
 import { formatBaht } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -84,8 +83,7 @@ export default function CartPage() {
     (sum, { item }) => sum + item.price * item.quantity,
     0
   );
-  const selectedShippingFee = selectedItems.length > 0 ? SHIPPING_FEE : 0;
-  const selectedTotal = selectedSubtotal + selectedShippingFee;
+  const selectedTotal = selectedSubtotal;
   const selectedQuantity = selectedItems.reduce(
     (sum, { item }) => sum + item.quantity,
     0
@@ -281,7 +279,7 @@ export default function CartPage() {
             <section className="rounded-3xl bg-white px-4 py-4 ring-1 ring-black/[0.04]">
               <CartSummary
                 subtotal={selectedSubtotal}
-                shippingFee={selectedShippingFee}
+                showShipping={false}
                 total={selectedTotal}
               />
             </section>
