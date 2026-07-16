@@ -150,7 +150,7 @@ export default function ProfilePage() {
       label: "คูปองของฉัน",
       countKey: "couponCount" as const,
       icon: TicketPercent,
-      href: "/coupons",
+      href: "/coupons?scope=my",
     },
     {
       label: "สินค้าที่ถูกใจ",

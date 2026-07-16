@@ -244,8 +244,11 @@ export function CouponSection({ coupons: apiCoupons = [] }: CouponSectionProps) 
           <TicketPercent className="h-5 w-5 text-brand" />
           คูปองสำหรับคุณ
         </h2>
-        <Link href="/coupons" className="text-[11px] font-extrabold text-brand">
-          คูปองของฉัน
+        <Link
+          href="/coupons"
+          className="rounded-full bg-white px-3 py-1 text-xs font-extrabold text-brand shadow-sm ring-1 ring-brand/10"
+        >
+          ดูคูปองทั้งหมด
         </Link>
       </div>
 

@@ -95,7 +95,7 @@ export function AppHeader({
     { href: "/", label: "หน้าหลัก", icon: Home },
     { href: "/products", label: "สินค้าทั้งหมด", icon: LayoutGrid },
     { href: "/cart", label: "ตะกร้าสินค้า", icon: ShoppingCart },
-    { href: "/coupons", label: "คูปองของฉัน", icon: TicketPercent },
+    { href: "/coupons?scope=my", label: "คูปองของฉัน", icon: TicketPercent },
     { href: "/orders", label: "ออเดอร์ของฉัน", icon: ReceiptText },
     { href: "/profile", label: "โปรไฟล์", icon: UserRound },
   ];

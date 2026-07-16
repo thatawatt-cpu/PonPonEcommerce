@@ -18,7 +18,11 @@ import {
 import { AppHeader } from "@/components/layout/app-header";
 import { PageContainer } from "@/components/layout/page-container";
 import { Card } from "@/components/ui/card";
-import { fetchMyCoupons } from "@/features/coupons/coupon-api";
+import {
+  claimCoupon,
+  fetchAvailableCoupons,
+  fetchMyCoupons,
+} from "@/features/coupons/coupon-api";
 import { storePendingCouponCode } from "@/features/coupons/pending-coupon";
 import { getStoredBuyNowCheckout } from "@/features/checkout/buy-now-checkout";
 import { getStoredCartSelectionCheckout } from "@/features/checkout/cart-selection-checkout";
@@ -43,6 +47,8 @@ interface CouponItem {
   kind: CouponKind;
   icon: LucideIcon;
   canUse: boolean;
+  canClaim: boolean;
+  isClaimed: boolean;
   unavailableReason: string | null;
 }
 
@@ -183,6 +189,8 @@ function mapApiCoupon(coupon: ApiCouponListItem): CouponItem | null {
     kind,
     icon: getCouponIcon(kind),
     canUse,
+    canClaim: coupon.canClaim !== false,
+    isClaimed: coupon.isClaimed === true,
     unavailableReason: coupon.unavailableReason ?? null,
   };
 }
@@ -207,9 +215,10 @@ export default function CouponsPage({
     returnTo?: string;
     selected?: string;
     mode?: string;
+    scope?: string;
   }>;
 }) {
-  const { returnTo, selected, mode } = use(searchParams);
+  const { returnTo, selected, mode, scope } = use(searchParams);
   const router = useRouter();
   const [activeFilter, setActiveFilter] = useState<CouponFilter>("all");
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
@@ -219,7 +228,9 @@ export default function CouponsPage({
   );
   const [remoteCoupons, setRemoteCoupons] = useState<ApiCouponListItem[]>([]);
   const [couponsLoaded, setCouponsLoaded] = useState(false);
+  const [claimingId, setClaimingId] = useState<string | null>(null);
   const isCheckoutPicker = returnTo === "checkout";
+  const isMyCouponsPage = scope === "my";
   const coupons = useMemo(() => {
     return remoteCoupons
       .map(mapApiCoupon)
@@ -228,7 +239,11 @@ export default function CouponsPage({
 
   useEffect(() => {
     let cancelled = false;
-    fetchMyCoupons()
+    const loadCoupons = isMyCouponsPage
+      ? fetchMyCoupons()
+      : fetchAvailableCoupons({ salesChannel: "line_liff" });
+
+    loadCoupons
       .then((items) => {
         if (cancelled) return;
         setRemoteCoupons(items);
@@ -240,7 +255,7 @@ export default function CouponsPage({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [isMyCouponsPage]);
 
   const filteredCoupons = useMemo(() => {
     if (activeFilter === "all") return coupons;
@@ -320,12 +335,18 @@ export default function CouponsPage({
   const availableCount = coupons.filter(
     (coupon) => coupon.status === "available",
   ).length;
+  function canUseCouponNow(coupon: CouponItem) {
+    return coupon.canUse && (coupon.isClaimed || isMyCouponsPage);
+  }
+
   const availableCouponCodes = useMemo(
     () =>
       new Set(
-        availableCoupons.map((coupon) => coupon.code.trim().toUpperCase()),
+        availableCoupons
+          .filter((coupon) => coupon.canUse && (coupon.isClaimed || isMyCouponsPage))
+          .map((coupon) => coupon.code.trim().toUpperCase()),
       ),
-    [availableCoupons],
+    [availableCoupons, isMyCouponsPage],
   );
   const checkoutSelectedCouponCodes = useMemo(() => {
     const current = selectedCouponCodes.slice(0, 2);
@@ -374,7 +395,7 @@ export default function CouponsPage({
   };
 
   const toggleCheckoutCoupon = (coupon: CouponItem) => {
-    if (!isCheckoutPicker || !coupon.canUse) return;
+    if (!isCheckoutPicker || !canUseCouponNow(coupon)) return;
 
     const code = coupon.code.trim().toUpperCase();
     setSelectedCouponCodes((current) => {
@@ -391,7 +412,7 @@ export default function CouponsPage({
   };
 
   const applyCouponNow = (coupon: CouponItem) => {
-    if (!coupon.canUse) return;
+    if (!canUseCouponNow(coupon)) return;
 
     const code = coupon.code;
     setApplyingCode(code);
@@ -410,10 +431,28 @@ export default function CouponsPage({
     router.push(`/checkout?${params.toString()}#checkout-coupon-section`);
   };
 
+  const claimCouponNow = (coupon: CouponItem) => {
+    if (coupon.isClaimed || !coupon.canClaim || claimingId) return;
+
+    setClaimingId(coupon.id);
+    claimCoupon(coupon.id)
+      .then((claimedCoupon) => {
+        if (!claimedCoupon) return;
+        setRemoteCoupons((current) =>
+          current.map((item) =>
+            item.id === coupon.id || item.code === coupon.code
+              ? claimedCoupon
+              : item,
+          ),
+        );
+      })
+      .finally(() => setClaimingId(null));
+  };
+
   return (
     <>
       <AppHeader
-        title="คูปองของฉัน"
+        title={isMyCouponsPage ? "คูปองของฉัน" : "คูปองทั้งหมด"}
         showBack
         showCart={false}
         showNotifications={false}
@@ -426,10 +465,13 @@ export default function CouponsPage({
             <div>
               <p className="text-xs font-bold text-white/80">My Coupons</p>
               <h1 className="mt-1 text-2xl font-extrabold">
-                มีคูปองพร้อมใช้ {availableCount} ใบ
+                {isMyCouponsPage ? "มีคูปองพร้อมใช้" : "คูปองพร้อมเก็บ"}{" "}
+                {availableCount} ใบ
               </h1>
               <p className="mt-2 text-xs leading-relaxed text-white/80">
-                เก็บคูปองไว้ใช้ตอนชำระเงิน ระบบจะเลือกส่วนลดที่เหมาะที่สุดให้
+                {isMyCouponsPage
+                  ? "คูปองที่เก็บไว้ใช้ตอนชำระเงิน ระบบจะเลือกส่วนลดที่เหมาะที่สุดให้"
+                  : "กดเก็บคูปองไว้ก่อน แล้วนำไปใช้ตอนเลือกสินค้า/ชำระเงิน"}
               </p>
             </div>
             <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-3xl bg-white/18 text-white shadow-inner">
@@ -495,10 +537,15 @@ export default function CouponsPage({
             const isApplying = applyingCode === coupon.code;
             const isShippingCoupon = coupon.kind === "shipping";
             const normalizedCode = coupon.code.trim().toUpperCase();
+            const isUsableNow = canUseCouponNow(coupon);
+            const canClaimCoupon = !coupon.isClaimed && coupon.canClaim;
+            const isClaiming = claimingId === coupon.id;
             const isSelected =
               checkoutSelectedCouponCodes.includes(normalizedCode);
             const unavailableText =
-              !isAvailable ? coupon.unavailableReason ?? coupon.description : null;
+              !isAvailable
+                ? coupon.unavailableReason ?? coupon.description
+                : null;
 
             return (
               <Card
@@ -568,12 +615,20 @@ export default function CouponsPage({
                       {isCheckoutPicker ? (
                         <button
                           type="button"
-                          onClick={() => toggleCheckoutCoupon(coupon)}
-                          disabled={!isAvailable}
+                          onClick={() => {
+                            if (canClaimCoupon) {
+                              claimCouponNow(coupon);
+                              return;
+                            }
+                            toggleCheckoutCoupon(coupon);
+                          }}
+                          disabled={!isUsableNow && !canClaimCoupon}
                           aria-label={
                             isSelected
                               ? `ยกเลิกคูปอง ${coupon.code}`
-                              : `เลือกคูปอง ${coupon.code}`
+                              : canClaimCoupon
+                                ? `เก็บคูปอง ${coupon.code}`
+                                : `เลือกคูปอง ${coupon.code}`
                           }
                           className={cn(
                             "flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3 text-xs font-extrabold transition disabled:cursor-not-allowed",
@@ -581,12 +636,14 @@ export default function CouponsPage({
                               ? isShippingCoupon
                                 ? "bg-success text-white shadow-sm"
                                 : "bg-brand text-white shadow-sm"
-                              : isAvailable
+                              : isUsableNow || canClaimCoupon
                                 ? "bg-white text-ink ring-1 ring-black/15"
                                 : "bg-surface-muted text-ink-soft opacity-70",
                           )}
                         >
-                          {isSelected ? (
+                          {isClaiming ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : isSelected ? (
                             <CheckCircle2 className="h-4 w-4" />
                           ) : (
                             <Circle className="h-4 w-4" />
@@ -594,12 +651,14 @@ export default function CouponsPage({
                           <span>
                             {isSelected
                               ? "เลือกแล้ว"
-                              : isAvailable
+                              : canClaimCoupon
+                                ? "เก็บ"
+                                : isUsableNow
                                 ? "เลือก"
                                 : "ใช้ไม่ได้"}
                           </span>
                         </button>
-                      ) : isAvailable ? (
+                      ) : isAvailable || canClaimCoupon ? (
                         <div className="flex shrink-0 items-center gap-1.5">
                           <button
                             type="button"
@@ -627,9 +686,17 @@ export default function CouponsPage({
                             type="button"
                             onClick={(event) => {
                               event.stopPropagation();
-                              applyCouponNow(coupon);
+                              if (canClaimCoupon) {
+                                claimCouponNow(coupon);
+                              } else {
+                                applyCouponNow(coupon);
+                              }
                             }}
-                            disabled={Boolean(applyingCode)}
+                            disabled={
+                              Boolean(applyingCode) ||
+                              Boolean(claimingId) ||
+                              (!isUsableNow && !canClaimCoupon)
+                            }
                             className={cn(
                               "flex h-8 items-center rounded-full px-3 text-xs font-extrabold text-white disabled:opacity-70",
                               isShippingCoupon
@@ -637,8 +704,10 @@ export default function CouponsPage({
                                 : "brand-button",
                             )}
                           >
-                            {isApplying ? (
+                            {isApplying || isClaiming ? (
                               <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : canClaimCoupon ? (
+                              "เก็บ"
                             ) : (
                               "ใช้เลย"
                             )}
