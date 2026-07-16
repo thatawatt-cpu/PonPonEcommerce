@@ -2,7 +2,8 @@ import type { ApiFlashSale } from "@/types/api";
 import type { Product } from "@/types/product";
 
 function createFlashSaleFallbackProduct(
-  item: ApiFlashSale["products"][number]
+  item: ApiFlashSale["products"][number],
+  flashSaleId: string
 ): Product {
   return {
     id: item.productId,
@@ -19,6 +20,8 @@ function createFlashSaleFallbackProduct(
     stock: 0,
     isFeatured: false,
     isBestSeller: false,
+    priceSource: "flash_sale",
+    activeFlashSaleId: flashSaleId,
   };
 }
 
@@ -37,17 +40,21 @@ export function buildFlashSaleProducts(
           ...product,
           price: item.salePrice,
           compareAtPrice: item.originalPrice,
+          priceSource: "flash_sale",
+          activeFlashSaleId: flashSale.id,
           imageUrl: product.imageUrl || item.imageUrl || "",
         }
-      : createFlashSaleFallbackProduct(item);
+      : createFlashSaleFallbackProduct(item, flashSale.id);
   });
 }
 
 export function mergeFlashSaleProducts(
   products: Product[],
-  flashSaleProducts: Product[]
+  flashSaleProducts: Product[],
+  options: { includeMissing?: boolean } = {}
 ): Product[] {
   if (flashSaleProducts.length === 0) return products;
+  const includeMissing = options.includeMissing ?? true;
 
   const existingIds = new Set(products.map((product) => product.id));
   const missingFlashSaleProducts = flashSaleProducts.filter(
@@ -61,6 +68,6 @@ export function mergeFlashSaleProducts(
       );
       return flashSaleProduct ?? product;
     }),
-    ...missingFlashSaleProducts,
+    ...(includeMissing ? missingFlashSaleProducts : []),
   ];
 }

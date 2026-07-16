@@ -1,5 +1,10 @@
 import "server-only";
 import { PONPON_BACKEND_BASE_URL } from "@/lib/server/api-backend";
+import { getActiveFlashSaleServer } from "@/features/flash-sales/flash-sales-service.server";
+import {
+  buildFlashSaleProducts,
+  mergeFlashSaleProducts,
+} from "@/features/flash-sales/flash-sale-products";
 import {
   mapApiCategoryToCategory,
   mapApiProductDetailToProduct,
@@ -48,20 +53,38 @@ function applyResolvedPrice(
   };
 }
 
-function mapShopProductDetail(
+async function applyActiveFlashSalePrices(
+  products: Product[],
+  options: { includeMissing?: boolean } = {}
+): Promise<Product[]> {
+  if (products.length === 0) return products;
+
+  const activeFlashSale = await getActiveFlashSaleServer();
+  const flashSaleProducts = buildFlashSaleProducts(products, activeFlashSale);
+  return mergeFlashSaleProducts(products, flashSaleProducts, options);
+}
+
+async function mapShopProductDetail(
   data: ApiShopProductDetailResponse | null
-): ProductDetailServerData | null {
+): Promise<ProductDetailServerData | null> {
   if (!data?.product) return null;
 
+  const product = applyResolvedPrice(
+    mapApiProductDetailToProduct(data.product),
+    data.resolvedPrice
+  );
+  const relatedProducts = getArray(data.relatedProducts).map(
+    mapApiShopProductToProduct
+  );
+  const mergedProducts = await applyActiveFlashSalePrices(
+    [product, ...relatedProducts],
+    { includeMissing: false }
+  );
+
   return {
-    product: applyResolvedPrice(
-      mapApiProductDetailToProduct(data.product),
-      data.resolvedPrice
-    ),
+    product: mergedProducts[0] ?? product,
     availableCoupons: getArray(data.availableCoupons),
-    relatedProducts: getArray(data.relatedProducts).map(
-      mapApiShopProductToProduct
-    ),
+    relatedProducts: mergedProducts.slice(1),
   };
 }
 
@@ -84,7 +107,10 @@ export async function getAllProductsServer(params?: {
     if (!res.ok) return [];
 
     const data: ApiShopProductListItem[] = await res.json();
-    return Array.isArray(data) ? data.map(mapApiShopProductToProduct) : [];
+    const products = Array.isArray(data)
+      ? data.map(mapApiShopProductToProduct)
+      : [];
+    return applyActiveFlashSalePrices(products);
   } catch (err) {
     console.error("[products] getAllProductsServer failed:", err);
     return [];
