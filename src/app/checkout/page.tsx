@@ -287,7 +287,7 @@ function getShippingRateKey(rate: ShippingRateOption): string {
 }
 
 function getShippingRateChannel(rate: ShippingRateOption | null): string | null {
-  return rate?.courierCode || rate?.serviceCode || null;
+  return rate?.courierCode || null;
 }
 
 function getShippingRateDetail(rate: ShippingRateOption): string {
