@@ -8,7 +8,6 @@ import {
   Check,
   Clock,
   Gift,
-  Loader2,
   Trash2,
   Truck,
 } from "lucide-react";
@@ -36,8 +35,14 @@ import { fetchPricingPreview } from "@/features/orders/order-api";
 import { toSavedAddress } from "@/lib/address-storage";
 import { formatBaht } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import type { ApiPricingPreviewResponse } from "@/types/api";
 
 const FREE_SHIPPING_THRESHOLD = 399;
+
+type PrecomputedCheckoutQuote = {
+  quote: ApiPricingPreviewResponse;
+  signature: string;
+};
 
 export default function CartPage() {
   const router = useRouter();
@@ -55,9 +60,9 @@ export default function CartPage() {
     () => new Set(itemKeys)
   );
   const [checkoutError, setCheckoutError] = useState("");
-  const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [selectionTouched, setSelectionTouched] = useState(false);
   const restoredSelectionRef = useRef(false);
+  const precomputedCheckoutRef = useRef<PrecomputedCheckoutQuote | null>(null);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -122,6 +127,59 @@ export default function CartPage() {
   );
   const totalItems = selectedQuantity;
 
+  useEffect(() => {
+    if (!hydrated || selectedItems.length === 0) {
+      precomputedCheckoutRef.current = null;
+      return;
+    }
+
+    let cancelled = false;
+    precomputedCheckoutRef.current = null;
+
+    fetchCustomerAddresses()
+      .catch(() => [])
+      .then((addresses) => {
+        if (cancelled) return null;
+
+        const defaultAddress = addresses
+          .map(toSavedAddress)
+          .find((address) => address.isDefault);
+        const request = buildCheckoutPricingRequest({
+          items: selectedItems.map(({ item }) => item),
+          address: defaultAddress
+            ? {
+                email: defaultAddress.email,
+                customerName: defaultAddress.customerName,
+                phone: defaultAddress.phone,
+                address: defaultAddress.address,
+              }
+            : null,
+          shippingChannel: null,
+          couponCodes: null,
+        });
+        const signature = getCheckoutPricingSignature(request);
+
+        return fetchPricingPreview(request).then((quote) => ({
+          quote,
+          signature,
+        }));
+      })
+      .then((result) => {
+        if (!cancelled && result) {
+          precomputedCheckoutRef.current = result;
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          precomputedCheckoutRef.current = null;
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [hydrated, selectedItems]);
+
   const toggleSelectAll = () => {
     setCheckoutError("");
     setSelectionTouched(true);
@@ -151,53 +209,20 @@ export default function CartPage() {
     setSelectedKeys(new Set());
   };
 
-  const handleCheckout = async () => {
-    if (checkoutLoading) return false;
+  const handleCheckout = () => {
     if (selectedItems.length === 0) {
       setCheckoutError("กรุณาเลือกสินค้าก่อนชำระเงิน");
       return false;
     }
 
-    setCheckoutLoading(true);
     setCheckoutError("");
-
-    try {
-      const addresses = await fetchCustomerAddresses().catch(() => []);
-      const defaultAddress = addresses.map(toSavedAddress).find(
-        (address) => address.isDefault
-      );
-      const request = buildCheckoutPricingRequest({
-        items: selectedItems.map(({ item }) => item),
-        address: defaultAddress
-          ? {
-              email: defaultAddress.email,
-              customerName: defaultAddress.customerName,
-              phone: defaultAddress.phone,
-              address: defaultAddress.address,
-            }
-          : null,
-        shippingChannel: null,
-        couponCodes: null,
-      });
-      const quote = await fetchPricingPreview(request);
-
-      storeCartSelectionCheckout(
-        selectedItems,
-        quote,
-        getCheckoutPricingSignature(request)
-      );
-      router.push("/checkout?mode=cart-selection");
-      return true;
-    } catch (error) {
-      setCheckoutError(
-        error instanceof Error
-          ? error.message
-          : "ไม่สามารถคำนวณยอดก่อนชำระเงินได้"
-      );
-      return false;
-    } finally {
-      setCheckoutLoading(false);
-    }
+    storeCartSelectionCheckout(
+      selectedItems,
+      precomputedCheckoutRef.current?.quote ?? null,
+      precomputedCheckoutRef.current?.signature ?? null
+    );
+    router.push("/checkout?mode=cart-selection");
+    return true;
   };
 
   const isLoadingCart = !hydrated;
@@ -347,21 +372,11 @@ export default function CartPage() {
 
             {/* ── Order summary ── */}
             <section className="rounded-3xl bg-white px-4 py-4 ring-1 ring-black/[0.04]">
-              {checkoutLoading ? (
-                <div
-                  aria-live="polite"
-                  className="flex min-h-[88px] items-center justify-center gap-2 text-sm font-bold text-ink-soft"
-                >
-                  <Loader2 className="h-5 w-5 animate-spin text-brand" />
-                  กำลังคำนวณยอดชำระ
-                </div>
-              ) : (
-                <CartSummary
-                  subtotal={selectedSubtotal}
-                  showShipping={false}
-                  total={selectedTotal}
-                />
-              )}
+              <CartSummary
+                subtotal={selectedSubtotal}
+                showShipping={false}
+                total={selectedTotal}
+              />
             </section>
 
           </>
@@ -377,15 +392,6 @@ export default function CartPage() {
                 <p className="text-[11px] font-semibold text-ink-soft">
                   ยอดรวมทั้งหมด
                 </p>
-                {checkoutLoading ? (
-                  <div
-                    aria-live="polite"
-                    className="mt-0.5 flex min-h-[1.75rem] items-center gap-2 text-sm font-bold text-brand"
-                  >
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                    กำลังคำนวณ
-                  </div>
-                ) : (
                 <div className="flex items-baseline gap-1.5">
                   <span className="text-xl font-extrabold text-brand">
                     {formatBaht(selectedTotal)}
@@ -394,7 +400,6 @@ export default function CartPage() {
                     รวม {totalItems} ชิ้น
                   </span>
                 </div>
-                )}
               </div>
               <Link
                 href="/checkout?mode=cart-selection"
@@ -407,19 +412,9 @@ export default function CartPage() {
                 <Button
                   size="lg"
                   className="gap-1.5 px-6"
-                  disabled={checkoutLoading}
                 >
-                  {checkoutLoading ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      กำลังคำนวณ
-                    </>
-                  ) : (
-                    <>
-                      ไปชำระเงิน
-                      <ArrowRight className="h-4 w-4" />
-                    </>
-                  )}
+                  ไปชำระเงิน
+                  <ArrowRight className="h-4 w-4" />
                 </Button>
               </Link>
             </div>

@@ -319,22 +319,22 @@ function getShippingRateDetailText(rate: ShippingRateOption): string {
 }
 
 function getShippingOptionTitle(rate: ShippingRateOption): string {
-  if (rate.optionType === "fastest") return "ส่งด่วน";
-  if (rate.optionType === "standard_fastest") return "ส่งธรรมดาและด่วน";
-  return "ส่งธรรมดา";
+  if (rate.optionType === "cheapest") return "ถูกสุด";
+  if (rate.optionType === "fastest") return "เร็วสุด";
+  return "เวลากลาง ๆ";
 }
 
 function getShippingOptionHint(rate: ShippingRateOption): string {
-  if (rate.optionType === "fastest") return "เหมาะเมื่ออยากได้ของไว";
-  if (rate.optionType === "standard_fastest") return "ตัวเลือกมาตรฐานที่เร็วที่สุดด้วย";
-  return "ตัวเลือกมาตรฐานสำหรับออเดอร์นี้";
+  if (rate.optionType === "cheapest") return "ตัวเลือกที่ราคาดีที่สุด";
+  if (rate.optionType === "fastest") return "ตัวเลือกที่ถึงเร็วที่สุด";
+  return "ตัวเลือกเวลาจัดส่งกลาง ๆ";
 }
 
 function getShippingOptionBadge(rate: ShippingRateOption): string {
   if (rate.label) return rate.label;
-  if (rate.optionType === "fastest") return "เร็วที่สุด";
-  if (rate.optionType === "standard_fastest") return "ปานกลางและเร็วที่สุด";
-  return "ปานกลาง";
+  if (rate.optionType === "cheapest") return "ถูกสุด";
+  if (rate.optionType === "fastest") return "เร็วสุด";
+  return "เวลากลาง ๆ";
 }
 
 function getShippingOptionClasses(
@@ -347,8 +347,8 @@ function getShippingOptionClasses(
   badge: string;
   price: string;
 } {
+  const isCheap = rate.optionType === "cheapest";
   const isFast = rate.optionType === "fastest";
-  const isCombo = rate.optionType === "standard_fastest";
 
   if (selected) {
     if (isFast) {
@@ -360,21 +360,21 @@ function getShippingOptionClasses(
         price: "text-brand",
       };
     }
-    if (isCombo) {
+    if (isCheap) {
       return {
-        card: "border-brand bg-gradient-to-br from-brand-soft to-success-soft shadow-[0_10px_24px_rgba(237,23,28,0.10)]",
-        icon: "bg-brand text-white",
-        title: "text-brand",
-        badge: "bg-white text-brand ring-1 ring-brand/15",
-        price: "text-brand",
+        card: "border-success bg-success-soft shadow-[0_10px_24px_rgba(25,135,84,0.12)]",
+        icon: "bg-success text-white",
+        title: "text-success",
+        badge: "bg-white text-success ring-1 ring-success/15",
+        price: "text-success",
       };
     }
     return {
-      card: "border-success bg-success-soft shadow-[0_10px_24px_rgba(25,135,84,0.12)]",
-      icon: "bg-success text-white",
-      title: "text-success",
-      badge: "bg-white text-success ring-1 ring-success/15",
-      price: "text-success",
+      card: "border-black/[0.12] bg-surface-muted/70 shadow-[0_10px_24px_rgba(17,24,39,0.08)]",
+      icon: "bg-ink text-white",
+      title: "text-ink",
+      badge: "bg-white text-ink ring-1 ring-black/10",
+      price: "text-ink",
     };
   }
 
@@ -388,11 +388,21 @@ function getShippingOptionClasses(
     };
   }
 
+  if (isCheap) {
+    return {
+      card: "border-success/15 bg-white hover:border-success/35",
+      icon: "bg-success-soft text-success",
+      title: "text-ink",
+      badge: "bg-success-soft text-success",
+      price: "text-ink",
+    };
+  }
+
   return {
-    card: "border-black/[0.07] bg-white hover:border-success/35",
-    icon: "bg-success-soft text-success",
+    card: "border-black/[0.07] bg-white hover:border-black/20",
+    icon: "bg-surface-muted text-ink-soft",
     title: "text-ink",
-    badge: "bg-success-soft text-success",
+    badge: "bg-surface-muted text-ink-soft",
     price: "text-ink",
   };
 }
@@ -2327,6 +2337,7 @@ export default function CheckoutPage({
             <SummaryLine
               label="รวมการสั่งซื้อ"
               value={formatBaht(previewSubtotal)}
+              loading={summaryRecalculating}
             />
             <SummaryLine
               label="การจัดส่ง"
@@ -2335,6 +2346,7 @@ export default function CheckoutPage({
                   ? "ฟรี"
                   : formatBaht(previewShippingAmount)
               }
+              loading={summaryRecalculating}
             />
             {shippingDiscountAmount > 0 && (
               <SummaryLine
