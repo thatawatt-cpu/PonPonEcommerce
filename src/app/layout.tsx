@@ -11,6 +11,16 @@ import { getAppOrigin } from "@/lib/site-url";
 const SITE_TITLE = `${SHOP_NAME} — ${SHOP_TAGLINE}`;
 const SITE_DESCRIPTION = "ร้าน Pon Pon — ช้อปง่าย สั่งไว ผ่าน LINE";
 
+function getPreconnectOrigin(value: string): string | null {
+  try {
+    return new URL(value).origin;
+  } catch {
+    return null;
+  }
+}
+
+const BACKEND_PRECONNECT_ORIGIN = getPreconnectOrigin(PONPON_BACKEND_BASE_URL);
+
 export const metadata: Metadata = {
   metadataBase: new URL(getAppOrigin()),
   title: SITE_TITLE,
@@ -45,6 +55,13 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="th" className="h-full" suppressHydrationWarning>
+      <head>
+        {BACKEND_PRECONNECT_ORIGIN ? (
+          <link rel="preconnect" href={BACKEND_PRECONNECT_ORIGIN} />
+        ) : null}
+        <link rel="preconnect" href="https://image.zort.co.th" />
+        <link rel="preconnect" href="https://static.line-scdn.net" />
+      </head>
       <body className="min-h-full bg-surface-muted" suppressHydrationWarning>
         <Script
           id="line-webview-performance-mode"

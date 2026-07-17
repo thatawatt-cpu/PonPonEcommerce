@@ -2,14 +2,18 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useRef } from "react";
 import { ArrowUpRight, Star } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Price } from "@/components/ui/price";
 import { ProductImage } from "@/components/product/product-image";
+import { cacheProductDetailSummary } from "@/features/products/product-detail-cache";
 import type { Product } from "@/types/product";
 
 const prefetchedProductHrefs = new Set<string>();
+const EAGER_PREFETCH_COUNT = 6;
+const PREFETCH_STAGGER_MS = 120;
 
 function formatSoldCount(count?: number): string | null {
   if (!count || count <= 0) return null;
@@ -41,6 +45,7 @@ export function ProductCard({
   metaLabel?: string;
 }) {
   const router = useRouter();
+  const linkRef = useRef<HTMLAnchorElement | null>(null);
   const discountPercent = getDiscountPercent(product);
   const soldCountLabel = formatSoldCount(product.soldCount);
   const reviewLabel =
@@ -50,12 +55,42 @@ export function ProductCard({
     .slice(0, discountPercent === null ? 2 : 1);
   const productHref = `/products/${product.slug}`;
 
-  const prefetchProductDetail = () => {
+  const prefetchProductDetail = useCallback(() => {
+    cacheProductDetailSummary(product);
+
     if (prefetchedProductHrefs.has(productHref)) return;
 
     prefetchedProductHrefs.add(productHref);
     router.prefetch(productHref);
-  };
+  }, [product, productHref, router]);
+
+  useEffect(() => {
+    const link = linkRef.current;
+    if (!link || prefetchedProductHrefs.has(productHref)) return;
+
+    if (index < EAGER_PREFETCH_COUNT) {
+      const timer = window.setTimeout(
+        prefetchProductDetail,
+        250 + index * PREFETCH_STAGGER_MS
+      );
+      return () => window.clearTimeout(timer);
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry?.isIntersecting) return;
+        window.setTimeout(
+          prefetchProductDetail,
+          (index % EAGER_PREFETCH_COUNT) * PREFETCH_STAGGER_MS
+        );
+        observer.disconnect();
+      },
+      { rootMargin: "450px 0px" }
+    );
+
+    observer.observe(link);
+    return () => observer.disconnect();
+  }, [index, productHref, prefetchProductDetail]);
 
   return (
     <Card
@@ -63,12 +98,10 @@ export function ProductCard({
       style={{ animationDelay: `${Math.min(index, 9) * 55}ms` }}
     >
       <Link
+        ref={linkRef}
         href={productHref}
         prefetch={false}
         className="flex flex-1 flex-col"
-        onFocus={prefetchProductDetail}
-        onMouseEnter={prefetchProductDetail}
-        onTouchStart={prefetchProductDetail}
       >
         <div className="relative overflow-hidden">
           <ProductImage

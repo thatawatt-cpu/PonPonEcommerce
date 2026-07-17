@@ -1,10 +1,5 @@
 import "server-only";
 import { PONPON_BACKEND_BASE_URL } from "@/lib/server/api-backend";
-import { getActiveFlashSaleServer } from "@/features/flash-sales/flash-sales-service.server";
-import {
-  buildFlashSaleProducts,
-  mergeFlashSaleProducts,
-} from "@/features/flash-sales/flash-sale-products";
 import {
   mapApiCategoryToCategory,
   mapApiProductDetailToProduct,
@@ -21,6 +16,9 @@ import type {
 } from "@/types/api";
 
 const ALL_CATEGORY: Category = { id: "all", name: "ทั้งหมด", emoji: "🛍️" };
+const PRODUCT_LIST_REVALIDATE_SECONDS = 20;
+const PRODUCT_DETAIL_REVALIDATE_SECONDS = 10;
+const PRODUCT_DETAIL_RELATED_LIMIT = 4;
 
 export interface ProductDetailServerData {
   product: Product;
@@ -53,20 +51,9 @@ function applyResolvedPrice(
   };
 }
 
-async function applyActiveFlashSalePrices(
-  products: Product[],
-  options: { includeMissing?: boolean } = {}
-): Promise<Product[]> {
-  if (products.length === 0) return products;
-
-  const activeFlashSale = await getActiveFlashSaleServer();
-  const flashSaleProducts = buildFlashSaleProducts(products, activeFlashSale);
-  return mergeFlashSaleProducts(products, flashSaleProducts, options);
-}
-
-async function mapShopProductDetail(
+function mapShopProductDetail(
   data: ApiShopProductDetailResponse | null
-): Promise<ProductDetailServerData | null> {
+): ProductDetailServerData | null {
   if (!data?.product) return null;
 
   const product = applyResolvedPrice(
@@ -76,15 +63,11 @@ async function mapShopProductDetail(
   const relatedProducts = getArray(data.relatedProducts).map(
     mapApiShopProductToProduct
   );
-  const mergedProducts = await applyActiveFlashSalePrices(
-    [product, ...relatedProducts],
-    { includeMissing: false }
-  );
 
   return {
-    product: mergedProducts[0] ?? product,
+    product,
     availableCoupons: getArray(data.availableCoupons),
-    relatedProducts: mergedProducts.slice(1),
+    relatedProducts,
   };
 }
 
@@ -101,8 +84,7 @@ export async function getAllProductsServer(params?: {
     url.searchParams.set("pageSize", String(params?.pageSize ?? 100));
 
     const res = await fetch(url.toString(), {
-      cache: "no-store",
-      headers: { "Cache-Control": "no-cache" },
+      next: { revalidate: PRODUCT_LIST_REVALIDATE_SECONDS },
     });
     if (!res.ok) return [];
 
@@ -110,7 +92,7 @@ export async function getAllProductsServer(params?: {
     const products = Array.isArray(data)
       ? data.map(mapApiShopProductToProduct)
       : [];
-    return applyActiveFlashSalePrices(products);
+    return products;
   } catch (err) {
     console.error("[products] getAllProductsServer failed:", err);
     return [];
@@ -132,11 +114,10 @@ export async function getProductDetailByIdServer(
       `${PONPON_BACKEND_BASE_URL}/api/shop/products/${id}/detail`
     );
     url.searchParams.set("salesChannel", "line_liff");
-    url.searchParams.set("relatedProductLimit", "8");
+    url.searchParams.set("relatedProductLimit", String(PRODUCT_DETAIL_RELATED_LIMIT));
 
     const res = await fetch(url.toString(), {
-      cache: "no-store",
-      headers: { "Cache-Control": "no-cache" },
+      next: { revalidate: PRODUCT_DETAIL_REVALIDATE_SECONDS },
     });
     if (!res.ok) return null;
 
@@ -165,11 +146,10 @@ export async function getProductDetailBySlugServer(
       `${PONPON_BACKEND_BASE_URL}/api/shop/products/slug/${encodeURIComponent(slug)}/detail`
     );
     url.searchParams.set("salesChannel", "line_liff");
-    url.searchParams.set("relatedProductLimit", "8");
+    url.searchParams.set("relatedProductLimit", String(PRODUCT_DETAIL_RELATED_LIMIT));
 
     const res = await fetch(url.toString(), {
-      cache: "no-store",
-      headers: { "Cache-Control": "no-cache" },
+      next: { revalidate: PRODUCT_DETAIL_REVALIDATE_SECONDS },
     });
     if (!res.ok) return null;
 

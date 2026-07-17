@@ -9,6 +9,8 @@ import type {
 } from "@/types/api";
 import type { Product } from "@/types/product";
 
+const SHOP_HOME_REVALIDATE_SECONDS = 20;
+
 interface ShopHomeData {
   slides: ApiHomeSlide[];
   flashSale: ApiFlashSale | null;
@@ -33,8 +35,7 @@ export async function getShopHomeServer(params?: {
     );
 
     const res = await fetch(url.toString(), {
-      cache: "no-store",
-      headers: { "Cache-Control": "no-cache" },
+      next: { revalidate: SHOP_HOME_REVALIDATE_SECONDS },
     });
     if (!res.ok) {
       return {
