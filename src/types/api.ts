@@ -78,6 +78,38 @@ export interface ApiShopProductDetailResponse {
   resolvedPrice: ApiResolvedProductPrice;
 }
 
+export interface ApiShopProductSummaryVariant {
+  id: string;
+  sku: string;
+  variantCode: string | null;
+  sellPrice: number;
+  stock: number;
+  availableStock: number;
+  imageUrl: string | null;
+  options: ApiProductVariantOption[];
+}
+
+export interface ApiShopProductSummaryResponse {
+  id: string;
+  slug: string | null;
+  name: string;
+  baseSku: string | null;
+  categoryName: string | null;
+  zortCategoryId: number | null;
+  imageUrl: string | null;
+  displayPrice: number;
+  displayOriginalPrice: number | null;
+  priceSource: "base" | "flash_sale" | string;
+  activeFlashSaleId: string | null;
+  stock: number;
+  availableStock: number;
+  soldCount: number;
+  promotionBadge: string | null;
+  highlights: string | null;
+  variants: ApiShopProductSummaryVariant[];
+  resolvedPrice: ApiResolvedProductPrice;
+}
+
 export interface ApiProductImage {
   id: string;
   url: string;

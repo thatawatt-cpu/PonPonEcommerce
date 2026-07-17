@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import {
-  getProductDetailByIdServer,
-  getProductDetailBySlugServer,
+  getProductSummaryByIdServer,
+  getProductSummaryBySlugServer,
 } from "@/features/products/product-service.server";
 import { ProductDetailClient } from "./product-detail-client";
 
@@ -44,17 +44,17 @@ export default async function ProductDetailPage({
   const { id } = await params;
   const { cartItemKey, options, quantity } = await searchParams;
   const detail = isUuid(id)
-    ? await getProductDetailByIdServer(id)
-    : (await getProductDetailBySlugServer(id)) ??
-      (await getProductDetailByIdServer(id));
+    ? await getProductSummaryByIdServer(id)
+    : (await getProductSummaryBySlugServer(id)) ??
+      (await getProductSummaryByIdServer(id));
 
   if (!detail?.product) notFound();
 
   return (
     <ProductDetailClient
       product={detail.product}
-      initialCoupons={detail.availableCoupons}
-      relatedProducts={detail.relatedProducts}
+      initialCoupons={[]}
+      relatedProducts={[]}
       cartEditItemKey={cartItemKey}
       initialQuantity={quantity ? Number(quantity) : undefined}
       initialSelectedOptions={parseInitialOptions(options) ?? undefined}

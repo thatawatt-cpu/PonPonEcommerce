@@ -3,6 +3,7 @@ import { PONPON_BACKEND_BASE_URL } from "@/lib/server/api-backend";
 import {
   mapApiCategoryToCategory,
   mapApiProductDetailToProduct,
+  mapApiShopProductSummaryToProduct,
   mapApiShopProductToProduct,
 } from "./product-mapper";
 import type { Category } from "@/types/common";
@@ -13,6 +14,7 @@ import type {
   ApiResolvedProductPrice,
   ApiShopProductDetailResponse,
   ApiShopProductListItem,
+  ApiShopProductSummaryResponse,
 } from "@/types/api";
 
 const ALL_CATEGORY: Category = { id: "all", name: "ทั้งหมด", emoji: "🛍️" };
@@ -24,6 +26,10 @@ export interface ProductDetailServerData {
   product: Product;
   availableCoupons: ApiCouponListItem[];
   relatedProducts: Product[];
+}
+
+export interface ProductSummaryServerData {
+  product: Product;
 }
 
 function getArray<T>(value: T[] | null | undefined): T[] {
@@ -106,6 +112,30 @@ export async function getProductByIdServer(
   return detail?.product ?? null;
 }
 
+export async function getProductSummaryByIdServer(
+  id: string
+): Promise<ProductSummaryServerData | null> {
+  try {
+    const res = await fetch(
+      `${PONPON_BACKEND_BASE_URL}/api/shop/products/${id}/summary`,
+      {
+        next: { revalidate: PRODUCT_DETAIL_REVALIDATE_SECONDS },
+      }
+    );
+    if (!res.ok) return null;
+
+    const data = (await res.json().catch(() => null)) as
+      | ApiShopProductSummaryResponse
+      | null;
+    if (!data) return null;
+
+    return { product: mapApiShopProductSummaryToProduct(data) };
+  } catch (err) {
+    console.error("[products] getProductSummaryByIdServer failed:", err);
+    return null;
+  }
+}
+
 export async function getProductDetailByIdServer(
   id: string
 ): Promise<ProductDetailServerData | null> {
@@ -136,6 +166,30 @@ export async function getProductBySlugServer(
 ): Promise<Product | null> {
   const detail = await getProductDetailBySlugServer(slug);
   return detail?.product ?? null;
+}
+
+export async function getProductSummaryBySlugServer(
+  slug: string
+): Promise<ProductSummaryServerData | null> {
+  try {
+    const res = await fetch(
+      `${PONPON_BACKEND_BASE_URL}/api/shop/products/slug/${encodeURIComponent(slug)}/summary`,
+      {
+        next: { revalidate: PRODUCT_DETAIL_REVALIDATE_SECONDS },
+      }
+    );
+    if (!res.ok) return null;
+
+    const data = (await res.json().catch(() => null)) as
+      | ApiShopProductSummaryResponse
+      | null;
+    if (!data) return null;
+
+    return { product: mapApiShopProductSummaryToProduct(data) };
+  } catch (err) {
+    console.error("[products] getProductSummaryBySlugServer failed:", err);
+    return null;
+  }
 }
 
 export async function getProductDetailBySlugServer(

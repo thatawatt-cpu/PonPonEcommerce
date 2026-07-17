@@ -42,6 +42,10 @@ import {
   fetchProductReviewSummary,
 } from "@/features/reviews/review-api";
 import {
+  mapApiProductDetailToProduct,
+  mapApiShopProductToProduct,
+} from "@/features/products/product-mapper";
+import {
   addWishlistProduct,
   fetchWishlist,
   recordRecentlyViewed,
@@ -49,7 +53,7 @@ import {
 } from "@/features/customers/customer-engagement-api";
 import { storePendingCouponCode } from "@/features/coupons/pending-coupon";
 import { cn } from "@/lib/utils";
-import type { ApiCouponListItem } from "@/types/api";
+import type { ApiCouponListItem, ApiShopProductDetailResponse } from "@/types/api";
 import type { Product, ProductVariantStock } from "@/types/product";
 import type {
   ProductReview,
@@ -395,14 +399,17 @@ interface ProductDetailClientProps {
 }
 
 export function ProductDetailClient({
-  product,
+  product: initialProduct,
   initialCoupons = [],
-  relatedProducts = [],
+  relatedProducts: initialRelatedProducts = [],
   cartEditItemKey,
   initialQuantity,
   initialSelectedOptions,
 }: ProductDetailClientProps) {
   const router = useRouter();
+  const [product, setProduct] = useState(initialProduct);
+  const [relatedProducts, setRelatedProducts] = useState(initialRelatedProducts);
+  const [fullDetailLoaded, setFullDetailLoaded] = useState(false);
   const addItem = useCartStore((s) => s.addItem);
   const removeItem = useCartStore((s) => s.removeItem);
   const favoritesHydrated = useFavoritesHydrated();
@@ -419,7 +426,7 @@ export function ProductDetailClient({
       : 1
   );
   const [selected, setSelected] = useState<Record<string, string>>(() =>
-    getInitialSelectedOptions(product, initialSelectedOptions)
+    getInitialSelectedOptions(initialProduct, initialSelectedOptions)
   );
   const [added, setAdded] = useState(false);
   const [activeGallery, setActiveGallery] = useState("main");
@@ -636,6 +643,57 @@ export function ProductDetailClient({
   }, [setFavoriteProductIds]);
 
   useEffect(() => {
+    if (!initialProduct.slug) return;
+
+    let cancelled = false;
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      const params = new URLSearchParams({
+        salesChannel: "line_liff",
+        relatedProductLimit: "4",
+      });
+
+      fetch(
+        `/api/shop/products/slug/${encodeURIComponent(initialProduct.slug)}/detail?${params.toString()}`,
+        { signal: controller.signal }
+      )
+        .then((response) =>
+          response.ok ? response.json() : Promise.reject(response)
+        )
+        .then((data: ApiShopProductDetailResponse | null) => {
+          if (cancelled || !data?.product) return;
+
+          setProduct(mapApiProductDetailToProduct(data.product));
+          setRelatedProducts(
+            Array.isArray(data.relatedProducts)
+              ? data.relatedProducts.map(mapApiShopProductToProduct)
+              : []
+          );
+          setRemoteProductCoupons(
+            Array.isArray(data.availableCoupons) ? data.availableCoupons : []
+          );
+          setProductCouponsLoaded(true);
+          setFullDetailLoaded(true);
+        })
+        .catch((error: unknown) => {
+          if (
+            cancelled ||
+            (error instanceof DOMException && error.name === "AbortError")
+          ) {
+            return;
+          }
+          console.info("[product-detail] Full detail hydration skipped", error);
+        });
+    }, 150);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [initialProduct.slug]);
+
+  useEffect(() => {
     recordRecentlyViewed({ productId: product.id }).catch((error: unknown) => {
       console.info("[product-detail] Recently viewed sync skipped", error);
     });
@@ -665,7 +723,9 @@ export function ProductDetailClient({
     void Promise.resolve().then(() => {
       if (cancelled) return;
       if (!selectedVariant) {
-        setRemoteProductCoupons(initialCoupons);
+        if (!fullDetailLoaded) {
+          setRemoteProductCoupons(initialCoupons);
+        }
         setProductCouponsLoaded(true);
         return;
       }
@@ -712,7 +772,7 @@ export function ProductDetailClient({
     return () => {
       cancelled = true;
     };
-  }, [initialCoupons, product, selectedVariant]);
+  }, [fullDetailLoaded, initialCoupons, product, selectedVariant]);
 
   useEffect(() => {
     const shouldLoadReviews =

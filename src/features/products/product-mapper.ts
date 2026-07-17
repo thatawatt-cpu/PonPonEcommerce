@@ -5,6 +5,7 @@ import type {
   ApiShopProductListItem,
   ApiProductDetail,
   ApiCategory,
+  ApiShopProductSummaryResponse,
 } from "@/types/api";
 
 function deriveBadges(
@@ -195,6 +196,99 @@ export function mapApiProductDetailToProduct(api: ApiProductDetail): Product {
               v.options && v.options.length > 0
                 ? Object.fromEntries(v.options.map((o) => [o.name, o.value]))
                 : { variant: v.variantCode },
+            stock: v.availableStock,
+            imageUrl: v.imageUrl ?? undefined,
+          }))
+        : undefined,
+  };
+}
+
+export function mapApiShopProductSummaryToProduct(
+  api: ApiShopProductSummaryResponse
+): Product {
+  const activeVariants = api.variants ?? [];
+
+  return {
+    id: api.id,
+    sku: api.baseSku || undefined,
+    zortCategoryId: api.zortCategoryId,
+    name: api.name,
+    slug: api.slug ?? api.id,
+    description: "",
+    price: api.displayPrice,
+    compareAtPrice:
+      api.displayOriginalPrice && api.displayOriginalPrice > api.displayPrice
+        ? api.displayOriginalPrice
+        : undefined,
+    priceSource: api.priceSource,
+    activeFlashSaleId: api.activeFlashSaleId,
+    imageUrl: api.imageUrl ?? "",
+    emoji: "📦",
+    categoryId: api.categoryName ?? "",
+    categoryName: api.categoryName ?? "",
+    badges: api.promotionBadge ? ["ลดราคา"] : [],
+    stock: api.availableStock,
+    soldCount: api.soldCount > 0 ? api.soldCount : undefined,
+    isFeatured: false,
+    isBestSeller: false,
+    detailContent: {
+      highlights: api.highlights
+        ? api.highlights
+            .split("\n")
+            .map((h) => h.trim())
+            .filter(Boolean)
+        : [],
+    },
+    options: (() => {
+      if (activeVariants.length === 0) return undefined;
+      const allOptions = activeVariants.flatMap((v) => v.options ?? []);
+      if (allOptions.length === 0) {
+        return [
+          {
+            name: "variant",
+            label: "รุ่น",
+            choices: activeVariants.map((v) => ({
+              label: v.sku,
+              value: v.variantCode ?? v.id,
+              imageUrl: v.imageUrl ?? undefined,
+            })),
+          },
+        ];
+      }
+
+      const optionNames = [...new Set(allOptions.map((o) => o.name))];
+      return optionNames.map((name) => ({
+        name,
+        label: name,
+        choices: [
+          ...new Map(
+            activeVariants
+              .flatMap((v) =>
+                (v.options ?? [])
+                  .filter((o) => o.name === name)
+                  .map((o) => [
+                    o.value,
+                    {
+                      label: o.value,
+                      value: o.value,
+                      imageUrl: v.imageUrl ?? undefined,
+                    },
+                  ] as [string, { label: string; value: string; imageUrl: string | undefined }])
+              )
+          ).values(),
+        ],
+      }));
+    })(),
+    variants:
+      activeVariants.length > 0
+        ? activeVariants.map((v) => ({
+            id: v.id,
+            sku: v.sku,
+            variantCode: v.variantCode ?? undefined,
+            options:
+              v.options && v.options.length > 0
+                ? Object.fromEntries(v.options.map((o) => [o.name, o.value]))
+                : { variant: v.variantCode ?? v.id },
             stock: v.availableStock,
             imageUrl: v.imageUrl ?? undefined,
           }))
