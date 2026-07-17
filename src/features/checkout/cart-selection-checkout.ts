@@ -1,6 +1,7 @@
 "use client";
 
 import type { CartItem } from "@/types/cart";
+import type { ApiPricingPreviewResponse } from "@/types/api";
 
 const CART_SELECTION_CHECKOUT_STORAGE_KEY = "ponpon.cartSelectionCheckout";
 
@@ -11,6 +12,8 @@ export interface CartSelectionCheckoutItem {
 
 interface CartSelectionCheckoutPayload {
   items: CartSelectionCheckoutItem[];
+  quote?: ApiPricingPreviewResponse | null;
+  quoteSignature?: string | null;
   createdAt: string;
 }
 
@@ -38,12 +41,16 @@ function isValidSelectionItem(
 }
 
 export function storeCartSelectionCheckout(
-  items: CartSelectionCheckoutItem[]
+  items: CartSelectionCheckoutItem[],
+  quote?: ApiPricingPreviewResponse | null,
+  quoteSignature?: string | null
 ): void {
   if (!canUseSessionStorage()) return;
 
   const payload: CartSelectionCheckoutPayload = {
     items,
+    quote: quote ?? null,
+    quoteSignature: quoteSignature ?? null,
     createdAt: new Date().toISOString(),
   };
 
@@ -71,6 +78,33 @@ export function getStoredCartSelectionCheckout(): CartSelectionCheckoutItem[] {
     return payload.items.filter(isValidSelectionItem);
   } catch {
     return [];
+  }
+}
+
+export function getStoredCartSelectionCheckoutQuote(): {
+  quote: ApiPricingPreviewResponse;
+  signature: string | null;
+} | null {
+  if (!canUseSessionStorage()) return null;
+
+  const raw = window.sessionStorage.getItem(
+    CART_SELECTION_CHECKOUT_STORAGE_KEY
+  );
+  if (!raw) return null;
+
+  try {
+    const payload = JSON.parse(
+      raw
+    ) as Partial<CartSelectionCheckoutPayload>;
+
+    if (!payload.quote || !Array.isArray(payload.quote.lines)) return null;
+
+    return {
+      quote: payload.quote,
+      signature: payload.quoteSignature ?? null,
+    };
+  } catch {
+    return null;
   }
 }
 

@@ -8,6 +8,7 @@ import {
   Check,
   Clock,
   Gift,
+  Loader2,
   Trash2,
   Truck,
 } from "lucide-react";
@@ -23,6 +24,13 @@ import {
   useCartStore,
 } from "@/store/cart-store";
 import { storeCartSelectionCheckout } from "@/features/checkout/cart-selection-checkout";
+import {
+  buildCheckoutPricingRequest,
+  getCheckoutPricingSignature,
+} from "@/features/checkout/checkout-pricing";
+import { fetchCustomerAddresses } from "@/features/customer-addresses/customer-address-api";
+import { fetchPricingPreview } from "@/features/orders/order-api";
+import { toSavedAddress } from "@/lib/address-storage";
 import { formatBaht } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -44,6 +52,7 @@ export default function CartPage() {
     () => new Set(itemKeys)
   );
   const [checkoutError, setCheckoutError] = useState("");
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [selectionTouched, setSelectionTouched] = useState(false);
 
   useEffect(() => {
@@ -119,15 +128,53 @@ export default function CartPage() {
     setSelectedKeys(new Set());
   };
 
-  const handleCheckout = () => {
+  const handleCheckout = async () => {
+    if (checkoutLoading) return false;
     if (selectedItems.length === 0) {
       setCheckoutError("กรุณาเลือกสินค้าก่อนชำระเงิน");
       return false;
     }
 
-    storeCartSelectionCheckout(selectedItems);
-    router.push("/checkout?mode=cart-selection");
-    return true;
+    setCheckoutLoading(true);
+    setCheckoutError("");
+
+    try {
+      const addresses = await fetchCustomerAddresses().catch(() => []);
+      const defaultAddress = addresses.map(toSavedAddress).find(
+        (address) => address.isDefault
+      );
+      const request = buildCheckoutPricingRequest({
+        items: selectedItems.map(({ item }) => item),
+        address: defaultAddress
+          ? {
+              email: defaultAddress.email,
+              customerName: defaultAddress.customerName,
+              phone: defaultAddress.phone,
+              address: defaultAddress.address,
+            }
+          : null,
+        shippingChannel: "standard",
+        couponCodes: null,
+      });
+      const quote = await fetchPricingPreview(request);
+
+      storeCartSelectionCheckout(
+        selectedItems,
+        quote,
+        getCheckoutPricingSignature(request)
+      );
+      router.push("/checkout?mode=cart-selection");
+      return true;
+    } catch (error) {
+      setCheckoutError(
+        error instanceof Error
+          ? error.message
+          : "ไม่สามารถคำนวณยอดก่อนชำระเงินได้"
+      );
+      return false;
+    } finally {
+      setCheckoutLoading(false);
+    }
   };
 
   const isLoadingCart = !hydrated;
@@ -317,9 +364,14 @@ export default function CartPage() {
                 <Button
                   size="lg"
                   className="gap-1.5 px-6"
+                  disabled={checkoutLoading}
                 >
                   ไปชำระเงิน
-                  <ArrowRight className="h-4 w-4" />
+                  {checkoutLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <ArrowRight className="h-4 w-4" />
+                  )}
                 </Button>
               </Link>
             </div>

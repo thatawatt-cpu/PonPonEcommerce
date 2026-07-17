@@ -30,12 +30,18 @@ import { getCartItemKey } from "@/store/cart-store";
 import {
   clearBuyNowCheckout,
   getStoredBuyNowCheckout,
+  getStoredBuyNowCheckoutQuote,
 } from "@/features/checkout/buy-now-checkout";
 import {
   clearCartSelectionCheckout,
   getStoredCartSelectionCheckout,
+  getStoredCartSelectionCheckoutQuote,
   type CartSelectionCheckoutItem,
 } from "@/features/checkout/cart-selection-checkout";
+import {
+  buildCheckoutPricingRequest,
+  getCheckoutPricingSignature,
+} from "@/features/checkout/checkout-pricing";
 import { fetchCustomerAddresses } from "@/features/customer-addresses/customer-address-api";
 import {
   ApiRequestError,
@@ -385,6 +391,16 @@ function isCouponValidationError(err: unknown): boolean {
   );
 }
 
+function isRefreshableQuoteError(err: unknown): boolean {
+  return (
+    err instanceof ApiRequestError &&
+    (err.code === "quote_expired" ||
+      err.code === "quote_mismatch" ||
+      err.code === "quote_not_final" ||
+      err.code === "quote_shipping_not_finalized")
+  );
+}
+
 function isZeroTotalCouponPreview(
   preview: ApiPricingPreviewResponse,
   selectedCouponCodes: string[]
@@ -565,22 +581,33 @@ export default function CheckoutPage({
       shipping.phone,
     ]
   );
-  const previewCanLoad = canLoadShippingRates && shippingQuoteResolved;
+  const hasShippingContact =
+    Boolean(shipping.customerName.trim()) &&
+    Boolean(shipping.phone.trim()) &&
+    Boolean(shipping.address.trim());
+  const previewCanLoad =
+    hydrated &&
+    addressesLoaded &&
+    !(usesStoredCheckoutItems && !checkoutSourceLoaded) &&
+    items.length > 0 &&
+    (!hasShippingContact || shippingQuoteResolved);
   const buildPricingPreviewRequest = useCallback(
-    (nextCouponCodes: string[]): ApiPricingPreviewRequest => ({
-        customerEmail: selectedAddress?.email || null,
-        shippingName: shipping.customerName.trim(),
-        shippingPhone: shipping.phone.trim(),
-        shippingAddress: shipping.address.trim(),
-        shippingChannel: selectedShippingRate?.courierCode ?? null,
+    (nextCouponCodes: string[]): ApiPricingPreviewRequest =>
+      buildCheckoutPricingRequest({
+        items,
+        address: hasShippingContact
+          ? {
+              email: selectedAddress?.email ?? null,
+              customerName: shipping.customerName,
+              phone: shipping.phone,
+              address: shipping.address,
+            }
+          : null,
+        shippingChannel: selectedShippingRate?.courierCode ?? "standard",
         couponCodes: nextCouponCodes,
-        items: items.map((item) => ({
-          productId: item.productId,
-          variantId: item.variantId ?? null,
-          quantity: item.quantity,
-        })),
       }),
     [
+      hasShippingContact,
       items,
       selectedAddress?.email,
       selectedShippingRate?.courierCode,
@@ -591,7 +618,7 @@ export default function CheckoutPage({
   );
   const getPricingPreviewSignature = useCallback(
     (nextCouponCodes: string[]) =>
-      JSON.stringify(buildPricingPreviewRequest(nextCouponCodes)),
+      getCheckoutPricingSignature(buildPricingPreviewRequest(nextCouponCodes)),
     [buildPricingPreviewRequest]
   );
   const currentPricingPreviewSignature = useMemo(
@@ -811,9 +838,33 @@ export default function CheckoutPage({
     const timer = window.setTimeout(() => {
       if (isBuyNowCheckout) {
         setBuyNowItem(getStoredBuyNowCheckout());
+        const storedQuote = getStoredBuyNowCheckoutQuote();
+        if (storedQuote) {
+          setPricingPreview(storedQuote.quote);
+          setPricingPreviewSignature(storedQuote.signature ?? "");
+          if (storedQuote.signature) {
+            pricingPreviewCacheRef.current.set(
+              storedQuote.signature,
+              storedQuote.quote
+            );
+          }
+          setQuoteTime(Date.now());
+        }
       }
       if (isCartSelectionCheckout) {
         setCartSelectionItems(getStoredCartSelectionCheckout());
+        const storedQuote = getStoredCartSelectionCheckoutQuote();
+        if (storedQuote) {
+          setPricingPreview(storedQuote.quote);
+          setPricingPreviewSignature(storedQuote.signature ?? "");
+          if (storedQuote.signature) {
+            pricingPreviewCacheRef.current.set(
+              storedQuote.signature,
+              storedQuote.quote
+            );
+          }
+          setQuoteTime(Date.now());
+        }
       }
       setCheckoutSourceLoaded(true);
     }, 0);
@@ -879,6 +930,7 @@ export default function CheckoutPage({
   const currentPricingPreview = pricingPreviewIsCurrent
     ? pricingPreview
     : null;
+  const displayPricingPreview = pricingPreview ?? currentPricingPreview;
   const currentQuoteId =
     currentPricingPreview && typeof currentPricingPreview.quoteId === "string"
       ? currentPricingPreview.quoteId
@@ -900,7 +952,7 @@ export default function CheckoutPage({
       ? currentPricingPreview
       : null;
   const manualShippingRequired =
-    currentPricingPreview?.calculationStatus === "manual_shipping_required";
+    displayPricingPreview?.calculationStatus === "manual_shipping_required";
   const zeroTotalCouponBlocked =
     currentPricingPreview != null &&
     isZeroTotalCouponPreview(currentPricingPreview, couponCodes);
@@ -919,8 +971,8 @@ export default function CheckoutPage({
     !currentQuoteId ||
     !finalPricingQuote ||
     quoteExpired;
-  const estimatedAppliedCoupons = pricingPreviewIsCurrent
-    ? pricingPreview.appliedCoupons.filter((coupon) =>
+  const estimatedAppliedCoupons = displayPricingPreview
+    ? displayPricingPreview.appliedCoupons.filter((coupon) =>
         couponCodes.includes(coupon.code)
       )
     : [];
@@ -933,34 +985,34 @@ export default function CheckoutPage({
   const localCouponDiscountAmount = estimatedAppliedCoupons
     .filter((coupon) => coupon.type !== "free_shipping")
     .reduce((sum, coupon) => sum + coupon.discountAmount, 0);
-  const previewSubtotal = pricingPreviewIsCurrent
-    ? pricingPreview.itemSubtotal
+  const previewSubtotal = displayPricingPreview
+    ? displayPricingPreview.itemSubtotal
     : subtotal;
-  const previewShippingAmount = pricingPreviewIsCurrent
-    ? pricingPreview.shippingAmount
+  const previewShippingAmount = displayPricingPreview
+    ? displayPricingPreview.shippingAmount
     : shippingFee;
   const shippingDiscountAmount =
-    pricingPreviewIsCurrent
-      ? pricingPreview.shippingDiscountAmount
+    displayPricingPreview
+      ? displayPricingPreview.shippingDiscountAmount
       : localShippingDiscountAmount;
-  const couponDiscountAmount = pricingPreviewIsCurrent
-    ? pricingPreview.couponDiscountAmount
+  const couponDiscountAmount = displayPricingPreview
+    ? displayPricingPreview.couponDiscountAmount
     : localCouponDiscountAmount;
   const promotionDiscountAmount =
-    pricingPreviewIsCurrent ? pricingPreview.promotionDiscountAmount : 0;
+    displayPricingPreview ? displayPricingPreview.promotionDiscountAmount : 0;
   const discountAmount =
-    pricingPreviewIsCurrent
-      ? pricingPreview.orderDiscountAmount
+    displayPricingPreview
+      ? displayPricingPreview.orderDiscountAmount
       : couponDiscountAmount + promotionDiscountAmount;
   const payableTotal =
-    pricingPreviewIsCurrent
-      ? pricingPreview.grandTotal
+    displayPricingPreview
+      ? displayPricingPreview.grandTotal
       : Math.max(
           subtotal + shippingFee - shippingDiscountAmount - discountAmount,
           0
         );
-  const displayAppliedCoupons = pricingPreviewIsCurrent
-    ? pricingPreview.appliedCoupons
+  const displayAppliedCoupons = displayPricingPreview
+    ? displayPricingPreview.appliedCoupons
     : estimatedAppliedCoupons;
   const displayCouponDiscountAmount = displayAppliedCoupons
     .filter((coupon) => coupon.type !== "free_shipping")
@@ -996,6 +1048,10 @@ export default function CheckoutPage({
   }, [currentQuoteExpiresAtMs]);
 
   useEffect(() => {
+    if (!addressesLoaded) {
+      return;
+    }
+
     if (!previewCanLoad) {
       const resetTimer = window.setTimeout(() => {
         setPricingPreview(null);
@@ -1119,6 +1175,7 @@ export default function CheckoutPage({
     };
   }, [
     buildPricingPreviewRequest,
+    addressesLoaded,
     checkoutSourceLoaded,
     couponCodes,
     currentPricingPreviewSignature,
@@ -1313,7 +1370,7 @@ export default function CheckoutPage({
           shippingName: shipping.customerName,
           shippingPhone: shipping.phone,
           shippingAddress: shipping.address,
-          shippingChannel: selectedShippingRate?.courierCode ?? null,
+          shippingChannel: selectedShippingRate?.courierCode ?? "standard",
           paymentMethod: submitPaymentMethod,
           couponCodes,
           description: shipping.note || null,
@@ -1463,6 +1520,13 @@ export default function CheckoutPage({
 
       throw new Error("Unsupported payment method.");
     } catch (err) {
+      if (isRefreshableQuoteError(err)) {
+        pricingPreviewCacheRef.current.delete(currentPricingPreviewSignature);
+        setPricingPreview(null);
+        setPricingPreviewSignature("");
+        setPricingPreviewError(null);
+        setQuoteTime(Date.now());
+      }
       setPlaceError(
         getCouponErrorMessage(err, "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง")
       );

@@ -225,12 +225,12 @@ export interface ApiSubmitOrderResponse {
 
 export interface ApiPricingPreviewRequest {
   customerEmail: string | null;
-  shippingName: string;
-  shippingPhone: string;
-  shippingAddress: string;
+  shippingName: string | null;
+  shippingPhone: string | null;
+  shippingAddress: string | null;
   shippingChannel: string | null;
-  couponCodes?: string[];
-  couponCode?: string;
+  couponCodes?: string[] | null;
+  couponCode?: string | null;
   items: ApiCreateOrderItem[];
 }
 
