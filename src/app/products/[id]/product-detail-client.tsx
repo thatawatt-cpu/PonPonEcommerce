@@ -827,7 +827,7 @@ export function ProductDetailClient({
               address: defaultAddress.address,
             }
           : null,
-        shippingChannel: "standard",
+        shippingChannel: null,
         couponCodes: null,
       });
       const quote = await fetchPricingPreview(request);

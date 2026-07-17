@@ -153,7 +153,7 @@ export default function CartPage() {
               address: defaultAddress.address,
             }
           : null,
-        shippingChannel: "standard",
+        shippingChannel: null,
         couponCodes: null,
       });
       const quote = await fetchPricingPreview(request);

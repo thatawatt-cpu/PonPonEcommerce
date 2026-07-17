@@ -281,6 +281,14 @@ function buildShippingRateRequest(
   };
 }
 
+function getShippingRateKey(rate: ShippingRateOption): string {
+  return `${rate.courierCode}:${rate.serviceCode}`;
+}
+
+function getShippingRateChannel(rate: ShippingRateOption | null): string | null {
+  return rate?.courierCode || rate?.serviceCode || null;
+}
+
 function storePendingRedirectPayment(input: {
   chargeId: string;
   orderId: string;
@@ -510,6 +518,9 @@ export default function CheckoutPage({
     });
   }, []);
   const [shippingRates, setShippingRates] = useState<ShippingRateOption[]>([]);
+  const [selectedShippingRateKey, setSelectedShippingRateKey] = useState<
+    string | null
+  >(null);
   const [shippingRatesLoading, setShippingRatesLoading] = useState(false);
   const [shippingRatesError, setShippingRatesError] = useState<string | null>(null);
   const [addressesLoaded, setAddressesLoaded] = useState(false);
@@ -547,7 +558,10 @@ export default function CheckoutPage({
       ? SHIPPING_FEE
       : 0
     : cartShippingFee;
-  const selectedShippingRate = shippingRates[0] ?? null;
+  const selectedShippingRate =
+    shippingRates.find((rate) => getShippingRateKey(rate) === selectedShippingRateKey) ??
+    null;
+  const selectedShippingChannel = getShippingRateChannel(selectedShippingRate);
   const shippingFee = selectedShippingRate?.price ?? fallbackShippingFee;
   const selectedAddress = savedAddresses.find(
     (address) => address.id === selectedAddressId
@@ -603,14 +617,14 @@ export default function CheckoutPage({
               address: shipping.address,
             }
           : null,
-        shippingChannel: selectedShippingRate?.courierCode ?? "standard",
+        shippingChannel: selectedShippingChannel,
         couponCodes: nextCouponCodes,
       }),
     [
       hasShippingContact,
       items,
       selectedAddress?.email,
-      selectedShippingRate?.courierCode,
+      selectedShippingChannel,
       shipping.address,
       shipping.customerName,
       shipping.phone,
@@ -632,6 +646,7 @@ export default function CheckoutPage({
     const timer = window.setTimeout(() => {
       if (!shippingRateRequest) {
         setShippingRates([]);
+        setSelectedShippingRateKey(null);
         setShippingRatesError(null);
         setShippingRatesLoading(false);
         setShippingQuoteResolved(true);
@@ -640,6 +655,7 @@ export default function CheckoutPage({
 
       setShippingQuoteResolved(false);
       setShippingRatesLoading(true);
+      setSelectedShippingRateKey(null);
       setShippingRatesError(null);
 
       fetchShippingRates(shippingRateRequest)
@@ -1370,7 +1386,7 @@ export default function CheckoutPage({
           shippingName: shipping.customerName,
           shippingPhone: shipping.phone,
           shippingAddress: shipping.address,
-          shippingChannel: selectedShippingRate?.courierCode ?? "standard",
+          shippingChannel: selectedShippingChannel,
           paymentMethod: submitPaymentMethod,
           couponCodes,
           description: shipping.note || null,
@@ -1935,6 +1951,61 @@ export default function CheckoutPage({
                 </div>
               </div>
             </div>
+            {shippingRates.length > 0 && (
+              <div className="mt-3 grid gap-2">
+                {shippingRates.map((rate) => {
+                  const rateKey = getShippingRateKey(rate);
+                  const selected = selectedShippingRateKey === rateKey;
+
+                  return (
+                    <button
+                      key={rateKey}
+                      type="button"
+                      onClick={() => {
+                        setSelectedShippingRateKey(rateKey);
+                        setPlaceError(null);
+                      }}
+                      className={`flex min-h-[66px] w-full items-center justify-between gap-3 rounded-2xl border px-3 py-2.5 text-left transition active:scale-[0.99] ${
+                        selected
+                          ? "border-success bg-success-soft"
+                          : "border-black/[0.07] bg-white hover:border-brand/25"
+                      }`}
+                    >
+                      <span className="min-w-0 flex-1">
+                        <span
+                          className={`block truncate text-sm font-extrabold ${
+                            selected ? "text-success" : "text-ink"
+                          }`}
+                        >
+                          {rate.serviceName}
+                        </span>
+                        <span className="mt-0.5 block truncate text-xs font-semibold text-ink-soft">
+                          {rate.courierName}
+                        </span>
+                      </span>
+                      <span className="flex shrink-0 items-center gap-2">
+                        <span className="text-sm font-extrabold tabular-nums text-ink">
+                          {rate.price === 0 ? "ส่งฟรี" : formatBaht(rate.price)}
+                        </span>
+                        <span
+                          className={`flex h-6 w-6 items-center justify-center rounded-full ${
+                            selected
+                              ? "bg-success text-white"
+                              : "bg-surface-muted text-ink-soft"
+                          }`}
+                        >
+                          {selected ? (
+                            <Check className="h-3.5 w-3.5" />
+                          ) : (
+                            <Truck className="h-3.5 w-3.5" />
+                          )}
+                        </span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
           <details className="group border-t border-black/[0.05] px-4 py-3">
             <summary className="flex cursor-pointer list-none items-center justify-between gap-3">

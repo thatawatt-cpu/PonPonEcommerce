@@ -24,7 +24,7 @@ export function buildCheckoutPricingRequest(input: {
     shippingName: address?.customerName?.trim() || null,
     shippingPhone: address?.phone?.trim() || null,
     shippingAddress: address?.address?.trim() || null,
-    shippingChannel: input.shippingChannel?.trim() || "standard",
+    shippingChannel: input.shippingChannel?.trim() || null,
     couponCode: couponCodes[0] ?? null,
     couponCodes: couponCodes.length > 0 ? couponCodes : null,
     items: input.items.map((item) => ({
