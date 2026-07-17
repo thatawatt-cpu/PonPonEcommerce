@@ -1,12 +1,15 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ArrowUpRight, Star } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Price } from "@/components/ui/price";
 import { ProductImage } from "@/components/product/product-image";
 import type { Product } from "@/types/product";
+
+const prefetchedProductHrefs = new Set<string>();
 
 function formatSoldCount(count?: number): string | null {
   if (!count || count <= 0) return null;
@@ -37,6 +40,7 @@ export function ProductCard({
   /** Optional contextual label shown over the product image. */
   metaLabel?: string;
 }) {
+  const router = useRouter();
   const discountPercent = getDiscountPercent(product);
   const soldCountLabel = formatSoldCount(product.soldCount);
   const reviewLabel =
@@ -44,6 +48,14 @@ export function ProductCard({
   const visibleBadges = product.badges
     .filter((badge) => badge !== "ลดราคา" || discountPercent === null)
     .slice(0, discountPercent === null ? 2 : 1);
+  const productHref = `/products/${product.slug}`;
+
+  const prefetchProductDetail = () => {
+    if (prefetchedProductHrefs.has(productHref)) return;
+
+    prefetchedProductHrefs.add(productHref);
+    router.prefetch(productHref);
+  };
 
   return (
     <Card
@@ -51,9 +63,12 @@ export function ProductCard({
       style={{ animationDelay: `${Math.min(index, 9) * 55}ms` }}
     >
       <Link
-        href={`/products/${product.slug}`}
+        href={productHref}
         prefetch={false}
         className="flex flex-1 flex-col"
+        onFocus={prefetchProductDetail}
+        onMouseEnter={prefetchProductDetail}
+        onTouchStart={prefetchProductDetail}
       >
         <div className="relative overflow-hidden">
           <ProductImage
