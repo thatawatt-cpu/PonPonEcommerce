@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -23,7 +23,10 @@ import {
   useCartHydrated,
   useCartStore,
 } from "@/store/cart-store";
-import { storeCartSelectionCheckout } from "@/features/checkout/cart-selection-checkout";
+import {
+  getStoredCartSelectionCheckout,
+  storeCartSelectionCheckout,
+} from "@/features/checkout/cart-selection-checkout";
 import {
   buildCheckoutPricingRequest,
   getCheckoutPricingSignature,
@@ -54,12 +57,32 @@ export default function CartPage() {
   const [checkoutError, setCheckoutError] = useState("");
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [selectionTouched, setSelectionTouched] = useState(false);
+  const restoredSelectionRef = useRef(false);
 
   useEffect(() => {
     if (!hydrated) return;
 
     const timer = window.setTimeout(() => {
+      let restoredKeys: string[] | null = null;
+
+      if (!restoredSelectionRef.current) {
+        restoredSelectionRef.current = true;
+
+        const existingKeys = new Set(itemKeys);
+        restoredKeys = getStoredCartSelectionCheckout()
+          .map(({ key }) => key)
+          .filter((key) => existingKeys.has(key));
+
+        if (restoredKeys.length > 0) {
+          setSelectionTouched(true);
+        }
+      }
+
       setSelectedKeys((prev) => {
+        if (restoredKeys && restoredKeys.length > 0) {
+          return new Set(restoredKeys);
+        }
+
         if (!selectionTouched && prev.size === 0 && itemKeys.length > 0) {
           return new Set(itemKeys);
         }
@@ -324,11 +347,21 @@ export default function CartPage() {
 
             {/* ── Order summary ── */}
             <section className="rounded-3xl bg-white px-4 py-4 ring-1 ring-black/[0.04]">
-              <CartSummary
-                subtotal={selectedSubtotal}
-                showShipping={false}
-                total={selectedTotal}
-              />
+              {checkoutLoading ? (
+                <div
+                  aria-live="polite"
+                  className="flex min-h-[88px] items-center justify-center gap-2 text-sm font-bold text-ink-soft"
+                >
+                  <Loader2 className="h-5 w-5 animate-spin text-brand" />
+                  กำลังคำนวณยอดชำระ
+                </div>
+              ) : (
+                <CartSummary
+                  subtotal={selectedSubtotal}
+                  showShipping={false}
+                  total={selectedTotal}
+                />
+              )}
             </section>
 
           </>
@@ -344,6 +377,15 @@ export default function CartPage() {
                 <p className="text-[11px] font-semibold text-ink-soft">
                   ยอดรวมทั้งหมด
                 </p>
+                {checkoutLoading ? (
+                  <div
+                    aria-live="polite"
+                    className="mt-0.5 flex min-h-[1.75rem] items-center gap-2 text-sm font-bold text-brand"
+                  >
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    กำลังคำนวณ
+                  </div>
+                ) : (
                 <div className="flex items-baseline gap-1.5">
                   <span className="text-xl font-extrabold text-brand">
                     {formatBaht(selectedTotal)}
@@ -352,6 +394,7 @@ export default function CartPage() {
                     รวม {totalItems} ชิ้น
                   </span>
                 </div>
+                )}
               </div>
               <Link
                 href="/checkout?mode=cart-selection"
@@ -366,11 +409,16 @@ export default function CartPage() {
                   className="gap-1.5 px-6"
                   disabled={checkoutLoading}
                 >
-                  ไปชำระเงิน
                   {checkoutLoading ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      กำลังคำนวณ
+                    </>
                   ) : (
-                    <ArrowRight className="h-4 w-4" />
+                    <>
+                      ไปชำระเงิน
+                      <ArrowRight className="h-4 w-4" />
+                    </>
                   )}
                 </Button>
               </Link>
