@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
@@ -74,6 +74,7 @@ type DetailTab = "detail" | "shipping" | "review";
 const ANONYMOUS_REVIEW_AVATAR_URL =
   "/images/review-anonymous.png";
 const DEFAULT_REVIEW_AVATAR_URL = "/images/review-default.png";
+const DEFERRED_DETAIL_ROOT_MARGIN = "700px 0px";
 
 interface ProductCoupon {
   id: string;
@@ -141,6 +142,13 @@ function getMinimumLabel(coupon: ApiCouponListItem): string {
   return amount && amount > 0
     ? `ขั้นต่ำ ${amount.toLocaleString("th-TH")} ฿`
     : "ไม่มีขั้นต่ำ";
+}
+
+function addLazyImageAttributes(html: string): string {
+  return html
+    .replace(/<img\b(?![^>]*\bloading=)/gi, '<img loading="lazy"')
+    .replace(/<img\b(?![^>]*\bdecoding=)/gi, '<img decoding="async"')
+    .replace(/<img\b(?![^>]*\bfetchpriority=)/gi, '<img fetchpriority="low"');
 }
 
 function isCouponVisible(coupon: ApiCouponListItem): boolean {
@@ -424,7 +432,10 @@ export function ProductDetailClient({
   const [activeGallery, setActiveGallery] = useState("main");
   const [userPickedGallery, setUserPickedGallery] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const deferredDetailRef = useRef<HTMLDivElement | null>(null);
   const touchStartX = useRef<number | null>(null);
+  const reviewsRequestedRef = useRef(false);
+  const [deferredDetailReady, setDeferredDetailReady] = useState(false);
   const [reviewsOpen, setReviewsOpen] = useState(false);
   const [reviewFilter, setReviewFilter] = useState<ReviewFilter>("all");
   const [remoteProductCoupons, setRemoteProductCoupons] = useState<ApiCouponListItem[]>(
@@ -437,10 +448,10 @@ export function ProductDetailClient({
   const [activeReviewMedia, setActiveReviewMedia] = useState<ReviewMedia | null>(null);
   const [remoteReviews, setRemoteReviews] = useState<ProductReview[]>([]);
   const [reviewSummary, setReviewSummary] = useState<ProductReviewSummary>({
-    averageRating: 0,
-    totalReviews: 0,
+    averageRating: product.rating ?? 0,
+    totalReviews: product.reviewCount ?? 0,
   });
-  const [reviewsLoading, setReviewsLoading] = useState(true);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
   const [reviewsError, setReviewsError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<DetailTab>("detail");
   const [favoriteUpdating, setFavoriteUpdating] = useState(false);
@@ -553,6 +564,13 @@ export function ProductDetailClient({
   const productSpecs = detailContent.highlights;
   const detailSections = detailContent.sections ?? [];
   const summaryText = detailContent.summary ?? product.description;
+  const lazyRichDescription = useMemo(
+    () =>
+      detailContent.richDescription
+        ? addLazyImageAttributes(detailContent.richDescription)
+        : null,
+    [detailContent.richDescription]
+  );
 
   const galleryItems = [
     { key: "main", label: "รูปสินค้า", imageUrl: product.imageUrl, emoji: product.emoji, type: "image" },
@@ -633,6 +651,23 @@ export function ProductDetailClient({
   }, [product.id]);
 
   useEffect(() => {
+    const target = deferredDetailRef.current;
+    if (!target || deferredDetailReady) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry?.isIntersecting) return;
+        setDeferredDetailReady(true);
+        observer.disconnect();
+      },
+      { rootMargin: DEFERRED_DETAIL_ROOT_MARGIN }
+    );
+
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [deferredDetailReady]);
+
+  useEffect(() => {
     let cancelled = false;
     const params = getProductCouponParams(product, selectedVariant);
 
@@ -689,6 +724,11 @@ export function ProductDetailClient({
   }, [initialCoupons, product, selectedVariant]);
 
   useEffect(() => {
+    const shouldLoadReviews =
+      activeTab === "review" || reviewsOpen || deferredDetailReady;
+    if (!shouldLoadReviews || reviewsRequestedRef.current) return;
+
+    reviewsRequestedRef.current = true;
     let cancelled = false;
 
     Promise.resolve()
@@ -722,7 +762,7 @@ export function ProductDetailClient({
     return () => {
       cancelled = true;
     };
-  }, [product.id]);
+  }, [activeTab, deferredDetailReady, product.id, reviewsOpen]);
 
   const getPriorSelections = (optionName: string) => {
     const optionIndex =
@@ -1249,14 +1289,20 @@ export function ProductDetailClient({
           )}
 
           {/* ── Detail tabs ── */}
-          <div className="product-detail-wide app-panel-shadow mt-2 bg-white overflow-hidden">
+          <div
+            ref={deferredDetailRef}
+            className="product-detail-wide app-panel-shadow mt-2 bg-white overflow-hidden"
+          >
             {/* Tab bar */}
             <div className="flex border-b border-black/[0.06]">
               {(["detail", "shipping", "review"] as DetailTab[]).map((tab) => (
                 <button
                   key={tab}
                   type="button"
-                  onClick={() => setActiveTab(tab)}
+                  onClick={() => {
+                    setDeferredDetailReady(true);
+                    setActiveTab(tab);
+                  }}
                   className={cn(
                     "flex-1 py-3 text-xs font-bold transition",
                     activeTab === tab
@@ -1270,13 +1316,22 @@ export function ProductDetailClient({
             </div>
 
             <div className="px-4 py-4">
+              {!deferredDetailReady ? (
+                <div className="space-y-3">
+                  <div className="h-4 w-40 animate-pulse rounded-full bg-surface-muted" />
+                  <div className="h-3 w-full animate-pulse rounded-full bg-surface-muted" />
+                  <div className="h-3 w-11/12 animate-pulse rounded-full bg-surface-muted" />
+                  <div className="h-3 w-3/4 animate-pulse rounded-full bg-surface-muted" />
+                </div>
+              ) : (
+                <>
               {/* ── Detail tab ── */}
               {activeTab === "detail" && (
                 <div className="space-y-4">
-                  {detailContent.richDescription ? (
+                  {lazyRichDescription ? (
                     <div
                       className="overflow-hidden text-sm leading-7 text-ink-soft [&_*]:!max-w-full [&_img]:!block [&_img]:!h-auto [&_img]:!w-full [&_img]:!max-w-full [&_img]:rounded-xl [&_table]:!w-full"
-                      dangerouslySetInnerHTML={{ __html: detailContent.richDescription }}
+                      dangerouslySetInnerHTML={{ __html: lazyRichDescription }}
                     />
                   ) : summaryText ? (
                     <p className="text-sm leading-7 text-ink-soft">{summaryText}</p>
@@ -1464,10 +1519,12 @@ export function ProductDetailClient({
                   </div>
                 </div>
               )}
+                </>
+              )}
             </div>
           </div>
 
-          {relatedProducts.length > 0 && (
+          {deferredDetailReady && relatedProducts.length > 0 && (
             <section className="product-detail-wide app-panel-shadow mt-2 bg-white px-4 py-4">
               <div className="mb-3 flex items-center justify-between">
                 <h2 className="text-sm font-extrabold text-ink">
@@ -1736,10 +1793,8 @@ export function ProductDetailClient({
           >
             <X className="h-6 w-6" />
           </button>
-          <img
-            src={lightboxImages[lightboxIndex]}
-            alt="รูปสินค้า"
-            className="max-h-[90dvh] max-w-[calc(100vw-2rem)] rounded-2xl object-contain shadow-2xl"
+          <div
+            className="relative h-[90dvh] w-[calc(100vw-2rem)] max-w-5xl overflow-hidden rounded-2xl shadow-2xl"
             onClick={(e) => e.stopPropagation()}
             onTouchStart={(e) => { touchStartX.current = e.touches[0].clientX; }}
             onTouchEnd={(e) => {
@@ -1755,7 +1810,15 @@ export function ProductDetailClient({
                   : null
               );
             }}
-          />
+          >
+            <Image
+              src={lightboxImages[lightboxIndex]}
+              alt="Product image"
+              fill
+              sizes="100vw"
+              className="object-contain"
+            />
+          </div>
           {lightboxImages.length > 1 && (
             <div className="absolute bottom-5 rounded-full bg-black/40 px-3 py-1 text-sm font-semibold text-white backdrop-blur-sm">
               {lightboxIndex + 1}/{lightboxImages.length}
