@@ -670,15 +670,18 @@ export default function CheckoutPage({
   const userSelectedShippingRate =
     shippingRates.find((rate) => getShippingRateKey(rate) === selectedShippingRateKey) ??
     null;
+  const defaultShippingRate =
+    shippingRates.find((rate) => rate.isDefault) ?? shippingRates[0] ?? null;
   const selectedShippingRate =
     userSelectedShippingRate ??
     shippingRates.find((rate) =>
       shippingRateMatchesChannel(rate, quoteSelectedShippingChannel)
     ) ??
+    defaultShippingRate ??
     null;
   const selectedShippingChannel = useMemo(
-    () => getShippingRateChannel(userSelectedShippingRate),
-    [userSelectedShippingRate]
+    () => getShippingRateChannel(selectedShippingRate),
+    [selectedShippingRate]
   );
   const shippingFee =
     selectedShippingRate?.price ??
@@ -1062,7 +1065,7 @@ export default function CheckoutPage({
   const currentPricingPreview = pricingPreviewIsCurrent
     ? pricingPreview
     : null;
-  const displayPricingPreview = pricingPreview ?? currentPricingPreview;
+  const displayPricingPreview = currentPricingPreview;
   const currentQuoteId =
     currentPricingPreview && typeof currentPricingPreview.quoteId === "string"
       ? currentPricingPreview.quoteId
@@ -2017,12 +2020,8 @@ export default function CheckoutPage({
                 {shippingRates.map((rate) => {
                   const rateKey = getShippingRateKey(rate);
                   const selected =
-                    selectedShippingRateKey === rateKey ||
-                    (selectedShippingRateKey == null &&
-                      shippingRateMatchesChannel(
-                        rate,
-                        quoteSelectedShippingChannel
-                      ));
+                    selectedShippingRate != null &&
+                    rateKey === getShippingRateKey(selectedShippingRate);
                   const optionClasses = getShippingOptionClasses(rate, selected);
                   const ShippingIcon =
                     rate.optionType === "fastest" ? Zap : Truck;
