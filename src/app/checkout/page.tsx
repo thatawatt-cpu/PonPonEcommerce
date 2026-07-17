@@ -290,14 +290,6 @@ function getShippingRateChannel(rate: ShippingRateOption | null): string | null 
   return rate?.courierCode || null;
 }
 
-function getShippingRateDetail(rate: ShippingRateOption): string {
-  return [
-    rate.courierName,
-    rate.estimateTime ? `ส่งประมาณ ${rate.estimateTime}` : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
-}
 
 function shippingRateMatchesChannel(
   rate: ShippingRateOption,
@@ -308,33 +300,30 @@ function shippingRateMatchesChannel(
   );
 }
 
-function getShippingRateDetailText(rate: ShippingRateOption): string {
-  void getShippingRateDetail;
-  return [
-    rate.courierName,
-    rate.estimateTime ? `ส่งประมาณ ${rate.estimateTime}` : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+
+function getShippingEstimateText(rate: ShippingRateOption): string {
+  return rate.estimateTime
+    ? `ส่งประมาณ ${rate.estimateTime}`
+    : "รอประมาณเวลาจัดส่ง";
 }
 
 function getShippingOptionTitle(rate: ShippingRateOption): string {
   if (rate.optionType === "cheapest") return "ถูกสุด";
   if (rate.optionType === "fastest") return "เร็วสุด";
-  return "เวลากลาง ๆ";
+  return "ปานกลาง";
 }
 
 function getShippingOptionHint(rate: ShippingRateOption): string {
   if (rate.optionType === "cheapest") return "ตัวเลือกที่ราคาดีที่สุด";
   if (rate.optionType === "fastest") return "ตัวเลือกที่ถึงเร็วที่สุด";
-  return "ตัวเลือกเวลาจัดส่งกลาง ๆ";
+  return "ตัวเลือกปานกลาง";
 }
 
 function getShippingOptionBadge(rate: ShippingRateOption): string {
   if (rate.label) return rate.label;
   if (rate.optionType === "cheapest") return "ถูกสุด";
   if (rate.optionType === "fastest") return "เร็วสุด";
-  return "เวลากลาง ๆ";
+  return "ปานกลาง";
 }
 
 function getShippingOptionClasses(
@@ -370,11 +359,11 @@ function getShippingOptionClasses(
       };
     }
     return {
-      card: "border-black/[0.12] bg-surface-muted/70 shadow-[0_10px_24px_rgba(17,24,39,0.08)]",
-      icon: "bg-ink text-white",
-      title: "text-ink",
-      badge: "bg-white text-ink ring-1 ring-black/10",
-      price: "text-ink",
+      card: "border-amber-300 bg-amber-50 shadow-[0_10px_24px_rgba(245,158,11,0.12)]",
+      icon: "bg-amber-500 text-white",
+      title: "text-amber-700",
+      badge: "bg-white text-amber-700 ring-1 ring-amber-200",
+      price: "text-amber-700",
     };
   }
 
@@ -399,10 +388,10 @@ function getShippingOptionClasses(
   }
 
   return {
-    card: "border-black/[0.07] bg-white hover:border-black/20",
-    icon: "bg-surface-muted text-ink-soft",
+    card: "border-amber-200/70 bg-white hover:border-amber-300",
+    icon: "bg-amber-50 text-amber-600",
     title: "text-ink",
-    badge: "bg-surface-muted text-ink-soft",
+    badge: "bg-amber-50 text-amber-700",
     price: "text-ink",
   };
 }
@@ -640,6 +629,9 @@ export default function CheckoutPage({
     string | null
   >(null);
   const [shippingRatesLoading, setShippingRatesLoading] = useState(false);
+  const [shippingSelectionSettling, setShippingSelectionSettling] =
+    useState(false);
+  const shippingSelectionSettlingTimerRef = useRef<number | null>(null);
   const [addressesLoaded, setAddressesLoaded] = useState(false);
   const [shippingQuoteResolved, setShippingQuoteResolved] = useState(false);
   const [buyNowItem, setBuyNowItem] = useState<CartItem | null>(null);
@@ -816,6 +808,15 @@ export default function CheckoutPage({
   useEffect(() => {
     router.prefetch("/payment");
   }, [router]);
+
+  useEffect(
+    () => () => {
+      if (shippingSelectionSettlingTimerRef.current != null) {
+        window.clearTimeout(shippingSelectionSettlingTimerRef.current);
+      }
+    },
+    []
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -1109,7 +1110,8 @@ export default function CheckoutPage({
     !pricingPreviewError &&
     !manualShippingRequired &&
     (pricingPreviewLoading || !currentQuoteId || !finalPricingQuote);
-  const summaryRecalculating = shippingPreviewPending || waitingForFinalQuote;
+  const summaryRecalculating =
+    shippingPreviewPending || waitingForFinalQuote || shippingSelectionSettling;
   const paymentBlocked =
     summaryRecalculating ||
     Boolean(pricingPreviewError) ||
@@ -2041,6 +2043,19 @@ export default function CheckoutPage({
                       key={rateKey}
                       type="button"
                       onClick={() => {
+                        if (selectedShippingRateKey !== rateKey) {
+                          setShippingSelectionSettling(true);
+                          if (shippingSelectionSettlingTimerRef.current != null) {
+                            window.clearTimeout(
+                              shippingSelectionSettlingTimerRef.current
+                            );
+                          }
+                          shippingSelectionSettlingTimerRef.current =
+                            window.setTimeout(() => {
+                              setShippingSelectionSettling(false);
+                              shippingSelectionSettlingTimerRef.current = null;
+                            }, 350);
+                        }
                         setSelectedShippingRateKey(rateKey);
                         setPlaceError(null);
                       }}
@@ -2065,11 +2080,8 @@ export default function CheckoutPage({
                               {getShippingOptionBadge(rate)}
                             </span>
                           </span>
-                          <span className="mt-1 block truncate text-xs font-bold text-ink">
-                            {rate.serviceName}
-                          </span>
-                          <span className="mt-0.5 block text-xs font-semibold leading-4 text-ink-soft">
-                            {getShippingRateDetailText(rate)}
+                          <span className="mt-1 block text-xs font-semibold leading-4 text-ink-soft">
+                            {getShippingEstimateText(rate)}
                           </span>
                           <span className="mt-1 block text-[11px] font-semibold leading-4 text-ink-soft">
                             {getShippingOptionHint(rate)}

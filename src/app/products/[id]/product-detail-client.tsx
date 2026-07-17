@@ -29,13 +29,6 @@ import {
   storeBuyNowCheckout,
 } from "@/features/checkout/buy-now-checkout";
 import {
-  buildCheckoutPricingRequest,
-  getCheckoutPricingSignature,
-} from "@/features/checkout/checkout-pricing";
-import { fetchCustomerAddresses } from "@/features/customer-addresses/customer-address-api";
-import { fetchPricingPreview } from "@/features/orders/order-api";
-import { toSavedAddress } from "@/lib/address-storage";
-import {
   useFavoriteStore,
   useFavoritesHydrated,
 } from "@/store/favorite-store";
@@ -455,8 +448,6 @@ export function ProductDetailClient({
   const [reviewsError, setReviewsError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<DetailTab>("detail");
   const [favoriteUpdating, setFavoriteUpdating] = useState(false);
-  const [buyNowLoading, setBuyNowLoading] = useState(false);
-  const [buyNowError, setBuyNowError] = useState<string | null>(null);
   const apiProductCoupons = remoteProductCoupons
     .map(mapApiCoupon)
     .filter((coupon): coupon is ProductCoupon => Boolean(coupon));
@@ -838,8 +829,8 @@ export function ProductDetailClient({
     setTimeout(() => setAdded(false), 1500);
   };
 
-  const handleBuyNow = async () => {
-    if (purchaseDisabled || buyNowLoading) return;
+  const handleBuyNow = () => {
+    if (purchaseDisabled) return;
 
     const item = createBuyNowCartItem({
       product,
@@ -849,40 +840,8 @@ export function ProductDetailClient({
       imageUrl: selectedProductImageUrl,
     });
 
-    setBuyNowLoading(true);
-    setBuyNowError(null);
-
-    try {
-      const addresses = await fetchCustomerAddresses().catch(() => []);
-      const defaultAddress = addresses.map(toSavedAddress).find(
-        (address) => address.isDefault
-      );
-      const request = buildCheckoutPricingRequest({
-        items: [item],
-        address: defaultAddress
-          ? {
-              email: defaultAddress.email,
-              customerName: defaultAddress.customerName,
-              phone: defaultAddress.phone,
-              address: defaultAddress.address,
-            }
-          : null,
-        shippingChannel: null,
-        couponCodes: null,
-      });
-      const quote = await fetchPricingPreview(request);
-
-      storeBuyNowCheckout(item, quote, getCheckoutPricingSignature(request));
-      router.push("/checkout?mode=buy-now");
-    } catch (error) {
-      setBuyNowError(
-        error instanceof Error
-          ? error.message
-          : "ไม่สามารถคำนวณยอดก่อนชำระเงินได้"
-      );
-    } finally {
-      setBuyNowLoading(false);
-    }
+    storeBuyNowCheckout(item, null, null);
+    router.push("/checkout?mode=buy-now");
   };
 
   const reviewFilters: { value: ReviewFilter; label: string }[] = [
@@ -1582,7 +1541,7 @@ export function ProductDetailClient({
                 size="lg"
                 className="h-12 flex-1 whitespace-nowrap border-brand/20 bg-brand-soft/70 px-3 text-sm font-bold shadow-none hover:bg-brand-soft md:h-13"
                 onClick={handleAdd}
-                disabled={purchaseDisabled || buyNowLoading}
+                disabled={purchaseDisabled}
               >
                 {added ? (
                   <><Check className="mr-1.5 h-4 w-4" /> เพิ่มแล้ว</>
@@ -1598,16 +1557,11 @@ export function ProductDetailClient({
                 size="lg"
                 className="h-12 flex-[1.2] px-3 text-sm font-bold shadow-md shadow-brand/20 md:h-13"
                 onClick={handleBuyNow}
-                disabled={purchaseDisabled || buyNowLoading}
+                disabled={purchaseDisabled}
               >
                 {allVariantsSoldOut ? "แจ้งเตือนเมื่อมีสินค้า" : "ซื้อทันที"}
               </Button>
             </div>
-            {buyNowError && (
-              <p className="mt-2 rounded-2xl bg-red-50 px-3 py-2 text-center text-xs font-semibold text-red-600">
-                {buyNowError}
-              </p>
-            )}
           </div>
         </div>
       </div>
