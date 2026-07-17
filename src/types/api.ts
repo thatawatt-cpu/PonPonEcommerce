@@ -315,6 +315,7 @@ export interface ApiPricingPreviewResponse {
   isFinal?: boolean;
   calculationStatus?: "partial" | "final" | "manual_shipping_required" | string;
   shippingFinalized?: boolean;
+  selectedShippingChannel?: string | null;
   packages?: ApiPricingPreviewPackage[];
   lines: ApiPricingPreviewLine[];
   itemSubtotal: number;

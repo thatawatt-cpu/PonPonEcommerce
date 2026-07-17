@@ -289,6 +289,15 @@ function getShippingRateChannel(rate: ShippingRateOption | null): string | null 
   return rate?.courierCode || rate?.serviceCode || null;
 }
 
+function shippingRateMatchesChannel(
+  rate: ShippingRateOption,
+  channel: string | null | undefined
+): boolean {
+  return Boolean(
+    channel && (rate.courierCode === channel || rate.serviceCode === channel)
+  );
+}
+
 function storePendingRedirectPayment(input: {
   chargeId: string;
   orderId: string;
@@ -558,11 +567,22 @@ export default function CheckoutPage({
       ? SHIPPING_FEE
       : 0
     : cartShippingFee;
-  const selectedShippingRate =
+  const quoteSelectedShippingChannel =
+    pricingPreview?.selectedShippingChannel ?? null;
+  const userSelectedShippingRate =
     shippingRates.find((rate) => getShippingRateKey(rate) === selectedShippingRateKey) ??
     null;
-  const selectedShippingChannel = getShippingRateChannel(selectedShippingRate);
-  const shippingFee = selectedShippingRate?.price ?? fallbackShippingFee;
+  const selectedShippingRate =
+    userSelectedShippingRate ??
+    shippingRates.find((rate) =>
+      shippingRateMatchesChannel(rate, quoteSelectedShippingChannel)
+    ) ??
+    null;
+  const selectedShippingChannel = getShippingRateChannel(userSelectedShippingRate);
+  const shippingFee =
+    selectedShippingRate?.price ??
+    pricingPreview?.shippingAmount ??
+    fallbackShippingFee;
   const selectedAddress = savedAddresses.find(
     (address) => address.id === selectedAddressId
   );
@@ -964,9 +984,11 @@ export default function CheckoutPage({
     !quoteExpired &&
     currentPricingPreview?.isFinal === true &&
     currentPricingPreview.shippingFinalized === true &&
-    currentPricingPreview.calculationStatus === "final"
+    currentPricingPreview.calculationStatus === "final" &&
+    currentPricingPreview.selectedShippingChannel != null
       ? currentPricingPreview
       : null;
+  const finalShippingChannel = finalPricingQuote?.selectedShippingChannel ?? null;
   const manualShippingRequired =
     displayPricingPreview?.calculationStatus === "manual_shipping_required";
   const zeroTotalCouponBlocked =
@@ -1386,7 +1408,7 @@ export default function CheckoutPage({
           shippingName: shipping.customerName,
           shippingPhone: shipping.phone,
           shippingAddress: shipping.address,
-          shippingChannel: selectedShippingChannel,
+          shippingChannel: finalShippingChannel,
           paymentMethod: submitPaymentMethod,
           couponCodes,
           description: shipping.note || null,
@@ -1955,7 +1977,13 @@ export default function CheckoutPage({
               <div className="mt-3 grid gap-2">
                 {shippingRates.map((rate) => {
                   const rateKey = getShippingRateKey(rate);
-                  const selected = selectedShippingRateKey === rateKey;
+                  const selected =
+                    selectedShippingRateKey === rateKey ||
+                    (selectedShippingRateKey == null &&
+                      shippingRateMatchesChannel(
+                        rate,
+                        quoteSelectedShippingChannel
+                      ));
 
                   return (
                     <button
