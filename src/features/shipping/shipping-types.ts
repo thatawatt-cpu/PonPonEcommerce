@@ -20,4 +20,5 @@ export interface ShippingRateOption {
   serviceName: string;
   serviceCode: string;
   price: number;
+  estimateTime?: string | null;
 }

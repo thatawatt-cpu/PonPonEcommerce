@@ -289,6 +289,15 @@ function getShippingRateChannel(rate: ShippingRateOption | null): string | null 
   return rate?.courierCode || rate?.serviceCode || null;
 }
 
+function getShippingRateDetail(rate: ShippingRateOption): string {
+  return [
+    rate.courierName,
+    rate.estimateTime ? `ส่งประมาณ ${rate.estimateTime}` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
 function shippingRateMatchesChannel(
   rate: ShippingRateOption,
   channel: string | null | undefined
@@ -578,7 +587,10 @@ export default function CheckoutPage({
       shippingRateMatchesChannel(rate, quoteSelectedShippingChannel)
     ) ??
     null;
-  const selectedShippingChannel = getShippingRateChannel(userSelectedShippingRate);
+  const selectedShippingChannel = useMemo(
+    () => getShippingRateChannel(userSelectedShippingRate),
+    [userSelectedShippingRate]
+  );
   const shippingFee =
     selectedShippingRate?.price ??
     pricingPreview?.shippingAmount ??
@@ -1949,12 +1961,13 @@ export default function CheckoutPage({
                         : "จัดส่งมาตรฐาน")}
                   </p>
                   <p className="mt-0.5 line-clamp-2 min-h-8 text-xs font-semibold leading-4 text-ink-soft">
-                    {selectedShippingRate?.courierName ??
-                      (shippingRatesError
+                    {selectedShippingRate
+                      ? getShippingRateDetail(selectedShippingRate)
+                      : shippingRatesError
                         ? "ระบบจะใช้ค่าจัดส่งมาตรฐานชั่วคราว"
                         : shippingRateRequest
                           ? "กำลังค้นหาบริการที่เหมาะกับที่อยู่ของคุณ"
-                          : "เพิ่มที่อยู่เพื่อคำนวณค่าจัดส่ง")}
+                          : "เพิ่มที่อยู่เพื่อคำนวณค่าจัดส่ง"}
                   </p>
                 </div>
                 <div className="min-w-[5.5rem] shrink-0 text-right">
@@ -2008,7 +2021,7 @@ export default function CheckoutPage({
                           {rate.serviceName}
                         </span>
                         <span className="mt-0.5 block truncate text-xs font-semibold text-ink-soft">
-                          {rate.courierName}
+                          {getShippingRateDetail(rate)}
                         </span>
                       </span>
                       <span className="flex shrink-0 items-center gap-2">
