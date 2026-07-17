@@ -21,7 +21,7 @@ export interface ShippingRateOption {
   serviceCode: string;
   price: number;
   estimateTime: string | null;
-  optionType: "cheapest" | "fastest" | "cheapest_fastest";
+  optionType: "standard" | "fastest" | "standard_fastest";
   label: string;
   isDefault: boolean;
   estimatedMinDays: number | null;

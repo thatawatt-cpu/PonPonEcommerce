@@ -319,22 +319,22 @@ function getShippingRateDetailText(rate: ShippingRateOption): string {
 }
 
 function getShippingOptionTitle(rate: ShippingRateOption): string {
-  if (rate.optionType === "fastest") return "ส่งเร็ว";
-  if (rate.optionType === "cheapest_fastest") return "ส่งคุ้มและเร็ว";
+  if (rate.optionType === "fastest") return "ส่งด่วน";
+  if (rate.optionType === "standard_fastest") return "ส่งธรรมดาและด่วน";
   return "ส่งธรรมดา";
 }
 
 function getShippingOptionHint(rate: ShippingRateOption): string {
   if (rate.optionType === "fastest") return "เหมาะเมื่ออยากได้ของไว";
-  if (rate.optionType === "cheapest_fastest") return "ตัวเลือกที่คุ้มที่สุดและไวที่สุด";
-  return "ประหยัดที่สุดสำหรับออเดอร์นี้";
+  if (rate.optionType === "standard_fastest") return "ตัวเลือกมาตรฐานที่เร็วที่สุดด้วย";
+  return "ตัวเลือกมาตรฐานสำหรับออเดอร์นี้";
 }
 
 function getShippingOptionBadge(rate: ShippingRateOption): string {
   if (rate.label) return rate.label;
   if (rate.optionType === "fastest") return "เร็วที่สุด";
-  if (rate.optionType === "cheapest_fastest") return "คุ้มและเร็ว";
-  return "ถูกที่สุด";
+  if (rate.optionType === "standard_fastest") return "ปานกลางและเร็วที่สุด";
+  return "ปานกลาง";
 }
 
 function getShippingOptionClasses(
@@ -348,7 +348,7 @@ function getShippingOptionClasses(
   price: string;
 } {
   const isFast = rate.optionType === "fastest";
-  const isCombo = rate.optionType === "cheapest_fastest";
+  const isCombo = rate.optionType === "standard_fastest";
 
   if (selected) {
     if (isFast) {
@@ -630,7 +630,6 @@ export default function CheckoutPage({
     string | null
   >(null);
   const [shippingRatesLoading, setShippingRatesLoading] = useState(false);
-  const [shippingRatesError, setShippingRatesError] = useState<string | null>(null);
   const [addressesLoaded, setAddressesLoaded] = useState(false);
   const [shippingQuoteResolved, setShippingQuoteResolved] = useState(false);
   const [buyNowItem, setBuyNowItem] = useState<CartItem | null>(null);
@@ -677,9 +676,6 @@ export default function CheckoutPage({
       shippingRateMatchesChannel(rate, quoteSelectedShippingChannel)
     ) ??
     null;
-  const selectedShippingOptionClasses = selectedShippingRate
-    ? getShippingOptionClasses(selectedShippingRate, true)
-    : null;
   const selectedShippingChannel = useMemo(
     () => getShippingRateChannel(userSelectedShippingRate),
     [userSelectedShippingRate]
@@ -772,7 +768,6 @@ export default function CheckoutPage({
       if (!shippingRateRequest) {
         setShippingRates([]);
         setSelectedShippingRateKey(null);
-        setShippingRatesError(null);
         setShippingRatesLoading(false);
         setShippingQuoteResolved(true);
         return;
@@ -781,19 +776,15 @@ export default function CheckoutPage({
       setShippingQuoteResolved(false);
       setShippingRatesLoading(true);
       setSelectedShippingRateKey(null);
-      setShippingRatesError(null);
 
       fetchShippingRates(shippingRateRequest)
         .then((rates) => {
           if (cancelled) return;
           setShippingRates(rates);
         })
-        .catch((err) => {
+        .catch(() => {
           if (cancelled) return;
           setShippingRates([]);
-          setShippingRatesError(
-            err instanceof Error ? err.message : "Shipping rates failed"
-          );
         })
         .finally(() => {
           if (!cancelled) {
@@ -2021,70 +2012,8 @@ export default function CheckoutPage({
             </span>
           </div>
           <div className="px-4 pb-4">
-            <div
-              className={`relative min-h-[90px] rounded-2xl border px-4 py-3 transition-colors duration-300 ${
-                selectedShippingOptionClasses
-                  ? selectedShippingOptionClasses.card
-                  : "border-black/[0.07] bg-surface-muted/45"
-              }`}
-            >
-              <span
-                className={`absolute left-0 top-0 flex h-6 w-6 -translate-x-px -translate-y-px items-center justify-center rounded-br-2xl rounded-tl-2xl text-white transition-colors ${
-                  selectedShippingOptionClasses
-                    ? selectedShippingOptionClasses.icon
-                    : "bg-ink-soft"
-                }`}
-              >
-                {shippingRatesLoading ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : selectedShippingRate ? (
-                  <Check className="h-3.5 w-3.5" />
-                ) : (
-                  <Truck className="h-3.5 w-3.5" />
-                )}
-              </span>
-              <div className="ml-2 flex items-start justify-between gap-3">
-                <div className="min-w-0 flex-1">
-                  <p
-                    className={`line-clamp-1 min-h-5 text-sm font-extrabold ${
-                      selectedShippingOptionClasses
-                        ? selectedShippingOptionClasses.title
-                        : "text-ink"
-                    }`}
-                  >
-                    {selectedShippingRate ? getShippingOptionTitle(selectedShippingRate) :
-                      (shippingRatesLoading
-                        ? "กำลังตรวจสอบค่าจัดส่ง"
-                        : "จัดส่งมาตรฐาน")}
-                  </p>
-                  <p className="mt-0.5 line-clamp-2 min-h-8 text-xs font-semibold leading-4 text-ink-soft">
-                    {selectedShippingRate
-                      ? getShippingRateDetailText(selectedShippingRate)
-                      : shippingRatesError
-                        ? "ระบบจะใช้ค่าจัดส่งมาตรฐานชั่วคราว"
-                        : shippingRateRequest
-                          ? "กำลังค้นหาบริการที่เหมาะกับที่อยู่ของคุณ"
-                          : "เพิ่มที่อยู่เพื่อคำนวณค่าจัดส่ง"}
-                  </p>
-                </div>
-                <div className="min-w-[5.5rem] shrink-0 text-right">
-                  <p className="text-sm font-extrabold tabular-nums text-ink">
-                    {shippingFee === 0
-                      ? "ส่งฟรี"
-                      : formatBaht(shippingFee)}
-                  </p>
-                  <p className="mt-0.5 min-h-4 text-[10px] font-semibold text-ink-soft">
-                    {!shippingRateRequest
-                      ? "รอคำนวณ"
-                      : shippingRatesLoading || !selectedShippingRate
-                        ? "ประมาณการ"
-                        : "ยืนยันแล้ว"}
-                  </p>
-                </div>
-              </div>
-            </div>
             {shippingRates.length > 0 && (
-              <div className="mt-3 grid gap-2">
+              <div className="grid gap-2">
                 {shippingRates.map((rate) => {
                   const rateKey = getShippingRateKey(rate);
                   const selected =
