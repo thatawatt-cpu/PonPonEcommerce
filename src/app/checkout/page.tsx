@@ -14,6 +14,7 @@ import {
   Store,
   TicketPercent,
   Truck,
+  Zap,
 } from "lucide-react";
 import { AppHeader } from "@/components/layout/app-header";
 import { PageContainer } from "@/components/layout/page-container";
@@ -307,6 +308,95 @@ function shippingRateMatchesChannel(
   );
 }
 
+function getShippingRateDetailText(rate: ShippingRateOption): string {
+  void getShippingRateDetail;
+  return [
+    rate.courierName,
+    rate.estimateTime ? `ส่งประมาณ ${rate.estimateTime}` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+function getShippingOptionTitle(rate: ShippingRateOption): string {
+  if (rate.optionType === "fastest") return "ส่งเร็ว";
+  if (rate.optionType === "cheapest_fastest") return "ส่งคุ้มและเร็ว";
+  return "ส่งธรรมดา";
+}
+
+function getShippingOptionHint(rate: ShippingRateOption): string {
+  if (rate.optionType === "fastest") return "เหมาะเมื่ออยากได้ของไว";
+  if (rate.optionType === "cheapest_fastest") return "ตัวเลือกที่คุ้มที่สุดและไวที่สุด";
+  return "ประหยัดที่สุดสำหรับออเดอร์นี้";
+}
+
+function getShippingOptionBadge(rate: ShippingRateOption): string {
+  if (rate.label) return rate.label;
+  if (rate.optionType === "fastest") return "เร็วที่สุด";
+  if (rate.optionType === "cheapest_fastest") return "คุ้มและเร็ว";
+  return "ถูกที่สุด";
+}
+
+function getShippingOptionClasses(
+  rate: ShippingRateOption,
+  selected: boolean
+): {
+  card: string;
+  icon: string;
+  title: string;
+  badge: string;
+  price: string;
+} {
+  const isFast = rate.optionType === "fastest";
+  const isCombo = rate.optionType === "cheapest_fastest";
+
+  if (selected) {
+    if (isFast) {
+      return {
+        card: "border-brand bg-brand-soft shadow-[0_10px_24px_rgba(237,23,28,0.12)]",
+        icon: "bg-brand text-white",
+        title: "text-brand",
+        badge: "bg-white text-brand ring-1 ring-brand/15",
+        price: "text-brand",
+      };
+    }
+    if (isCombo) {
+      return {
+        card: "border-brand bg-gradient-to-br from-brand-soft to-success-soft shadow-[0_10px_24px_rgba(237,23,28,0.10)]",
+        icon: "bg-brand text-white",
+        title: "text-brand",
+        badge: "bg-white text-brand ring-1 ring-brand/15",
+        price: "text-brand",
+      };
+    }
+    return {
+      card: "border-success bg-success-soft shadow-[0_10px_24px_rgba(25,135,84,0.12)]",
+      icon: "bg-success text-white",
+      title: "text-success",
+      badge: "bg-white text-success ring-1 ring-success/15",
+      price: "text-success",
+    };
+  }
+
+  if (isFast) {
+    return {
+      card: "border-brand/15 bg-white hover:border-brand/35",
+      icon: "bg-brand-soft text-brand",
+      title: "text-ink",
+      badge: "bg-brand-soft text-brand",
+      price: "text-ink",
+    };
+  }
+
+  return {
+    card: "border-black/[0.07] bg-white hover:border-success/35",
+    icon: "bg-success-soft text-success",
+    title: "text-ink",
+    badge: "bg-success-soft text-success",
+    price: "text-ink",
+  };
+}
+
 function storePendingRedirectPayment(input: {
   chargeId: string;
   orderId: string;
@@ -587,6 +677,9 @@ export default function CheckoutPage({
       shippingRateMatchesChannel(rate, quoteSelectedShippingChannel)
     ) ??
     null;
+  const selectedShippingOptionClasses = selectedShippingRate
+    ? getShippingOptionClasses(selectedShippingRate, true)
+    : null;
   const selectedShippingChannel = useMemo(
     () => getShippingRateChannel(userSelectedShippingRate),
     [userSelectedShippingRate]
@@ -1930,14 +2023,16 @@ export default function CheckoutPage({
           <div className="px-4 pb-4">
             <div
               className={`relative min-h-[90px] rounded-2xl border px-4 py-3 transition-colors duration-300 ${
-                selectedShippingRate
-                  ? "border-success bg-success-soft"
+                selectedShippingOptionClasses
+                  ? selectedShippingOptionClasses.card
                   : "border-black/[0.07] bg-surface-muted/45"
               }`}
             >
               <span
                 className={`absolute left-0 top-0 flex h-6 w-6 -translate-x-px -translate-y-px items-center justify-center rounded-br-2xl rounded-tl-2xl text-white transition-colors ${
-                  selectedShippingRate ? "bg-success" : "bg-ink-soft"
+                  selectedShippingOptionClasses
+                    ? selectedShippingOptionClasses.icon
+                    : "bg-ink-soft"
                 }`}
               >
                 {shippingRatesLoading ? (
@@ -1952,17 +2047,19 @@ export default function CheckoutPage({
                 <div className="min-w-0 flex-1">
                   <p
                     className={`line-clamp-1 min-h-5 text-sm font-extrabold ${
-                      selectedShippingRate ? "text-success" : "text-ink"
+                      selectedShippingOptionClasses
+                        ? selectedShippingOptionClasses.title
+                        : "text-ink"
                     }`}
                   >
-                    {selectedShippingRate?.serviceName ??
+                    {selectedShippingRate ? getShippingOptionTitle(selectedShippingRate) :
                       (shippingRatesLoading
                         ? "กำลังตรวจสอบค่าจัดส่ง"
                         : "จัดส่งมาตรฐาน")}
                   </p>
                   <p className="mt-0.5 line-clamp-2 min-h-8 text-xs font-semibold leading-4 text-ink-soft">
                     {selectedShippingRate
-                      ? getShippingRateDetail(selectedShippingRate)
+                      ? getShippingRateDetailText(selectedShippingRate)
                       : shippingRatesError
                         ? "ระบบจะใช้ค่าจัดส่งมาตรฐานชั่วคราว"
                         : shippingRateRequest
@@ -1997,6 +2094,9 @@ export default function CheckoutPage({
                         rate,
                         quoteSelectedShippingChannel
                       ));
+                  const optionClasses = getShippingOptionClasses(rate, selected);
+                  const ShippingIcon =
+                    rate.optionType === "fastest" ? Zap : Truck;
 
                   return (
                     <button
@@ -2006,32 +2106,46 @@ export default function CheckoutPage({
                         setSelectedShippingRateKey(rateKey);
                         setPlaceError(null);
                       }}
-                      className={`flex min-h-[66px] w-full items-center justify-between gap-3 rounded-2xl border px-3 py-2.5 text-left transition active:scale-[0.99] ${
-                        selected
-                          ? "border-success bg-success-soft"
-                          : "border-black/[0.07] bg-white hover:border-brand/25"
-                      }`}
+                      className={`flex min-h-[92px] w-full items-center justify-between gap-3 rounded-2xl border px-3 py-3 text-left transition active:scale-[0.99] ${optionClasses.card}`}
                     >
-                      <span className="min-w-0 flex-1">
+                      <span className="flex min-w-0 flex-1 items-start gap-3">
                         <span
-                          className={`block truncate text-sm font-extrabold ${
-                            selected ? "text-success" : "text-ink"
-                          }`}
+                          className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${optionClasses.icon}`}
                         >
-                          {rate.serviceName}
+                          <ShippingIcon className="h-5 w-5" />
                         </span>
-                        <span className="mt-0.5 block truncate text-xs font-semibold text-ink-soft">
-                          {getShippingRateDetail(rate)}
+                        <span className="min-w-0 flex-1">
+                          <span className="flex flex-wrap items-center gap-2">
+                            <span
+                              className={`text-sm font-extrabold ${optionClasses.title}`}
+                            >
+                              {getShippingOptionTitle(rate)}
+                            </span>
+                            <span
+                              className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold ${optionClasses.badge}`}
+                            >
+                              {getShippingOptionBadge(rate)}
+                            </span>
+                          </span>
+                          <span className="mt-1 block truncate text-xs font-bold text-ink">
+                            {rate.serviceName}
+                          </span>
+                          <span className="mt-0.5 block text-xs font-semibold leading-4 text-ink-soft">
+                            {getShippingRateDetailText(rate)}
+                          </span>
+                          <span className="mt-1 block text-[11px] font-semibold leading-4 text-ink-soft">
+                            {getShippingOptionHint(rate)}
+                          </span>
                         </span>
                       </span>
-                      <span className="flex shrink-0 items-center gap-2">
-                        <span className="text-sm font-extrabold tabular-nums text-ink">
+                      <span className="flex shrink-0 flex-col items-end gap-1 text-right">
+                        <span className={`text-base font-extrabold tabular-nums ${optionClasses.price}`}>
                           {rate.price === 0 ? "ส่งฟรี" : formatBaht(rate.price)}
                         </span>
                         <span
                           className={`flex h-6 w-6 items-center justify-center rounded-full ${
                             selected
-                              ? "bg-success text-white"
+                              ? optionClasses.icon
                               : "bg-surface-muted text-ink-soft"
                           }`}
                         >
