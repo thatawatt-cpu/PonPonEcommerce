@@ -10,6 +10,7 @@ import {
   Loader2,
   MapPin,
   MessageSquareText,
+  Plus,
   ShieldCheck,
   Store,
   TicketPercent,
@@ -1772,13 +1773,41 @@ export default function CheckoutPage({
             </div>
             <Link
               href="/addresses"
-              className="flex shrink-0 items-center gap-0.5 rounded-full bg-brand-soft px-3 py-1.5 text-xs font-extrabold text-brand"
+              className={`flex shrink-0 items-center gap-0.5 rounded-full px-3 py-1.5 text-xs font-extrabold ${
+                addressesLoaded && savedAddresses.length === 0
+                  ? "bg-brand text-white shadow-[0_8px_18px_rgba(237,23,28,0.2)]"
+                  : "bg-brand-soft text-brand"
+              }`}
             >
-              จัดการ
+              {addressesLoaded && savedAddresses.length === 0
+                ? "เพิ่มที่อยู่"
+                : "จัดการ"}
               <ChevronRight className="h-3.5 w-3.5" />
             </Link>
           </div>
 
+          {addressesLoaded && savedAddresses.length === 0 ? (
+            <div className="p-4">
+              <div className="rounded-[1.5rem] border border-brand/15 bg-brand-soft/60 p-4 text-center">
+                <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-brand shadow-sm">
+                  <MapPin className="h-7 w-7" />
+                </span>
+                <h2 className="mt-3 text-base font-extrabold text-ink">
+                  เพิ่มที่อยู่จัดส่งก่อนสั่งซื้อ
+                </h2>
+                <p className="mx-auto mt-1 max-w-xs text-xs font-semibold leading-relaxed text-ink-soft">
+                  ต้องมีชื่อผู้รับ เบอร์โทร และที่อยู่ เพื่อคำนวณค่าจัดส่งและเปิดปุ่มชำระเงิน
+                </p>
+                <Link
+                  href="/addresses"
+                  className="brand-button mt-4 inline-flex h-12 w-full items-center justify-center gap-2 rounded-full px-4 text-sm font-extrabold text-white shadow-[0_10px_24px_rgba(237,23,28,0.2)]"
+                >
+                  <Plus className="h-4 w-4" />
+                  เพิ่มที่อยู่จัดส่ง
+                </Link>
+              </div>
+            </div>
+          ) : (
           <div className="flex items-start gap-3 p-4">
             <span
               className={`mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${
@@ -1841,6 +1870,7 @@ export default function CheckoutPage({
               </div>
             </div>
           </div>
+          )}
 
           {addressPickerOpen && savedAddresses.length > 0 && (
             <div className="animate-fade-in border-t border-black/[0.05] bg-surface-muted/35 px-4 py-3">
