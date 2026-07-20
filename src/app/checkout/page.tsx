@@ -308,25 +308,19 @@ function getShippingEstimateText(rate: ShippingRateOption): string {
 }
 
 function getShippingOptionTitle(rate: ShippingRateOption): string {
-  if (rate.optionType === "cheapest") return "ถูกสุด";
-  if (rate.optionType === "best_value") return "คุ้มที่สุด";
-  if (rate.optionType === "fastest") return "เร็วสุด";
-  return "ปานกลาง";
+  if (rate.label) return rate.label;
+  return rate.optionType === "fastest" ? "เร็วที่สุด" : "คุ้มที่สุด";
 }
 
 function getShippingOptionHint(rate: ShippingRateOption): string {
-  if (rate.optionType === "cheapest") return "ตัวเลือกที่ราคาดีที่สุด";
-  if (rate.optionType === "best_value") return "ตัวเลือกที่คุ้มค่าที่สุด";
-  if (rate.optionType === "fastest") return "ตัวเลือกที่ถึงเร็วที่สุด";
-  return "ตัวเลือกปานกลาง";
+  return rate.optionType === "fastest"
+    ? "ตัวเลือกที่ถึงเร็วที่สุด"
+    : "คุ้มค่าจากราคาและเวลาจัดส่ง";
 }
 
 function getShippingOptionBadge(rate: ShippingRateOption): string {
   if (rate.label) return rate.label;
-  if (rate.optionType === "cheapest") return "ถูกสุด";
-  if (rate.optionType === "best_value") return "คุ้มที่สุด";
-  if (rate.optionType === "fastest") return "เร็วสุด";
-  return "ปานกลาง";
+  return rate.optionType === "fastest" ? "เร็วที่สุด" : "คุ้มที่สุด";
 }
 
 function getShippingOptionClasses(
@@ -339,8 +333,6 @@ function getShippingOptionClasses(
   badge: string;
   price: string;
 } {
-  const isCheap = rate.optionType === "cheapest";
-  const isBestValue = rate.optionType === "best_value";
   const isFast = rate.optionType === "fastest";
 
   if (selected) {
@@ -353,21 +345,12 @@ function getShippingOptionClasses(
         price: "text-brand",
       };
     }
-    if (isCheap || isBestValue) {
-      return {
-        card: "border-success bg-success-soft shadow-[0_10px_24px_rgba(25,135,84,0.12)]",
-        icon: "bg-success text-white",
-        title: "text-success",
-        badge: "bg-white text-success ring-1 ring-success/15",
-        price: "text-success",
-      };
-    }
     return {
-      card: "border-amber-300 bg-amber-50 shadow-[0_10px_24px_rgba(245,158,11,0.12)]",
-      icon: "bg-amber-500 text-white",
-      title: "text-amber-700",
-      badge: "bg-white text-amber-700 ring-1 ring-amber-200",
-      price: "text-amber-700",
+      card: "border-success bg-success-soft shadow-[0_10px_24px_rgba(25,135,84,0.12)]",
+      icon: "bg-success text-white",
+      title: "text-success",
+      badge: "bg-white text-success ring-1 ring-success/15",
+      price: "text-success",
     };
   }
 
@@ -381,21 +364,11 @@ function getShippingOptionClasses(
     };
   }
 
-  if (isCheap || isBestValue) {
-    return {
-      card: "border-success/15 bg-white hover:border-success/35",
-      icon: "bg-success-soft text-success",
-      title: "text-ink",
-      badge: "bg-success-soft text-success",
-      price: "text-ink",
-    };
-  }
-
   return {
-    card: "border-amber-200/70 bg-white hover:border-amber-300",
-    icon: "bg-amber-50 text-amber-600",
+    card: "border-success/15 bg-white hover:border-success/35",
+    icon: "bg-success-soft text-success",
     title: "text-ink",
-    badge: "bg-amber-50 text-amber-700",
+    badge: "bg-success-soft text-success",
     price: "text-ink",
   };
 }

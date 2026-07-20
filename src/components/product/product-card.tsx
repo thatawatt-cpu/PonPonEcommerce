@@ -8,7 +8,6 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Price } from "@/components/ui/price";
 import { ProductImage } from "@/components/product/product-image";
-import { cacheProductDetailSummary } from "@/features/products/product-detail-cache";
 import { markProductDetailNavigation } from "@/features/products/product-detail-navigation";
 import type { Product } from "@/types/product";
 
@@ -57,13 +56,11 @@ export function ProductCard({
   const productHref = `/products/${product.slug}`;
 
   const prefetchProductDetail = useCallback(() => {
-    cacheProductDetailSummary(product);
-
     if (prefetchedProductHrefs.has(productHref)) return;
 
     prefetchedProductHrefs.add(productHref);
     router.prefetch(productHref);
-  }, [product, productHref, router]);
+  }, [productHref, router]);
 
   useEffect(() => {
     const link = linkRef.current;
