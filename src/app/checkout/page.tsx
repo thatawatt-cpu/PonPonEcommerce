@@ -308,19 +308,17 @@ function getShippingEstimateText(rate: ShippingRateOption): string {
 }
 
 function getShippingOptionTitle(rate: ShippingRateOption): string {
-  if (rate.label) return rate.label;
-  return rate.optionType === "fastest" ? "เร็วที่สุด" : "คุ้มที่สุด";
+  return rate.optionType === "fastest" ? "ส่งด่วน" : "ส่งปกติ";
 }
 
 function getShippingOptionHint(rate: ShippingRateOption): string {
   return rate.optionType === "fastest"
-    ? "ตัวเลือกที่ถึงเร็วที่สุด"
-    : "คุ้มค่าจากราคาและเวลาจัดส่ง";
+    ? "เหมาะเมื่อต้องการได้รับสินค้าเร็วขึ้น"
+    : "ตัวเลือกเริ่มต้นที่เหมาะกับออเดอร์นี้";
 }
 
 function getShippingOptionBadge(rate: ShippingRateOption): string {
-  if (rate.label) return rate.label;
-  return rate.optionType === "fastest" ? "เร็วที่สุด" : "คุ้มที่สุด";
+  return rate.optionType === "fastest" ? "ส่งด่วน" : "ส่งปกติ";
 }
 
 function getShippingOptionClasses(
