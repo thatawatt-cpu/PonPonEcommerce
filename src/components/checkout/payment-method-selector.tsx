@@ -36,13 +36,13 @@ const BANK_ACCOUNTS = [
     id: "mobile_banking_ktb",
     name: "กรุงไทย",
     suffix: "NEXT",
-    logoSrc: null,
+    logoSrc: "/images/banks/ktb.svg",
   },
   {
     id: "mobile_banking_bay",
     name: "กรุงศรี",
     suffix: "KMA",
-    logoSrc: null,
+    logoSrc: "/images/banks/krungsri.svg",
   },
 ] satisfies {
   id: ApiMobileBankingType;
@@ -174,14 +174,14 @@ export function PaymentMethodSelector({
                       : "border-black/[0.07]"
                   )}
                 >
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white ring-1 ring-black/10">
+                  <span className="flex h-10 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white px-1 ring-1 ring-black/10">
                     {bank.logoSrc ? (
                       <Image
                         src={bank.logoSrc}
                         alt=""
-                        width={36}
-                        height={36}
-                        className="h-full w-full object-contain"
+                        width={48}
+                        height={40}
+                        className="max-h-full max-w-full object-contain"
                       />
                     ) : (
                       <span className="text-[9px] font-extrabold text-ink-soft">
