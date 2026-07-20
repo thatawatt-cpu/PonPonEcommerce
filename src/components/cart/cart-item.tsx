@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { ProductImage } from "@/components/product/product-image";
 import { QuantitySelector } from "@/components/product/quantity-selector";
 import { Price } from "@/components/ui/price";
+import { markProductDetailNavigation } from "@/features/products/product-detail-navigation";
 import { getCartItemKey, useCartStore } from "@/store/cart-store";
 import { cn } from "@/lib/utils";
 import type { CartItem as CartItemType } from "@/types/cart";
@@ -37,6 +38,7 @@ export function CartItem({ item, checked = false, onCheckedChange }: CartItemPro
   const productHref = `/products/${encodeURIComponent(productPath)}?${editParams.toString()}`;
 
   const openProduct = () => {
+    markProductDetailNavigation();
     router.push(productHref);
   };
 

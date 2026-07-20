@@ -51,6 +51,7 @@ import {
   recordRecentlyViewed,
   removeWishlistProduct,
 } from "@/features/customers/customer-engagement-api";
+import { consumeProductDetailScrollTop } from "@/features/products/product-detail-navigation";
 import { storePendingCouponCode } from "@/features/coupons/pending-coupon";
 import { cn } from "@/lib/utils";
 import type { ApiCouponListItem, ApiShopProductDetailResponse } from "@/types/api";
@@ -692,6 +693,16 @@ export function ProductDetailClient({
       controller.abort();
     };
   }, [initialProduct.slug]);
+
+  useEffect(() => {
+    if (!consumeProductDetailScrollTop()) return;
+
+    const frame = window.requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [product.id]);
 
   useEffect(() => {
     recordRecentlyViewed({ productId: product.id }).catch((error: unknown) => {

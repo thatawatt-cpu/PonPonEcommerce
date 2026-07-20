@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowUpRight, ChevronRight, Zap } from "lucide-react";
 import { ProductImage } from "@/components/product/product-image";
+import { markProductDetailNavigation } from "@/features/products/product-detail-navigation";
 import { getDiscountPercent } from "@/features/products/product-utils";
 import { formatBaht } from "@/lib/format";
 import type { Product } from "@/types/product";
@@ -118,7 +119,11 @@ function FlashSaleItem({ product, priority = false }: { product: Product; priori
 
   return (
     <article className="home-panel-shadow w-32 shrink-0 snap-start overflow-hidden rounded-2xl bg-white ring-1 ring-black/[0.04] md:w-40 lg:w-44">
-      <Link href={`/products/${product.slug}`} className="group block">
+      <Link
+        href={`/products/${product.slug}`}
+        onClick={markProductDetailNavigation}
+        className="group block"
+      >
         <div className="relative">
           <ProductImage
             imageUrl={product.imageUrl}

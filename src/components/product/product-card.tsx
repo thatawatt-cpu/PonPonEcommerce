@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Price } from "@/components/ui/price";
 import { ProductImage } from "@/components/product/product-image";
 import { cacheProductDetailSummary } from "@/features/products/product-detail-cache";
+import { markProductDetailNavigation } from "@/features/products/product-detail-navigation";
 import type { Product } from "@/types/product";
 
 const prefetchedProductHrefs = new Set<string>();
@@ -101,6 +102,7 @@ export function ProductCard({
         ref={linkRef}
         href={productHref}
         prefetch={false}
+        onClick={markProductDetailNavigation}
         className="flex flex-1 flex-col"
       >
         <div className="relative overflow-hidden">

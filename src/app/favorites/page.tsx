@@ -13,6 +13,7 @@ import {
   fetchWishlist,
   removeWishlistProduct,
 } from "@/features/customers/customer-engagement-api";
+import { markProductDetailNavigation } from "@/features/products/product-detail-navigation";
 import {
   useFavoriteStore,
   useFavoritesHydrated,
@@ -124,6 +125,7 @@ export default function FavoritesPage() {
                 >
                   <Link
                     href={`/products/${product.slug}`}
+                    onClick={markProductDetailNavigation}
                     className="flex min-w-0 flex-1 items-center gap-3"
                   >
                     <ProductImage
