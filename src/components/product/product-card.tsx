@@ -102,6 +102,7 @@ export function ProductCard({
         ref={linkRef}
         href={productHref}
         prefetch={false}
+        scroll
         onClick={markProductDetailNavigation}
         className="flex flex-1 flex-col"
       >

@@ -121,6 +121,7 @@ function FlashSaleItem({ product, priority = false }: { product: Product; priori
     <article className="home-panel-shadow w-32 shrink-0 snap-start overflow-hidden rounded-2xl bg-white ring-1 ring-black/[0.04] md:w-40 lg:w-44">
       <Link
         href={`/products/${product.slug}`}
+        scroll
         onClick={markProductDetailNavigation}
         className="group block"
       >

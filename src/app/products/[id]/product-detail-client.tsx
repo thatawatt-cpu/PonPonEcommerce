@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
@@ -695,7 +695,7 @@ export function ProductDetailClient({
     };
   }, [initialProduct.slug]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!consumeProductDetailScrollTop()) return;
 
     let cancelled = false;

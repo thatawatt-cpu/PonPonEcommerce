@@ -1,6 +1,8 @@
 "use client";
 
+import { useLayoutEffect } from "react";
 import { usePathname } from "next/navigation";
+import { Loader2 } from "lucide-react";
 import { AppHeader } from "@/components/layout/app-header";
 import { PageContainer } from "@/components/layout/page-container";
 import { ProductImage } from "@/components/product/product-image";
@@ -9,14 +11,7 @@ import {
   getCachedProductDetailSummary,
   type CachedProductDetailSummary,
 } from "@/features/products/product-detail-cache";
-
-function SkeletonLine({ className = "" }: { className?: string }) {
-  return (
-    <div
-      className={`animate-pulse rounded-full bg-surface-muted ${className}`}
-    />
-  );
-}
+import { shouldScrollProductDetailToTop } from "@/features/products/product-detail-navigation";
 
 function formatSoldCount(count?: number): string | null {
   if (!count || count <= 0) return null;
@@ -66,9 +61,7 @@ function CachedProductHero({
               </span>
             ))}
           </div>
-        ) : (
-          <SkeletonLine className="h-4 w-24 bg-brand/15" />
-        )}
+        ) : null}
 
         <h1 className="line-clamp-2 text-xl font-extrabold leading-snug text-ink">
           {product.name}
@@ -93,17 +86,21 @@ function CachedProductHero({
 
 function GenericProductHero() {
   return (
-    <div className="overflow-hidden rounded-card bg-white shadow-sm ring-1 ring-black/[0.04]">
-      <div className="aspect-square w-full animate-pulse bg-surface-muted md:aspect-[16/10]" />
-      <div className="space-y-3 p-4">
-        <SkeletonLine className="h-4 w-24 bg-brand/15" />
-        <SkeletonLine className="h-6 w-4/5" />
-        <SkeletonLine className="h-6 w-2/3" />
-        <div className="flex items-center justify-between gap-3 pt-1">
-          <SkeletonLine className="h-8 w-28 bg-brand/15" />
-          <SkeletonLine className="h-7 w-20" />
-        </div>
+    <div className="rounded-card bg-white px-4 py-12 text-center shadow-sm ring-1 ring-black/[0.04]">
+      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-brand-soft text-brand">
+        <Loader2 className="h-6 w-6 animate-spin" />
       </div>
+      <p className="mt-4 text-sm font-extrabold text-ink">กำลังเปิดสินค้า</p>
+      <p className="mt-1 text-xs font-medium text-ink-soft">รอสักครู่</p>
+    </div>
+  );
+}
+
+function LoadingStatus() {
+  return (
+    <div className="mt-3 flex items-center justify-center gap-2 rounded-card bg-white/80 px-4 py-3 text-xs font-bold text-ink-soft ring-1 ring-black/[0.04]">
+      <Loader2 className="h-4 w-4 animate-spin text-brand" />
+      กำลังโหลดรายละเอียดสินค้า
     </div>
   );
 }
@@ -112,6 +109,14 @@ export function ProductDetailLoadingClient() {
   const pathname = usePathname();
   const slug = getProductSlugFromPath(pathname);
   const cachedProduct = getCachedProductDetailSummary(slug);
+
+  useLayoutEffect(() => {
+    if (!shouldScrollProductDetailToTop()) return;
+
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+  }, []);
 
   return (
     <>
@@ -123,35 +128,8 @@ export function ProductDetailLoadingClient() {
           <GenericProductHero />
         )}
 
-        <div className="mt-3 grid grid-cols-4 gap-2">
-          {Array.from({ length: 4 }).map((_, index) => (
-            <div
-              key={index}
-              className="aspect-square animate-pulse rounded-2xl bg-white/80 ring-1 ring-black/[0.04]"
-            />
-          ))}
-        </div>
-
-        <div className="mt-3 space-y-3 rounded-card bg-white p-4 shadow-sm ring-1 ring-black/[0.04]">
-          <SkeletonLine className="h-4 w-32" />
-          <SkeletonLine className="h-11 w-full rounded-2xl" />
-          <SkeletonLine className="h-11 w-full rounded-2xl" />
-        </div>
-
-        <div className="mt-3 space-y-3 rounded-card bg-white p-4 shadow-sm ring-1 ring-black/[0.04]">
-          <SkeletonLine className="h-4 w-28" />
-          <SkeletonLine className="h-3 w-full" />
-          <SkeletonLine className="h-3 w-11/12" />
-          <SkeletonLine className="h-3 w-3/4" />
-        </div>
+        <LoadingStatus />
       </PageContainer>
-
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-black/[0.05] bg-white/95 px-3.5 py-3 shadow-[0_-10px_30px_rgba(65,25,25,0.08)] backdrop-blur">
-        <div className="mx-auto flex max-w-md gap-2 md:max-w-3xl">
-          <div className="h-12 flex-1 animate-pulse rounded-2xl bg-brand/10" />
-          <div className="h-12 flex-[1.2] animate-pulse rounded-2xl bg-brand/20" />
-        </div>
-      </div>
     </>
   );
 }

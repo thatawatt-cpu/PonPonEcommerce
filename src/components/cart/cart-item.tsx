@@ -39,7 +39,7 @@ export function CartItem({ item, checked = false, onCheckedChange }: CartItemPro
 
   const openProduct = () => {
     markProductDetailNavigation();
-    router.push(productHref);
+    router.push(productHref, { scroll: true });
   };
 
   return (

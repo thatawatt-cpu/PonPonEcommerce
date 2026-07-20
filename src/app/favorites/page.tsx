@@ -125,6 +125,7 @@ export default function FavoritesPage() {
                 >
                   <Link
                     href={`/products/${product.slug}`}
+                    scroll
                     onClick={markProductDetailNavigation}
                     className="flex min-w-0 flex-1 items-center gap-3"
                   >

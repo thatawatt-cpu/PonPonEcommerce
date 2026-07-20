@@ -28,6 +28,7 @@ export function ReorderSection({ products }: { products: Product[] }) {
           <Link
             key={product.id}
             href={`/products/${product.slug}`}
+            scroll
             onClick={markProductDetailNavigation}
             className="home-panel-shadow group flex min-w-64 items-center gap-3 rounded-card bg-white p-2.5 ring-1 ring-black/[0.04] md:min-w-0"
           >

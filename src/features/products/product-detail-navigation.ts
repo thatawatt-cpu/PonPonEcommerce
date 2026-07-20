@@ -18,6 +18,12 @@ export function markProductDetailNavigation(): void {
   window.sessionStorage.setItem(PRODUCT_DETAIL_SCROLL_TOP_KEY, "1");
 }
 
+export function shouldScrollProductDetailToTop(): boolean {
+  if (!canUseSessionStorage()) return false;
+
+  return window.sessionStorage.getItem(PRODUCT_DETAIL_SCROLL_TOP_KEY) === "1";
+}
+
 export function consumeProductDetailScrollTop(): boolean {
   if (!canUseSessionStorage()) return false;
 
