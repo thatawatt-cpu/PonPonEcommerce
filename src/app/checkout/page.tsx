@@ -309,12 +309,14 @@ function getShippingEstimateText(rate: ShippingRateOption): string {
 
 function getShippingOptionTitle(rate: ShippingRateOption): string {
   if (rate.optionType === "cheapest") return "ถูกสุด";
+  if (rate.optionType === "best_value") return "คุ้มที่สุด";
   if (rate.optionType === "fastest") return "เร็วสุด";
   return "ปานกลาง";
 }
 
 function getShippingOptionHint(rate: ShippingRateOption): string {
   if (rate.optionType === "cheapest") return "ตัวเลือกที่ราคาดีที่สุด";
+  if (rate.optionType === "best_value") return "ตัวเลือกที่คุ้มค่าที่สุด";
   if (rate.optionType === "fastest") return "ตัวเลือกที่ถึงเร็วที่สุด";
   return "ตัวเลือกปานกลาง";
 }
@@ -322,6 +324,7 @@ function getShippingOptionHint(rate: ShippingRateOption): string {
 function getShippingOptionBadge(rate: ShippingRateOption): string {
   if (rate.label) return rate.label;
   if (rate.optionType === "cheapest") return "ถูกสุด";
+  if (rate.optionType === "best_value") return "คุ้มที่สุด";
   if (rate.optionType === "fastest") return "เร็วสุด";
   return "ปานกลาง";
 }
@@ -337,6 +340,7 @@ function getShippingOptionClasses(
   price: string;
 } {
   const isCheap = rate.optionType === "cheapest";
+  const isBestValue = rate.optionType === "best_value";
   const isFast = rate.optionType === "fastest";
 
   if (selected) {
@@ -349,7 +353,7 @@ function getShippingOptionClasses(
         price: "text-brand",
       };
     }
-    if (isCheap) {
+    if (isCheap || isBestValue) {
       return {
         card: "border-success bg-success-soft shadow-[0_10px_24px_rgba(25,135,84,0.12)]",
         icon: "bg-success text-white",
@@ -377,7 +381,7 @@ function getShippingOptionClasses(
     };
   }
 
-  if (isCheap) {
+  if (isCheap || isBestValue) {
     return {
       card: "border-success/15 bg-white hover:border-success/35",
       icon: "bg-success-soft text-success",
