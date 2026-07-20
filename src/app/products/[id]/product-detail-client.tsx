@@ -73,6 +73,7 @@ const ANONYMOUS_REVIEW_AVATAR_URL =
   "/images/review-anonymous.png";
 const DEFAULT_REVIEW_AVATAR_URL = "/images/review-default.png";
 const DEFERRED_DETAIL_ROOT_MARGIN = "700px 0px";
+const PRODUCT_DETAIL_ENTRY_SCROLL_RETRY_DELAYS_MS = [0, 80, 180, 360];
 
 interface ProductCoupon {
   id: string;
@@ -697,11 +698,26 @@ export function ProductDetailClient({
   useEffect(() => {
     if (!consumeProductDetailScrollTop()) return;
 
-    const frame = window.requestAnimationFrame(() => {
-      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
-    });
+    let cancelled = false;
+    const scrollToTop = () => {
+      if (cancelled) return;
 
-    return () => window.cancelAnimationFrame(frame);
+      window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    };
+
+    scrollToTop();
+    const frame = window.requestAnimationFrame(scrollToTop);
+    const timers = PRODUCT_DETAIL_ENTRY_SCROLL_RETRY_DELAYS_MS.map((delay) =>
+      window.setTimeout(scrollToTop, delay)
+    );
+
+    return () => {
+      cancelled = true;
+      window.cancelAnimationFrame(frame);
+      timers.forEach((timer) => window.clearTimeout(timer));
+    };
   }, [product.id]);
 
   useEffect(() => {
